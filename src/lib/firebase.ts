@@ -1,11 +1,13 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { getDatabase } from 'firebase/database';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId); /* CRITICAL: The app will break without this line */
 export const auth = getAuth(app);
+export const rtdb = getDatabase(app, "https://livingstoneedu-17aad-default-rtdb.firebaseio.com/");
 
 // Connectivity check with delayed retries to avoid startup race conditions
 async function testConnection(retries = 3, delayMs = 2000) {

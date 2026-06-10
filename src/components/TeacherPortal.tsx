@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { User, ClassLevel, TeacherClassSetup, TeacherStudent, AIExam, QuizQuestion } from '../types';
 import { getSubjectsForClass } from '../data/curriculum';
+import { rtdbGet, NODES } from '../lib/rtdbService';
 
 interface TeacherPortalProps {
   user: User;
@@ -65,15 +66,46 @@ export function TeacherPortal({ user, onNavigateToHome, isPro, onPaymentTrigger 
     setUserAnswers({});
     setShowAnswerKey(false);
     try {
+      // 1. Retrieve curriculum topic from Firebase Realtime Database curriculum node
+      const rtdbCurriculum = await rtdbGet(NODES.CURRICULUM);
+      let matchedCurriculum: any = null;
+      
+      const targetTerm = selectedTerm; // e.g. "1st Term"
+      const targetWeek = selectedWeek; // number
+      const targetClass = selectedClass; // e.g. "SS 1"
+      const targetSubject = selectedSubject; // e.g. "Mathematics"
+
+      if (rtdbCurriculum) {
+        const keys = Object.keys(rtdbCurriculum);
+        for (const k of keys) {
+          const item = rtdbCurriculum[k];
+          if (
+            item &&
+            String(item.class).toLowerCase() === targetClass.toLowerCase() &&
+            String(item.subject).toLowerCase() === targetSubject.toLowerCase() &&
+            String(item.term).toLowerCase() === targetTerm.toLowerCase() &&
+            Number(item.week) === Number(targetWeek)
+          ) {
+            matchedCurriculum = item;
+            break;
+          }
+        }
+      }
+
+      if (!matchedCurriculum) {
+        throw new Error(`Could not locate an official registered school curriculum in database for Class: ${targetClass}, Subject: ${targetSubject}, Term: ${targetTerm}, Week: ${targetWeek}. Please check the Admin Panel curriculum tab!`);
+      }
+
       const res = await fetch('/api/gemini/generate-lesson-note', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          classLevel: selectedClass,
-          subject: selectedSubject,
-          term: selectedTerm,
-          week: `Week ${selectedWeek}`,
-          focusTopic: customTopic,
+          classLevel: matchedCurriculum.class,
+          subject: matchedCurriculum.subject,
+          term: matchedCurriculum.term,
+          week: `Week ${matchedCurriculum.week}`,
+          focusTopic: matchedCurriculum.topic,
+          topicDescription: matchedCurriculum.details,
           isEndOfTerm: isEndOfTerm
         })
       });

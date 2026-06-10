@@ -15,6 +15,9 @@ import { PaymentModal } from './components/PaymentModal';
 import { AdminPanel } from './components/AdminPanel';
 import { syncUserProfile, syncLessonProgress } from './lib/firebaseSync';
 import { GraduationCap, LogOut, Home, BookOpen, HelpCircle, MessageSquare, ShieldCheck, Heart, Trophy, Award, Zap, Sparkles, Mail } from 'lucide-react';
+import { seedRtdbIfEmpty, rtdbSubscribe, rtdbSet, rtdbGet, NODES } from './lib/rtdbService';
+import { auth } from './lib/firebase';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -24,6 +27,22 @@ export default function App() {
   const [isCustomizingSubjects, setIsCustomizingSubjects] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [demoUsageCount, setDemoUsageCount] = useState<number>(0);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
+  const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const [isSimulatedOffline, setIsSimulatedOffline] = useState<boolean>(false);
+  const effectiveIsOnline = isOnline && !isSimulatedOffline;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Dynamic branding configurations state loaded from full stack JSON DB
   const [appConfig, setAppConfig] = useState({
@@ -87,35 +106,83 @@ export default function App() {
     }
   }, [appConfig.logoColor]);
 
-  // Hot reload config setting parameters from server
+  // 1. Database seeding, dynamic branding subscription, and Firebase Auth listener
   useEffect(() => {
-    fetch('/api/admin/config')
-      .then(res => {
-        if (res.ok) return res.json();
-        throw new Error();
-      })
-      .then(data => {
-        if (data && data.brandName) {
-          setAppConfig({
-            brandName: data.brandName,
-            appSubtitle: data.appSubtitle || 'Syllabus Portal',
-            proPrice: data.proPrice || '₦5,000',
-            supportGroupUrl: data.supportGroupUrl || 'https://wa.me/message/AJ4NILOGBTTMJ1',
-            contactName: data.contactName || 'Livingtch Brand Agency',
-            logoIcon: data.logoIcon || 'GraduationCap',
-            logoColor: data.logoColor || 'blue',
-            logoText: data.logoText || 'LIVINGSTONE',
-            activeGateway: data.activeGateway || 'Paystack',
-            isPaymentLive: !!data.isPaymentLive,
-            paystackPublicKey: data.paystackPublicKey || '',
-            flutterwavePublicKey: data.flutterwavePublicKey || '',
-            stripePublicKey: data.stripePublicKey || ''
+    let unsubBranding: (() => void) | null = null;
+
+    // Listen to Firebase Auth state changes
+    const unsubAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser && firebaseUser.email) {
+        const cleanEmail = firebaseUser.email.toLowerCase();
+        const id = cleanEmail.replace(/[.@]/g, '_');
+        
+        // Seed database with default structure if empty (safely once authenticated)
+        seedRtdbIfEmpty();
+
+        // Subscribe to dynamic branding configurations on Firebase RTDB safely
+        if (!unsubBranding) {
+          unsubBranding = rtdbSubscribe(NODES.SCHOOL_SETTINGS, (data) => {
+            if (data && data.brandName) {
+              setAppConfig({
+                brandName: data.brandName,
+                appSubtitle: data.appSubtitle || 'Syllabus Portal',
+                proPrice: data.proPrice || '₦5,000',
+                supportGroupUrl: data.supportGroupUrl || 'https://wa.me/message/AJ4NILOGBTTMJ1',
+                contactName: data.contactName || 'Livingtch Brand Agency',
+                logoIcon: data.logoIcon || 'GraduationCap',
+                logoColor: data.logoColor || 'blue',
+                logoText: data.logoText || 'LIVINGSTONE',
+                activeGateway: data.activeGateway || 'Paystack',
+                isPaymentLive: !!data.isPaymentLive,
+                paystackPublicKey: data.paystackPublicKey || '',
+                flutterwavePublicKey: data.flutterwavePublicKey || '',
+                stripePublicKey: data.stripePublicKey || ''
+              });
+            }
           });
         }
-      })
-      .catch(() => {
-        console.log("Working in static offline demo branding mode.");
-      });
+
+        // Grab full loaded user profile from RTDB
+        const userProfile = await rtdbGet(`${NODES.USERS}/${id}`);
+        if (userProfile) {
+          setCurrentUser(userProfile);
+          localStorage.setItem('hub_active_user', JSON.stringify(userProfile));
+        } else {
+          // Build fallback profile if logged in but DB records aren't ready yet
+          const fallbackProfile: User = {
+            id,
+            fullName: cleanEmail.split('@')[0],
+            email: cleanEmail,
+            avatarSeed: 'scholar',
+            role: cleanEmail === 'toped18@gmail.com' ? 'admin' : 'student',
+            joinDate: new Date().toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
+          };
+          setCurrentUser(fallbackProfile);
+          localStorage.setItem('hub_active_user', JSON.stringify(fallbackProfile));
+        }
+      } else {
+        // Logout or unauthenticated
+        if (unsubBranding) {
+          unsubBranding();
+          unsubBranding = null;
+        }
+
+        // Double check local storage if no user logged in to ease refresh
+        const loadedProfile = localStorage.getItem('hub_active_user');
+        if (loadedProfile) {
+          setCurrentUser(JSON.parse(loadedProfile));
+        } else {
+          setCurrentUser(null);
+        }
+      }
+    });
+
+    return () => {
+      if (unsubBranding) {
+        unsubBranding();
+      }
+      unsubAuth();
+    };
   }, []);
 
   // Sync/Load demo usage count
@@ -244,10 +311,16 @@ export default function App() {
 
   // 3. Event: Sign Out / Reset session
   const handleSignOut = () => {
-    setCurrentUser(null);
-    localStorage.removeItem('hub_active_user');
-    // We keep historical progresses in localStorage so other students don't lose records
-    setActiveTab('home');
+    signOut(auth).then(() => {
+      setCurrentUser(null);
+      localStorage.removeItem('hub_active_user');
+      setActiveTab('home');
+    }).catch((err) => {
+      console.error("Sign out error:", err);
+      setCurrentUser(null);
+      localStorage.removeItem('hub_active_user');
+      setActiveTab('home');
+    });
   };
 
   // Payment Upgrade Callback Handler
@@ -454,6 +527,11 @@ export default function App() {
             onClose={() => setIsPaymentModalOpen(false)}
             brandName={appConfig.brandName}
             proPrice={appConfig.proPrice}
+            paystackLink={(appConfig as any).paystackLink}
+            flutterwaveLink={(appConfig as any).flutterwaveLink}
+            bankName={(appConfig as any).bankName}
+            bankAccountNumber={(appConfig as any).bankAccountNumber}
+            bankAccountName={(appConfig as any).bankAccountName}
           />
         )}
       </div>
@@ -470,6 +548,11 @@ export default function App() {
           onClose={() => setIsPaymentModalOpen(false)}
           brandName={appConfig.brandName}
           proPrice={appConfig.proPrice}
+          paystackLink={(appConfig as any).paystackLink}
+          flutterwaveLink={(appConfig as any).flutterwaveLink}
+          bankName={(appConfig as any).bankName}
+          bankAccountNumber={(appConfig as any).bankAccountNumber}
+          bankAccountName={(appConfig as any).bankAccountName}
         />
       )}
       
@@ -581,6 +664,27 @@ export default function App() {
 
             {/* User Profile Summary trigger */}
             <div className="flex items-center gap-3">
+              {/* Network Connectivity status with simulated toggling capability */}
+              {!effectiveIsOnline ? (
+                <div 
+                  onClick={() => setIsSimulatedOffline(false)}
+                  className="flex items-center gap-1.5 px-3 py-1 bg-red-50 text-red-700 rounded-lg border border-red-200 text-[10px] font-extrabold uppercase tracking-wider animate-pulse hover:bg-red-100 transition cursor-pointer" 
+                  title="Offline Mode: Progress is cached locally and will sync once you reconnect to the internet in pro version. Click to reconnect!"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping"></span>
+                  <span>Offline Caching</span>
+                </div>
+              ) : (
+                <div 
+                  onClick={() => setIsSimulatedOffline(true)}
+                  className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-155 text-[10px] font-extrabold uppercase tracking-wider hover:bg-emerald-100/60 transition cursor-pointer" 
+                  title="All systems synchronized. Click to simulate Offline mode!"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                  <span>Connected</span>
+                </div>
+              )}
+
               {currentUser?.isPro ? (
                 <div className="hidden xs:flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-750 rounded-lg border border-amber-200 text-[10px] font-black uppercase tracking-wider">
                   <Sparkles size={11} className="fill-amber-400 text-amber-550" />
@@ -705,30 +809,33 @@ export default function App() {
             <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
             <p className="text-xs text-slate-500 font-medium">Re-tuning curriculum mapping...</p>
           </div>
+        ) : isCustomizingSubjects ? (
+          <div className="max-w-2xl mx-auto py-4 animate-fade-in">
+            <SubjectSelector 
+              user={currentUser}
+              onSave={(ids) => {
+                handleSaveSubjectSelection(ids);
+                setIsCustomizingSubjects(false);
+              }}
+              onCancel={() => setIsCustomizingSubjects(false)}
+              isSettingsView={true}
+            />
+          </div>
         ) : (
           <>
             {activeTab === 'home' && (
-              isCustomizingSubjects ? (
-                <div className="max-w-2xl mx-auto py-4 animate-fade-in">
-                  <SubjectSelector 
-                    user={currentUser}
-                    onSave={(ids) => {
-                      handleSaveSubjectSelection(ids);
-                      setIsCustomizingSubjects(false);
-                    }}
-                    onCancel={() => setIsCustomizingSubjects(false)}
-                    isSettingsView={true}
-                  />
-                </div>
-              ) : (
-                <HomeDashboard 
-                  user={currentUser} 
-                  progressList={progressList} 
-                  onNavigateToHub={() => setActiveTab('hub')}
-                  onClassChange={handleClassChange}
-                  onCustomizeSubjects={() => setIsCustomizingSubjects(true)}
-                />
-              )
+              <HomeDashboard 
+                user={currentUser} 
+                progressList={progressList} 
+                onNavigateToHub={(subjectId) => {
+                  if (subjectId) {
+                    setSelectedSubjectId(subjectId);
+                  }
+                  setActiveTab('hub');
+                }}
+                onClassChange={handleClassChange}
+                onCustomizeSubjects={() => setIsCustomizingSubjects(true)}
+              />
             )}
 
             {activeTab === 'hub' && (
@@ -741,6 +848,8 @@ export default function App() {
                 demoUsageCount={demoUsageCount}
                 onIncrementDemoUsage={handleIncrementDemoUsage}
                 onCustomizeSubjects={() => setIsCustomizingSubjects(true)}
+                selectedSubjectId={selectedSubjectId}
+                setSelectedSubjectId={setSelectedSubjectId}
               />
             )}
 

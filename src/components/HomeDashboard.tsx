@@ -7,7 +7,7 @@ import { Award, BookOpen, Clock, CheckCircle, GraduationCap, Flame, Star, Trophy
 interface HomeDashboardProps {
   user: User;
   progressList: LessonProgress[];
-  onNavigateToHub: () => void;
+  onNavigateToHub: (subjectId?: string) => void;
   onClassChange: (newClass: ClassLevel) => void;
   onCustomizeSubjects: () => void;
 }
@@ -173,7 +173,7 @@ export function HomeDashboard({ user, progressList, onNavigateToHub, onClassChan
               return (
                 <div
                   key={subj.id}
-                  onClick={onNavigateToHub}
+                  onClick={() => onNavigateToHub(subj.id)}
                   className="group bg-white p-5 rounded-2xl border border-slate-100 hover:border-blue-300 hover:shadow-md transition duration-200 cursor-pointer flex flex-col justify-between gap-4"
                 >
                   <div className="space-y-3">
@@ -273,15 +273,19 @@ export function HomeDashboard({ user, progressList, onNavigateToHub, onClassChan
                 Click any standard class tier below to re-tune your subjects and curriculum instantly.
               </p>
               
-              <div className="grid grid-cols-2 gap-1.5">
-                {(['Primary 3', 'Primary 6', 'JSS 3', 'SS 3'] as ClassLevel[]).map((cls) => (
+              <div className="grid grid-cols-3 gap-1.5">
+                {([
+                  'Primary 1', 'Primary 2', 'Primary 3', 'Primary 4', 'Primary 5', 'Primary 6',
+                  'JSS 1', 'JSS 2', 'JSS 3',
+                  'SS 1', 'SS 2', 'SS 3'
+                ] as ClassLevel[]).map((cls) => (
                   <button
                     key={cls}
                     type="button"
                     onClick={() => onClassChange(cls)}
-                    className={`py-1.5 px-2.5 rounded-lg text-xs font-semibold border text-center transition ${
+                    className={`py-1.5 px-0.5 rounded-lg text-[10px] font-bold border text-center transition ${
                       user.classLevel === cls 
-                        ? 'border-blue-650 bg-blue-50/50 text-blue-800'
+                        ? 'border-blue-650 bg-blue-50/50 text-blue-800 font-extrabold shadow-sm'
                         : 'border-slate-200 text-slate-600 bg-white hover:bg-slate-50'
                     }`}
                   >

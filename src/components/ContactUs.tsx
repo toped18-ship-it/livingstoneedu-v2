@@ -47,44 +47,16 @@ export function ContactUs({
       return;
     }
 
-    const newMessage: ContactMessage = {
-      id: 'msg_' + Date.now().toString(),
-      name: name.trim(),
-      email: email.trim().toLowerCase(),
-      subject,
-      message: message.trim(),
-      timestamp: new Date().toLocaleDateString('en-NG', {
-        day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
-      }),
-      replyStatus: 'Pending'
-    };
-
-    const updated = [newMessage, ...messages];
-    setMessages(updated);
-    localStorage.setItem('hub_inquiries', JSON.stringify(updated));
-    syncContactMessage(newMessage); // Sync to Firestore match specifications
-
-    // Post to backend system and activity logger in parallel (fire-and-forget for snappy feedback)
-    fetch('/api/admin/add-inquiry', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
-        subject,
-        message: message.trim()
-      })
-    }).catch(err => console.warn("Backend add-inquiry offline sync", err));
-
+    // Dispatch a light activity log so the portal knows a WhatsApp session has been initiated
     fetch('/api/admin/log-activity', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         userName: user.fullName || name.trim(),
         userEmail: user.email || email.trim().toLowerCase(),
-        activityType: 'Submit Inquiry',
+        activityType: 'WhatsApp Inquiry',
         subject: subject,
-        detail: `Submitted academic inquiry on theme: "${subject}"`
+        detail: `Initiated direct WhatsApp help chat on curriculum theme: "${subject}"`
       })
     }).catch(err => console.warn("Backend log-activity sync", err));
 

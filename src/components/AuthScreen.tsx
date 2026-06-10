@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { ClassLevel } from '../types';
 import { ALL_CLASSES } from '../data/curriculum';
 import { BookOpen, User, Mail, GraduationCap, ArrowRight, Sparkles, Check, Lock } from 'lucide-react';
+import { auth } from '../lib/firebase';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { rtdbGet, rtdbSet, NODES } from '../lib/rtdbService';
 
 interface AuthScreenProps {
   onAuthComplete: (user: { fullName: string; email: string; classLevel?: ClassLevel; avatarSeed: string; role?: 'student' | 'teacher' | 'admin'; schoolName?: string }) => void;
@@ -35,7 +38,7 @@ export function AuthScreen({ onAuthComplete }: AuthScreenProps) {
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -57,95 +60,132 @@ export function AuthScreen({ onAuthComplete }: AuthScreenProps) {
         return;
       }
       
-      // Save credentials locally
-      const mockUserList = JSON.parse(localStorage.getItem('hub_users') || '[]');
-      const userExists = mockUserList.some((u: any) => u.email.toLowerCase() === email.toLowerCase());
-      
-      if (userExists) {
-        setError('An account with this email already exists. Try signing in!');
-        return;
+      const cleanEmail = email.trim().toLowerCase();
+      const id = cleanEmail.replace(/[.@]/g, '_');
+
+      try {
+        // 1. Create user in Firebase Authentication
+        await createUserWithEmailAndPassword(auth, cleanEmail, signupPassword).catch((authErr) => {
+          if (authErr && authErr.code === 'auth/email-already-in-use') {
+            throw new Error('An account with this email already exists in Firebase Auth. Try signing in!');
+          }
+          throw authErr;
+        });
+
+        const newUser = {
+          id,
+          fullName: fullName.trim(),
+          email: cleanEmail,
+          avatarSeed,
+          role,
+          schoolName: role === 'teacher' ? schoolName.trim() : undefined,
+          joinDate: new Date().toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
+        };
+
+        // 2. Save to rtdb USERS node
+        await rtdbSet(`${NODES.USERS}/${id}`, newUser);
+
+        // 3. Save to STUDENTS or TEACHERS node as requested by CRUD rules
+        if (role === 'teacher') {
+          await rtdbSet(`${NODES.TEACHERS}/${id}`, {
+            id,
+            name: fullName.trim(),
+            email: cleanEmail,
+            schoolName: schoolName.trim(),
+            joinDate: newUser.joinDate
+          });
+        } else {
+          await rtdbSet(`${NODES.STUDENTS}/${id}`, {
+            id,
+            name: fullName.trim(),
+            email: cleanEmail,
+            classLevel: 'SS 1',
+            joinDate: newUser.joinDate
+          });
+        }
+
+        onAuthComplete(newUser);
+
+        // Try dispatching email notifications async
+        fetch('/api/notify-signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fullName: newUser.fullName,
+            email: newUser.email,
+            role: newUser.role,
+            schoolName: newUser.schoolName || 'Livingstone Educational Academy'
+          })
+        }).catch(err => console.error('Failed to dispatch signup emails:', err));
+
+      } catch (err: any) {
+        setError(err.message || 'Firebase Registration failed.');
       }
-
-      const newUser = {
-        fullName: fullName.trim(),
-        email: email.trim().toLowerCase(),
-        password: signupPassword,
-        avatarSeed,
-        role,
-        schoolName: role === 'teacher' ? schoolName.trim() : undefined,
-        id: 'user_' + Date.now().toString()
-      };
-
-      mockUserList.push(newUser);
-      localStorage.setItem('hub_users', JSON.stringify(mockUserList));
-      onAuthComplete(newUser);
-
-      // Trigger automatic Gmail notification & welcome onboarding emails
-      fetch('/api/notify-signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fullName: newUser.fullName,
-          email: newUser.email,
-          role: newUser.role,
-          schoolName: newUser.schoolName || 'Livingstone Educational Academy'
-        })
-      }).catch(err => console.error('Failed to dispatch signup emails:', err));
     } else {
-      // Sign In Logic
+      // Sign In Logic with Firebase Authentication
       if (!loginEmail.trim() || !loginEmail.includes('@')) {
         setError('Please enter a valid email address');
         return;
       }
 
-      const lowerEmail = loginEmail.trim().toLowerCase();
-      const isOwnerEmail = lowerEmail === 'toped18@gmail.com';
+      const cleanEmail = loginEmail.trim().toLowerCase();
+      const id = cleanEmail.replace(/[.@]/g, '_');
+      const isOwnerEmail = cleanEmail === 'toped18@gmail.com';
 
-      if (isAdminMode || isOwnerEmail) {
-        const adminPass = passcode.trim() || loginPassword.trim();
-        if (!adminPass) {
-          setError('Please provide administrative passcode or password (admin123).');
-          return;
-        }
-
-        const isPasscodeCorrect = adminPass === 'owner7799' || adminPass === 'admin123';
-
-        if (isOwnerEmail && isPasscodeCorrect) {
-          const adminProfile = {
-            fullName: 'App Owner (Tope)',
-            email: 'toped18@gmail.com',
-            avatarSeed: 'scholar',
-            role: 'admin' as const,
-            schoolName: 'Livingstone Educational Academy'
-          };
-          onAuthComplete(adminProfile);
-          return;
-        } else {
-          setError('Access Denied. Only the verified App Owner (toped18@gmail.com) is permitted to access the Administration system with the passcode.');
-          return;
-        }
-      }
-
-      if (!loginPassword.trim()) {
-        setError('Please enter your password');
+      const pass = passcode.trim() || loginPassword.trim();
+      if (!pass) {
+        setError('Please enter your password or administrative passcode.');
         return;
       }
 
-      const mockUserList = JSON.parse(localStorage.getItem('hub_users') || '[]');
-      const matchedUser = mockUserList.find((u: any) => u.email.toLowerCase() === lowerEmail);
+      try {
+        let userProfile: any = null;
 
-      if (matchedUser) {
-        if (matchedUser.password && matchedUser.password !== loginPassword.trim()) {
-          setError('Incorrect password. Please verify and try again.');
-          return;
+        if (isOwnerEmail && (pass === 'owner7799' || pass === 'admin123')) {
+          // Bypassed owner check
+          userProfile = await rtdbGet(`${NODES.USERS}/${id}`);
+          if (!userProfile) {
+            userProfile = {
+              id,
+              fullName: 'App Owner (Tope)',
+              email: 'toped18@gmail.com',
+              avatarSeed: 'scholar',
+              role: 'admin',
+              schoolName: 'Livingstone Educational Academy',
+              isPro: true
+            };
+            await rtdbSet(`${NODES.USERS}/${id}`, userProfile);
+          }
+        } else {
+          // Try standard sign in using Firebase Authentication
+          await signInWithEmailAndPassword(auth, cleanEmail, pass);
+          
+          // Get profile from RTDB
+          userProfile = await rtdbGet(`${NODES.USERS}/${id}`);
+          if (!userProfile) {
+            // Build default profile if none exists in Realtime DB yet
+            userProfile = {
+              id,
+              fullName: cleanEmail.split('@')[0],
+              email: cleanEmail,
+              avatarSeed: 'scholar',
+              role: isOwnerEmail ? 'admin' : 'student'
+            };
+            await rtdbSet(`${NODES.USERS}/${id}`, userProfile);
+          }
         }
-        // If matched user has role admin and is not the owner, force student role for public security
-        if (matchedUser.role === 'admin' && matchedUser.email.toLowerCase() !== 'toped18@gmail.com') {
-          matchedUser.role = 'student';
+
+        if (userProfile.role === 'admin' && cleanEmail !== 'toped18@gmail.com') {
+          userProfile.role = 'student'; // security restriction
         }
-        onAuthComplete(matchedUser);
-      } else {
-        setError('Email not registered yet. Feel free to Create an Account below!');
+
+        onAuthComplete(userProfile);
+      } catch (err: any) {
+        if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+          setError('Invalid login credentials. Please register or verify the password.');
+        } else {
+          setError(err.message || 'Firebase Authentication login failed.');
+        }
       }
     }
   };
@@ -487,28 +527,6 @@ export function AuthScreen({ onAuthComplete }: AuthScreenProps) {
               >
                 {isSignUp ? "Already have a registered email? Sign In here" : "Need to register? Create a new Profile here"}
               </button>
-
-              {!isSignUp && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setError('');
-                    const nextMode = !isAdminMode;
-                    setIsAdminMode(nextMode);
-                    if (nextMode) {
-                      setLoginEmail('toped18@gmail.com');
-                      setPasscode('admin123');
-                    } else {
-                      setLoginEmail('');
-                      setPasscode('');
-                    }
-                  }}
-                  className="mt-2 text-xs text-indigo-650 hover:text-indigo-800 font-extrabold flex items-center justify-center gap-1.5 cursor-pointer bg-slate-50 hover:bg-indigo-50/50 px-3 py-1.5 rounded-xl border border-slate-200 hover:border-indigo-200 transition"
-                >
-                  <Lock size={12} className="text-indigo-600" />
-                  <span>{isAdminMode ? "Switch to Regular Student/Teacher Login" : "App Owner & Admin Portal Sign In"}</span>
-                </button>
-              )}
             </div>
           </form>
 

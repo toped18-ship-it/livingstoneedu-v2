@@ -8,9 +8,25 @@ interface PaymentModalProps {
   onClose: () => void;
   brandName?: string;
   proPrice?: string;
+  paystackLink?: string;
+  flutterwaveLink?: string;
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankAccountName?: string;
 }
 
-export function PaymentModal({ user, onPaymentSuccess, onClose, brandName = 'LIVINGSTONEEDU', proPrice = '₦5,000' }: PaymentModalProps) {
+export function PaymentModal({ 
+  user, 
+  onPaymentSuccess, 
+  onClose, 
+  brandName = 'LIVINGSTONEEDU', 
+  proPrice = '₦5,000',
+  paystackLink = '',
+  flutterwaveLink = '',
+  bankName = 'WEMA Bank (Paystack Secure)',
+  bankAccountNumber = '9038472910',
+  bankAccountName = 'LIVINGSTONEEDU PREMIUM PORTAL'
+}: PaymentModalProps) {
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'transfer'>('card');
   const [cardNumber, setCardNumber] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
@@ -128,13 +144,45 @@ export function PaymentModal({ user, onPaymentSuccess, onClose, brandName = 'LIV
 
             {paymentMethod === 'card' ? (
               <div className="space-y-3">
+                {(paystackLink || flutterwaveLink) && (
+                  <div className="p-3.5 bg-gradient-to-br from-indigo-50 to-blue-50/50 rounded-2xl border border-indigo-100 space-y-2">
+                    <p className="text-[10px] font-black uppercase text-indigo-950 tracking-wider">🔗 Active Billing Links</p>
+                    <p className="text-[9px] text-slate-500 font-medium pb-1">Click a portal gateway below to open secure web subscription checks instantly:</p>
+                    <div className="flex flex-col gap-1.5 pb-1">
+                      {paystackLink && (
+                        <a 
+                          href={paystackLink} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-center rounded-xl text-[11px] transition shadow-xs flex items-center justify-center gap-1.5"
+                        >
+                          <span>💳 PAYSTACK SECURE LINK</span>
+                        </a>
+                      )}
+                      {flutterwaveLink && (
+                        <a 
+                          href={flutterwaveLink} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-center rounded-xl text-[11px] transition shadow-xs flex items-center justify-center gap-1.5"
+                        >
+                          <span>💳 FLUTTERWAVE SECURE LINK</span>
+                        </a>
+                      )}
+                    </div>
+                    <div className="border-t border-indigo-100/60 pt-1.5 text-center">
+                      <span className="text-[8px] font-bold text-indigo-900 uppercase">Or proceed with local simulator check below:</span>
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Cardholder Email</label>
                   <input
                     type="text"
                     readOnly
                     value={user.email}
-                    className="w-full bg-slate-55 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-bold text-slate-500 capitalize cursor-not-allowed"
+                    className="w-full bg-slate-55 border border-slate-205 rounded-xl px-3.5 py-2 text-xs font-bold text-slate-500 capitalize cursor-not-allowed"
                   />
                 </div>
                 <div>
@@ -184,12 +232,12 @@ export function PaymentModal({ user, onPaymentSuccess, onClose, brandName = 'LIV
                 </div>
               </div>
             ) : (
-              <div className="space-y-4 text-center py-2">
-                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col items-center space-y-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">WEMA Bank (Paystack Secure)</span>
-                  <span className="text-lg font-black text-blue-700 select-all font-mono tracking-tight">9038472910</span>
-                  <span className="text-xs font-extrabold text-slate-700">{brandName.toUpperCase()} PREMIUM PORTAL</span>
-                  <span className="text-[10px] text-slate-400">(Transfer exactly {proPrice} reference to this account)</span>
+              <div className="space-y-4 text-center py-2 animate-scale-in">
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col items-center space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{bankName}</span>
+                  <span className="text-lg font-black text-blue-700 select-all font-mono tracking-tight">{bankAccountNumber}</span>
+                  <span className="text-xs font-extrabold text-slate-700">{bankAccountName}</span>
+                  <span className="text-[10px] text-slate-400">(Transfer exactly {proPrice} and check confirmation box below)</span>
                 </div>
 
                 <label className="flex items-center gap-2.5 p-1 bg-blue-50/50 rounded-xl border border-blue-105 cursor-pointer text-left">

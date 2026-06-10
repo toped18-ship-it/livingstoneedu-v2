@@ -33,6 +33,11 @@ interface AppDB {
     gmailAccessToken?: string;
     connectedGmailEmail?: string;
     lastConnectedTime?: string;
+    paystackLink?: string;
+    flutterwaveLink?: string;
+    bankName?: string;
+    bankAccountNumber?: string;
+    bankAccountName?: string;
   };
   activities: Array<{
     id: string;
@@ -396,7 +401,12 @@ Livingstone Educational Academy Team`;
       isPaymentLive,
       paystackPublicKey,
       flutterwavePublicKey,
-      stripePublicKey
+      stripePublicKey,
+      paystackLink,
+      flutterwaveLink,
+      bankName,
+      bankAccountNumber,
+      bankAccountName
     } = req.body;
     const db = getDB();
     
@@ -413,7 +423,12 @@ Livingstone Educational Academy Team`;
       isPaymentLive: isPaymentLive !== undefined ? isPaymentLive : db.config.isPaymentLive || false,
       paystackPublicKey: paystackPublicKey !== undefined ? paystackPublicKey : db.config.paystackPublicKey || '',
       flutterwavePublicKey: flutterwavePublicKey !== undefined ? flutterwavePublicKey : db.config.flutterwavePublicKey || '',
-      stripePublicKey: stripePublicKey !== undefined ? stripePublicKey : db.config.stripePublicKey || ''
+      stripePublicKey: stripePublicKey !== undefined ? stripePublicKey : db.config.stripePublicKey || '',
+      paystackLink: paystackLink !== undefined ? paystackLink : db.config.paystackLink || '',
+      flutterwaveLink: flutterwaveLink !== undefined ? flutterwaveLink : db.config.flutterwaveLink || '',
+      bankName: bankName !== undefined ? bankName : db.config.bankName || 'WEMA Bank (Paystack Secure)',
+      bankAccountNumber: bankAccountNumber !== undefined ? bankAccountNumber : db.config.bankAccountNumber || '9038472910',
+      bankAccountName: bankAccountName !== undefined ? bankAccountName : db.config.bankAccountName || 'LIVINGSTONEEDU PREMIUM PORTAL'
     };
     
     saveDB(db);
@@ -424,6 +439,14 @@ Livingstone Educational Academy Team`;
   app.get('/api/admin/activities', (req, res) => {
     const db = getDB();
     res.json(db.activities);
+  });
+
+  // API Route: Clear User Activities Log
+  app.post('/api/admin/activities/clear', (req, res) => {
+    const db = getDB();
+    db.activities = [];
+    saveDB(db);
+    res.json({ success: true });
   });
 
   // API Route: Append User Activity Event
@@ -704,6 +727,11 @@ Format the output as a clean, plain JSON object with the following schema:
 
       let systemPrompt = `You are an expert curriculum planner, NERDC educational planner, lesson-note writer, and academic supervisor in Nigeria.
 Your job is to generate COMPLETE, UPDATED, DETAILED, and PROFESSIONALLY STRUCTURED lesson notes conforming strictly to the latest Nigerian NERDC curriculum guidelines, WAEC/NECO standards, and BECE criteria.
+
+CRITICAL M&E COMPLIANCE REQUIREMENT:
+- DO NOT generate generic educational content.
+- Generate lesson notes strictly from the curriculum topic selected of: "${focusTopic || 'General syllabus topic and standards'}".
+- Ensure all sections write specifically about "${focusTopic || 'General syllabus topic and standards'}" and nothing else.
 
 Context parameters:
 - Student Class: ${classLevel}

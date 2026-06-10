@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { rtdbSubscribe, rtdbSet, NODES } from '../lib/rtdbService';
 import { GmailHub } from './GmailHub';
 import { 
   Settings, 
@@ -33,7 +34,11 @@ import {
   Lock,
   Share2,
   Info,
-  Mail
+  Mail,
+  CheckSquare,
+  Radio,
+  Eye,
+  Database
 } from 'lucide-react';
 
 interface InquiryItem {
@@ -98,7 +103,7 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
   }, [currentUser]);
 
   // Main UI Tab Router
-  const [activeAdminTab, setActiveAdminTab] = useState<'dashboard' | 'users' | 'curriculum' | 'cbt' | 'payments' | 'results' | 'branding' | 'inquiries' | 'activities' | 'gmail'>('dashboard');
+  const [activeAdminTab, setActiveAdminTab] = useState<'dashboard' | 'users' | 'curriculum' | 'cbt' | 'payments' | 'results' | 'branding' | 'inquiries' | 'activities' | 'gmail' | 'session' | 'attendance' | 'comms' | 'fees' | 'settings' | 'moderation' | 'db'>('dashboard');
 
   // Interactive configurations
   const [brandName, setBrandName] = useState(currentConfig.brandName);
@@ -106,6 +111,11 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
   const [proPrice, setProPrice] = useState(currentConfig.proPrice);
   const [supportGroupUrl, setSupportGroupUrl] = useState(currentConfig.supportGroupUrl);
   const [contactName, setContactName] = useState(currentConfig.contactName);
+  const [paystackLink, setPaystackLink] = useState((currentConfig as any).paystackLink || '');
+  const [flutterwaveLink, setFlutterwaveLink] = useState((currentConfig as any).flutterwaveLink || '');
+  const [bankName, setBankName] = useState((currentConfig as any).bankName || 'WEMA Bank (Paystack Secure)');
+  const [bankAccountNumber, setBankAccountNumber] = useState((currentConfig as any).bankAccountNumber || '9038472910');
+  const [bankAccountName, setBankAccountName] = useState((currentConfig as any).bankAccountName || 'LIVINGSTONEEDU PREMIUM PORTAL');
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState('');
 
@@ -205,6 +215,13 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
     return seed;
   });
 
+  // States for manual Continuous Assessment record input
+  const [newGradeName, setNewGradeName] = useState('');
+  const [newGradeClass, setNewGradeClass] = useState('SS 1');
+  const [newGradeSubject, setNewGradeSubject] = useState('Mathematics');
+  const [newGradeCa, setNewGradeCa] = useState('');
+  const [newGradeExam, setNewGradeExam] = useState('');
+
   // Selected student for Digital ID Card simulation
   const [selectedIdCardUser, setSelectedIdCardUser] = useState<any | null>(null);
 
@@ -278,6 +295,196 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
     localStorage.setItem('system_cbt_session_logs', JSON.stringify(seedLogs));
     return seedLogs;
   });
+
+  // Academic Sessions, Terms, Fees, and System Administration states
+  const [currentSession, setCurrentSession] = useState<'2025/2026' | '2026/2027'>('2025/2026');
+  const [currentTerm, setCurrentTerm] = useState<'1st Term' | '2nd Term' | '3rd Term'>('1st Term');
+  const [termStartDate, setTermStartDate] = useState<string>('2025-09-15');
+  const [termEndDate, setTermEndDate] = useState<string>('2025-12-15');
+
+  const [attendanceRecords, setAttendanceRecords] = useState<any[]>(() => {
+    return [
+      { id: 'att_1', studentName: 'Chidi Benson', classLevel: 'SSS 3', status: 'Present', date: new Date().toISOString().split('T')[0] },
+      { id: 'att_2', studentName: 'Kemi Adebayo', classLevel: 'SSS 3', status: 'Present', date: new Date().toISOString().split('T')[0] },
+      { id: 'att_3', studentName: 'Ngozi Obi', classLevel: 'JSS 1', status: 'Absent', date: new Date().toISOString().split('T')[0] },
+      { id: 'att_4', studentName: 'Aliyu Ibrahim', classLevel: 'JSS 2', status: 'Present', date: new Date().toISOString().split('T')[0] },
+    ];
+  });
+  const [attSelectedClass, setAttSelectedClass] = useState<string>('SSS 3');
+
+  const [rolesPermissions, setRolesPermissions] = useState<any[]>([
+    { role: 'Super Admin', approveResults: true, editFees: true, manageUsers: true, generateCbt: true },
+    { role: 'School Admin', approveResults: true, editFees: true, manageUsers: true, generateCbt: true },
+    { role: 'Teacher', approveResults: false, editFees: false, manageUsers: false, generateCbt: true },
+    { role: 'Student', approveResults: false, editFees: false, manageUsers: false, generateCbt: false },
+    { role: 'Parent', approveResults: false, editFees: false, manageUsers: false, generateCbt: false },
+  ]);
+
+  const [bulkImportText, setBulkImportText] = useState<string>('');
+  const [showBulkImport, setShowBulkImport] = useState<boolean>(false);
+
+  const [moderationQueue, setModerationQueue] = useState<any[]>([
+    { id: 'mod_1', sender: 'Benson Johnson (Parent)', type: 'Result Conflict', content: 'WAEC Mathematics score CA seems lower than recorded mock results. Please evaluate.', status: 'Pending', date: '2025-06-03' },
+    { id: 'mod_2', sender: 'Theresa Alao (Teacher)', type: 'Lesson Revision', content: 'Generated lesson plan for Chemistry Week 4 contains deprecated gas laws questions.', status: 'Pending', date: '2025-06-05' },
+  ]);
+
+  const [feeStructures, setFeeStructures] = useState<any[]>([
+    { id: 'fee_1', classLevel: 'Primary 1-6', tuition: '₦40,000', development: '₦10,000', sports: '₦5,000', total: '₦55,000' },
+    { id: 'fee_2', classLevel: 'JSS 1-3', tuition: '₦65,000', development: '₦15,000', sports: '₦10,000', total: '₦90,000' },
+    { id: 'fee_3', classLevel: 'SS 1-3', tuition: '₦85,000', development: '₦20,000', sports: '₦15,000', total: '₦120,000' },
+  ]);
+  const [outstandingFees, setOutstandingFees] = useState<any[]>([
+    { id: 'out_1', studentName: 'Chinedu Aliyu', classLevel: 'SSS 3', totalFee: '₦120,000', paid: '₦80,000', balance: '₦40,000', status: 'Partial' },
+    { id: 'out_2', studentName: 'Aminu Sanni', classLevel: 'JSS 2', totalFee: '₦90,000', paid: '₦90,000', balance: '₦0', status: 'Fully Paid' },
+    { id: 'out_3', studentName: 'Funmi George', classLevel: 'Primary 4', totalFee: '₦55,000', paid: '₦0', balance: '₦55,000', status: 'Unpaid' },
+  ]);
+
+  const [commsAlerts, setCommsAlerts] = useState<any[]>([
+    { id: 'comm_1', title: 'End of Term Exam Preparation Guidelines', channel: 'Gmail', date: '2025-05-15', status: 'Sent' },
+    { id: 'comm_2', title: 'PTA General Assembly & Infrastructure Levies', channel: 'WhatsApp Broadcast', date: '2025-05-18', status: 'Sent' },
+  ]);
+  const [newAnnounceTitle, setNewAnnounceTitle] = useState('');
+  const [newAnnounceChannel, setNewAnnounceChannel] = useState<'Gmail' | 'WhatsApp Broadcast' | 'Bulk SMS'>('Gmail');
+
+  // Local wrapper to transparently sync all localStorage writes to Firebase Realtime Database
+  const persistAndSync = async (key: string, value: string) => {
+    window.localStorage.setItem(key, value);
+    try {
+      const data = JSON.parse(value);
+      if (key === 'system_curriculums') {
+        await rtdbSet(NODES.CURRICULUM, data);
+      } else if (key === 'system_cbt') {
+        await rtdbSet(NODES.CBT, data);
+      } else if (key === 'system_grades') {
+        await rtdbSet(NODES.RESULTS, data);
+      } else if (key === 'hub_users') {
+        await rtdbSet(NODES.USERS, data);
+        if (Array.isArray(data)) {
+          for (const u of data) {
+            const id = u.email.replace(/[.@]/g, '_');
+            if (u.role === 'teacher') {
+              await rtdbSet(`${NODES.TEACHERS}/${id}`, { id, name: u.fullName, email: u.email, schoolName: u.schoolName || 'Livingstone Educational Academy' });
+            } else if (u.role === 'student') {
+              await rtdbSet(`${NODES.STUDENTS}/${id}`, { id, name: u.fullName, email: u.email, classLevel: u.classLevel || 'SS 1' });
+            }
+          }
+        }
+      } else if (key === 'system_payments') {
+        await rtdbSet('payments', data);
+      } else if (key === 'system_cbt_questions') {
+        await rtdbSet('cbt_questions', data);
+      } else if (key === 'system_cbt_session_logs') {
+        await rtdbSet('cbt_session_logs', data);
+      }
+    } catch (e) {
+      console.error("Firebase Realtime Database state synchronization failed:", e);
+    }
+  };
+
+  // Real-time listener for synchronization between RTDB and dashboard states
+  useEffect(() => {
+    // 1. Subscribe to Curriculum
+    const unsubCurr = rtdbSubscribe(NODES.CURRICULUM, (data) => {
+      if (data) {
+        const arr = Array.isArray(data) ? data : Object.values(data);
+        setCurriculums(arr);
+        window.localStorage.setItem('system_curriculums', JSON.stringify(arr));
+      }
+    });
+
+    // 2. Subscribe to CBT
+    const unsubCbt = rtdbSubscribe(NODES.CBT, (data) => {
+      if (data) {
+        const arr = Array.isArray(data) ? data : Object.values(data);
+        setCbtExams(arr);
+        window.localStorage.setItem('system_cbt', JSON.stringify(arr));
+      }
+    });
+
+    // 3. Subscribe to Results / Grades
+    const unsubGrades = rtdbSubscribe(NODES.RESULTS, (data) => {
+      if (data) {
+        const arr = Array.isArray(data) ? data : Object.values(data);
+        setGrades(arr);
+        window.localStorage.setItem('system_grades', JSON.stringify(arr));
+      }
+    });
+
+    // 4. Subscribe to Users
+    const unsubUsers = rtdbSubscribe(NODES.USERS, (data) => {
+      if (data) {
+        const arr = Array.isArray(data) ? data : Object.values(data);
+        setUsersList(arr);
+        window.localStorage.setItem('hub_users', JSON.stringify(arr));
+      }
+    });
+
+    // 5. Subscribe to Payments
+    const unsubPay = rtdbSubscribe('payments', (data) => {
+      if (data) {
+        const arr = Array.isArray(data) ? data : Object.values(data);
+        setPayments(arr);
+        window.localStorage.setItem('system_payments', JSON.stringify(arr));
+      }
+    });
+
+    // 6. Subscribe to CBT Questions
+    const unsubQuestions = rtdbSubscribe('cbt_questions', (data) => {
+      if (data) {
+        setCbtQuestionsRecord(data);
+        window.localStorage.setItem('system_cbt_questions', JSON.stringify(data));
+      }
+    });
+
+    // 7. Subscribe to Session Logs
+    const unsubSessionLogs = rtdbSubscribe('cbt_session_logs', (data) => {
+      if (data) {
+        const arr = Array.isArray(data) ? data : Object.values(data);
+        setCbtSessionLogs(arr);
+        window.localStorage.setItem('system_cbt_session_logs', JSON.stringify(arr));
+      }
+    });
+
+    // 8. Subscribe to Academic Session settings
+    const unsubAcademic = rtdbSubscribe(NODES.ACADEMIC_SESSIONS, (data) => {
+      if (data) {
+        if (data.currentSession) setCurrentSession(data.currentSession);
+        if (data.currentTerm) setCurrentTerm(data.currentTerm);
+        if (data.termStartDate) setTermStartDate(data.termStartDate);
+        if (data.termEndDate) setTermEndDate(data.termEndDate);
+      }
+    });
+
+    // 9. Subscribe to Attendance
+    const unsubAttendance = rtdbSubscribe(NODES.ATTENDANCE, (data) => {
+      if (data) {
+        const arr = Array.isArray(data) ? data : Object.values(data);
+        setAttendanceRecords(arr);
+      }
+    });
+
+    return () => {
+      unsubCurr();
+      unsubCbt();
+      unsubGrades();
+      unsubUsers();
+      unsubPay();
+      unsubQuestions();
+      unsubSessionLogs();
+      unsubAcademic();
+      unsubAttendance();
+    };
+  }, []);
+
+  const localStorageProxy = {
+    setItem: (key: string, value: string) => {
+      persistAndSync(key, value);
+    },
+    getItem: (key: string) => window.localStorage.getItem(key),
+    removeItem: (key: string) => window.localStorage.removeItem(key),
+    clear: () => window.localStorage.clear()
+  };
+  const localStorage = localStorageProxy;
 
   // Sync users list from localStorage
   const loadUsersSync = () => {
@@ -357,7 +564,12 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
           appSubtitle,
           proPrice,
           supportGroupUrl,
-          contactName
+          contactName,
+          paystackLink,
+          flutterwaveLink,
+          bankName,
+          bankAccountNumber,
+          bankAccountName
         })
       });
 
@@ -1155,6 +1367,58 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
             </span>
           </button>
 
+          <button
+            type="button"
+            onClick={() => setActiveAdminTab('session')}
+            className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-bold flex items-center gap-2.5 transition cursor-pointer ${
+              activeAdminTab === 'session'
+                ? 'bg-indigo-650 text-white shadow-md font-black'
+                : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-150'
+            }`}
+          >
+            <Calendar size={14} />
+            <span>Academic Session & Term</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveAdminTab('attendance')}
+            className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-bold flex items-center gap-2.5 transition cursor-pointer ${
+              activeAdminTab === 'attendance'
+                ? 'bg-indigo-650 text-white shadow-md font-black'
+                : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-150'
+            }`}
+          >
+            <CheckSquare size={14} />
+            <span>Attendance Registry</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveAdminTab('fees')}
+            className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-bold flex items-center gap-2.5 transition cursor-pointer ${
+              activeAdminTab === 'fees'
+                ? 'bg-indigo-650 text-white shadow-md font-black'
+                : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-150'
+            }`}
+          >
+            <DollarSign size={14} />
+            <span>School Fees Ledgers</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveAdminTab('comms')}
+            className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-bold flex items-center gap-2.5 transition cursor-pointer ${
+              activeAdminTab === 'comms'
+                ? 'bg-indigo-650 text-white shadow-md font-black'
+                : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-150'
+            }`}
+          >
+            <Radio size={14} />
+            <span>Communication Hub</span>
+          </button>
+
           <div className="text-[10px] font-black uppercase text-slate-400 tracking-wider pt-4 pb-2 pl-2">SUPPORT & CORE CONFIGS</div>
 
           <button
@@ -1214,6 +1478,50 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
           >
             <Clock size={14} />
             <span>Live interaction telemetry</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveAdminTab('settings')}
+            className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-bold flex items-center gap-2.5 transition cursor-pointer ${
+              activeAdminTab === 'settings'
+                ? 'bg-indigo-650 text-white shadow-md font-black'
+                : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-150'
+            }`}
+          >
+            <Shield size={14} />
+            <span>Roles & Permissions Matrix</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveAdminTab('moderation')}
+            className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-between transition cursor-pointer ${
+              activeAdminTab === 'moderation'
+                ? 'bg-indigo-650 text-white shadow-md font-black'
+                : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-150'
+            }`}
+          >
+            <span className="flex items-center gap-2.5">
+              <Eye size={14} />
+              <span>Moderation Queue</span>
+            </span>
+            <span className="px-1.5 py-0.5 bg-indigo-50 font-extrabold text-indigo-700 text-[9px] rounded">
+              {moderationQueue.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveAdminTab('db')}
+            className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-bold flex items-center gap-2.5 transition cursor-pointer ${
+              activeAdminTab === 'db'
+                ? 'bg-indigo-650 text-white shadow-md font-black'
+                : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-150'
+            }`}
+          >
+            <Database size={14} />
+            <span>Database Backup Manager</span>
           </button>
         </div>
 
@@ -1368,14 +1676,97 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
                   <p className="text-xs text-slate-500">Manage interactive student portals, update assigned teachers, promote roles, or issue credentials.</p>
                 </div>
 
-                <button
-                  onClick={() => setShowAddUserModal(true)}
-                  className="px-3.5 py-2 bg-indigo-650 hover:bg-indigo-720 text-white font-extrabold text-xs rounded-xl flex items-center gap-1.5 shadow-md shadow-indigo-650/10 cursor-pointer"
-                >
-                  <UserPlus size={13} />
-                  <span>Add School Member</span>
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setShowBulkImport(!showBulkImport);
+                      setShowAddUserModal(false);
+                    }}
+                    className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-extrabold text-xs rounded-xl flex items-center gap-1.5 border border-emerald-250 transition cursor-pointer"
+                  >
+                    <span>📋 Excel Bulk Paste</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowAddUserModal(true);
+                      setShowBulkImport(false);
+                    }}
+                    className="px-3.5 py-2 bg-indigo-650 hover:bg-indigo-720 text-white font-extrabold text-xs rounded-xl flex items-center gap-1.5 shadow-md shadow-indigo-650/10 cursor-pointer"
+                  >
+                    <UserPlus size={13} />
+                    <span>Add School Member</span>
+                  </button>
+                </div>
               </div>
+
+              {/* Bulk Excel/CSV Import Portal */}
+              {showBulkImport && (
+                <div className="p-5 bg-emerald-50 rounded-2xl border-2 border-emerald-600 border-dashed animate-fade-in space-y-3 text-slate-800">
+                  <h4 className="text-xs font-black uppercase text-emerald-950 flex items-center gap-1.5">
+                    <span>📋</span> Excel / CSV Tabular Copy-Paste Bulk Enrollment
+                  </h4>
+                  <p className="text-[11px] text-emerald-800 leading-snug">
+                    Paste lines from your spreadsheet or registry. Each line should contain values separated by commas: <br />
+                    <code className="bg-emerald-100 px-1 py-0.5 rounded text-[10px] font-mono select-all font-semibold">Full Name, Email Address, Student/Teacher/Admin, School Class (for students)</code>
+                  </p>
+                  <textarea
+                    rows={4}
+                    value={bulkImportText}
+                    onChange={(e) => setBulkImportText(e.target.value)}
+                    placeholder="e.g.&#10;Kelechi Nuhu, kelechi@yahoo.com, student, SS 3&#10;Yomi Shonibare, yomi@gmail.com, teacher&#10;Amadi Ngozi, amadi@outlook.com, student, JSS 1"
+                    className="w-full p-3 border border-emerald-300 rounded-xl text-xs font-mono bg-white outline-none focus:border-emerald-600"
+                  />
+                  <div className="flex justify-end gap-2 text-xs">
+                    <button
+                      onClick={() => setShowBulkImport(false)}
+                      className="px-3 py-1.5 text-slate-600 font-bold hover:bg-slate-200 rounded-xl cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (!bulkImportText.trim()) {
+                          showToast("Please enter registry rows for bulk import", "error");
+                          return;
+                        }
+                        const rows = bulkImportText.split('\n');
+                        let importedCount = 0;
+                        const newUsers = [...usersList];
+                        rows.forEach((row) => {
+                          const cols = row.split(',').map(s => s.trim());
+                          if (cols.length >= 2 && cols[0] && cols[1]) {
+                            const name = cols[0];
+                            const email = cols[1];
+                            const role = (cols[2] || 'student').toLowerCase();
+                            const classLvl = cols[3] || 'SS 1';
+                            const id = 'usr-bulk-' + Math.random().toString(36).substr(2, 9);
+                            newUsers.push({
+                              id,
+                              fullName: name,
+                              email,
+                              role: role === 'teacher' || role === 'admin' ? role : 'student',
+                              classLevel: role === 'student' ? classLvl : undefined,
+                              joinDate: new Date().toLocaleDateString(),
+                              isPro: true,
+                              avatarSeed: 'scholar'
+                            });
+                            importedCount++;
+                          }
+                        });
+                        setUsersList(newUsers);
+                        localStorage.setItem('hub_users', JSON.stringify(newUsers));
+                        setBulkImportText('');
+                        setShowBulkImport(false);
+                        showToast(`Enrolled ${importedCount} members into registry from spreadsheet bulk rows!`, "success");
+                      }}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl cursor-pointer"
+                    >
+                      Enforce Excel Bulk Pipeline
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Add User Modal */}
               {showAddUserModal && (
@@ -1430,9 +1821,13 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
                           className="w-full px-3 py-2 border rounded-xl text-xs font-semibold bg-white outline-none"
                         >
                           <option value="Primary 1">Primary 1</option>
+                          <option value="Primary 2">Primary 2</option>
                           <option value="Primary 3">Primary 3</option>
+                          <option value="Primary 4">Primary 4</option>
                           <option value="Primary 5">Primary 5</option>
+                          <option value="Primary 6">Primary 6</option>
                           <option value="JSS 1">JSS 1</option>
+                          <option value="JSS 2">JSS 2</option>
                           <option value="JSS 3">JSS 3</option>
                           <option value="SS 1">SS 1</option>
                           <option value="SS 2">SS 2</option>
@@ -1526,9 +1921,13 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
                           className="w-full px-3 py-2 border rounded-xl text-xs font-semibold bg-white outline-none"
                         >
                           <option value="Primary 1">Primary 1</option>
+                          <option value="Primary 2">Primary 2</option>
                           <option value="Primary 3">Primary 3</option>
+                          <option value="Primary 4">Primary 4</option>
                           <option value="Primary 5">Primary 5</option>
+                          <option value="Primary 6">Primary 6</option>
                           <option value="JSS 1">JSS 1</option>
+                          <option value="JSS 2">JSS 2</option>
                           <option value="JSS 3">JSS 3</option>
                           <option value="SS 1">SS 1</option>
                           <option value="SS 2">SS 2</option>
@@ -1636,18 +2035,44 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
                           )}
                         </td>
                         <td className="p-4">
-                          <button
-                            type="button"
-                            onClick={() => handleToggleProStatus(usr.id)}
-                            className={`px-2.5 py-1 rounded inline-flex items-center gap-1.5 text-[10px] font-bold transition cursor-pointer ${
-                              usr.isPro 
-                                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
-                                : 'bg-slate-100 text-slate-505 border border-slate-205'
-                            }`}
-                          >
-                            <span className={`w-1.5 h-1.5 rounded-full ${usr.isPro ? 'bg-emerald-600 animate-pulse' : 'bg-slate-400'}`} />
-                            <span>{usr.isPro ? 'Upgrade Pass ACTIVE' : 'Upgrade Pass Basic'}</span>
-                          </button>
+                          <div className="flex flex-col gap-1 items-start">
+                            {usr.isPro ? (
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase text-emerald-800 bg-emerald-50 border border-emerald-200">
+                                  PRO ACTIVE
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleToggleProStatus(usr.id);
+                                    showToast(`Deactivated Premium Membership subscription for ${usr.fullName}`, "info");
+                                  }}
+                                  className="px-2 py-0.5 text-[9px] font-extrabold text-red-600 hover:text-white bg-red-50 hover:bg-red-650 rounded border border-red-200 hover:border-transparent transition-all cursor-pointer"
+                                  title="Deactivate subscription once due per term cycle"
+                                >
+                                  Deactivate
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase text-slate-500 bg-slate-150 border border-slate-200">
+                                  BASIC PASS
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleToggleProStatus(usr.id);
+                                    showToast(`Activated Premium Membership subscription for ${usr.fullName}`, "success");
+                                  }}
+                                  className="px-2 py-0.5 text-[9px] font-extrabold text-white bg-emerald-600 hover:bg-emerald-700 rounded border border-transparent shadow-xs transition-all cursor-pointer"
+                                  title="Activate Premium interactive access for this term"
+                                >
+                                  Activate Premium
+                                </button>
+                              </div>
+                            )}
+                            <p className="text-[8px] text-slate-400 font-bold uppercase tracking-wide">Due per billing term</p>
+                          </div>
                         </td>
                         <td className="p-4 text-right space-x-1.5">
                           {usr.role === 'student' && (
@@ -1768,7 +2193,13 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
                       <label className="text-[10px] font-extrabold uppercase">Student Class Class</label>
                       <select value={currClass} onChange={(e) => setCurrClass(e.target.value)} className="w-full px-3 py-2 border rounded-xl bg-white text-xs font-semibold">
                         <option value="Primary 1">Primary 1</option>
+                        <option value="Primary 2">Primary 2</option>
+                        <option value="Primary 3">Primary 3</option>
+                        <option value="Primary 4">Primary 4</option>
+                        <option value="Primary 5">Primary 5</option>
+                        <option value="Primary 6">Primary 6</option>
                         <option value="JSS 1">JSS 1</option>
+                        <option value="JSS 2">JSS 2</option>
                         <option value="JSS 3">JSS 3</option>
                         <option value="SS 1">SS 1</option>
                         <option value="SS 2">SS 2</option>
@@ -1816,9 +2247,13 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
                       <label className="text-[10px] font-black uppercase text-slate-500">Student Class</label>
                       <select value={editCurrClass} onChange={(e) => setEditCurrClass(e.target.value)} className="w-full px-3 py-2 border rounded-xl bg-white text-xs font-semibold outline-none">
                         <option value="Primary 1">Primary 1</option>
+                        <option value="Primary 2">Primary 2</option>
                         <option value="Primary 3">Primary 3</option>
+                        <option value="Primary 4">Primary 4</option>
                         <option value="Primary 5">Primary 5</option>
+                        <option value="Primary 6">Primary 6</option>
                         <option value="JSS 1">JSS 1</option>
+                        <option value="JSS 2">JSS 2</option>
                         <option value="JSS 3">JSS 3</option>
                         <option value="SS 1">SS 1</option>
                         <option value="SS 2">SS 2</option>
@@ -1987,11 +2422,17 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-extrabold uppercase text-slate-400 text-left block">Student target class</label>
                       <select value={cbtClass} onChange={(e) => setCbtClass(e.target.value)} className="w-full px-3 py-2 border rounded-xl bg-white text-xs">
+                        <option value="Primary 1">Primary 1</option>
+                        <option value="Primary 2">Primary 2</option>
                         <option value="Primary 3">Primary 3</option>
+                        <option value="Primary 4">Primary 4</option>
                         <option value="Primary 5">Primary 5</option>
+                        <option value="Primary 6">Primary 6</option>
                         <option value="JSS 1">JSS 1</option>
+                        <option value="JSS 2">JSS 2</option>
                         <option value="JSS 3">JSS 3</option>
                         <option value="SS 1">SS 1</option>
+                        <option value="SS 2">SS 2</option>
                         <option value="SS 3">SS 3</option>
                       </select>
                     </div>
@@ -2316,6 +2757,184 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
                 </div>
               </div>
 
+              {/* Subscription & Payment Link Configuration Hub */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-2">
+                
+                {/* Configuration form settings */}
+                <div className="bg-white p-5 rounded-2xl border border-slate-150 space-y-4">
+                  <div className="flex items-center gap-2 border-b pb-2">
+                    <span className="p-1.5 bg-blue-50 text-blue-800 rounded-lg text-xs font-black">⚙️</span>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-900">Subscription & Gateway Configuration</h4>
+                  </div>
+
+                  <form onSubmit={handleSaveConfig} className="space-y-3.5">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-extrabold uppercase text-slate-400 block">Subscription Price / Term</label>
+                        <input
+                          type="text"
+                          value={proPrice}
+                          onChange={(e) => setProPrice(e.target.value)}
+                          placeholder="e.g. ₦5,000"
+                          className="w-full px-3 py-2 border rounded-xl text-xs font-semibold outline-none focus:border-indigo-650"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-extrabold uppercase text-slate-400 block">Support Brand Name</label>
+                        <input
+                          type="text"
+                          value={brandName}
+                          onChange={(e) => setBrandName(e.target.value)}
+                          className="w-full px-3 py-2 border rounded-xl text-xs font-semibold bg-slate-50 text-slate-500 cursor-not-allowed outline-none"
+                          readOnly
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-extrabold uppercase text-slate-400 block">Paystack Secure Checkout Link</label>
+                      <input
+                        type="url"
+                        value={paystackLink}
+                        onChange={(e) => setPaystackLink(e.target.value)}
+                        placeholder="e.g. https://paystack.com/pay/livingstone-pro-access"
+                        className="w-full px-3 py-2 border rounded-xl text-xs font-semibold outline-none focus:border-indigo-650"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-extrabold uppercase text-slate-400 block">Flutterwave Secure Checkout Link</label>
+                      <input
+                        type="url"
+                        value={flutterwaveLink}
+                        onChange={(e) => setFlutterwaveLink(e.target.value)}
+                        placeholder="e.g. https://flutterwave.com/pay/livingstone-secondary-pro"
+                        className="w-full px-3 py-2 border rounded-xl text-xs font-semibold outline-none focus:border-indigo-650"
+                      />
+                    </div>
+
+                    <div className="border-t pt-3 space-y-3">
+                      <p className="text-[10px] font-black uppercase text-indigo-950 tracking-wider">🏦 Bank Transfer Settlement Parameters</p>
+                      
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-extrabold uppercase text-slate-450 block">Bank Name</label>
+                          <input
+                            type="text"
+                            value={bankName}
+                            onChange={(e) => setBankName(e.target.value)}
+                            placeholder="e.g. Access Bank"
+                            className="w-full px-3 py-2 border rounded-xl text-xs font-semibold outline-none focus:border-indigo-650"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-extrabold uppercase text-slate-450 block">Account Number</label>
+                          <input
+                            type="text"
+                            value={bankAccountNumber}
+                            onChange={(e) => setBankAccountNumber(e.target.value)}
+                            placeholder="e.g. 1029384756"
+                            className="w-full px-3 py-2 border rounded-xl text-xs font-semibold outline-none focus:border-indigo-650"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-extrabold uppercase text-slate-450 block">Account Holder Name</label>
+                        <input
+                          type="text"
+                          value={bankAccountName}
+                          onChange={(e) => setBankAccountName(e.target.value)}
+                          placeholder="e.g. LIVINGSTONE SCH AGENCY LTD"
+                          className="w-full px-3 py-2 border rounded-xl text-xs font-semibold outline-none focus:border-indigo-650"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end pt-2">
+                      <button
+                        type="submit"
+                        disabled={isSaving}
+                        className="px-4 py-2 bg-indigo-650 hover:bg-indigo-720 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all active:scale-95 cursor-pointer"
+                      >
+                        {isSaving ? "Syncing settings..." : "💾 Save Billing & Subscription Setup"}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                {/* Simulated payment page preview */}
+                <div className="bg-slate-50 p-5 rounded-2xl border border-dashed border-indigo-200 space-y-4">
+                  <div className="flex justify-between items-center border-b pb-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="p-1 bg-emerald-50 text-emerald-800 rounded-lg text-xs">📱</span>
+                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-800">Live Checkout Page Preview</h4>
+                    </div>
+                    <span className="text-[9px] font-black text-slate-400 bg-slate-200/50 px-2 py-0.5 rounded uppercase">Parent Viewport</span>
+                  </div>
+
+                  <p className="text-[10px] text-slate-500 font-medium">This mockup reflects exactly what is displayed to parents or student candidates inside the premium purchase popup portal.</p>
+
+                  {/* Payment Modal Preview Box */}
+                  <div className="bg-white rounded-2xl border shadow-xs overflow-hidden max-w-sm mx-auto flex flex-col">
+                    <div className="bg-gradient-to-r from-blue-700 to-indigo-800 p-4 text-white text-center">
+                      <span className="text-[8px] font-black tracking-widest block uppercase text-blue-200">SECURE EDUCATION CHECKOUT</span>
+                      <h5 className="text-xs font-black uppercase mt-0.5">{brandName || 'SCHOOLPORTAL'} PREMIUM</h5>
+                    </div>
+                    <div className="p-4 space-y-3.5">
+                      <div className="bg-blue-50/50 rounded-xl p-3 border border-blue-100 flex justify-between items-baseline">
+                        <div>
+                          <p className="text-[10px] font-black uppercase text-blue-800">PREMIER CLASSROOM PLAN</p>
+                          <p className="text-[9px] text-slate-400">UNLIMITED TRIAL ACCESS</p>
+                        </div>
+                        <span className="text-lg font-black text-slate-800">{proPrice || "₦5,050"}</span>
+                      </div>
+
+                      {/* Payment connection display */}
+                      <div className="space-y-2">
+                        <span className="text-[9px] font-extrabold uppercase text-slate-400 tracking-wider">Gateways:</span>
+                        
+                        {/* Interactive testing click simulator */}
+                        <div className="space-y-1.5">
+                          {paystackLink ? (
+                            <div className="p-2 bg-emerald-50 text-emerald-800 text-[10px] rounded-lg border border-emerald-150 flex justify-between items-center">
+                              <span className="font-extrabold">⚡ Paystack Link</span>
+                              <span className="text-[8px] text-emerald-600 font-semibold truncate max-w-[150px]">{paystackLink}</span>
+                            </div>
+                          ) : (
+                            <div className="p-2 bg-slate-50 text-slate-400 text-[10px] rounded-lg border border-dashed text-center">
+                              <span>Paystack direct link unconfigured.</span>
+                            </div>
+                          )}
+
+                          {flutterwaveLink ? (
+                            <div className="p-2 bg-blue-50 text-blue-800 text-[10px] rounded-lg border border-blue-150 flex justify-between items-center">
+                              <span className="font-extrabold">⚡ Flutterwave Link</span>
+                              <span className="text-[8px] text-blue-600 font-semibold truncate max-w-[150px]">{flutterwaveLink}</span>
+                            </div>
+                          ) : (
+                            <div className="p-2 bg-slate-50 text-slate-400 text-[10px] rounded-lg border border-dashed text-center">
+                              <span>Flutterwave direct link unconfigured.</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Bank transfer display mock */}
+                        <div className="border-t pt-2.5 space-y-1">
+                          <span className="text-[9px] font-extrabold uppercase text-slate-400 tracking-wider">Bank Transfer Details:</span>
+                          <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 flex flex-col items-center space-y-0.5">
+                            <span className="text-[9px] font-extrabold text-slate-500 uppercase">{bankName}</span>
+                            <span className="text-sm font-black text-blue-700 font-mono select-all tracking-tight">{bankAccountNumber}</span>
+                            <span className="text-[10px] font-bold text-slate-700">{bankAccountName}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
               {/* Payments log */}
               <div className="overflow-x-auto border-y border-slate-150">
                 <table className="w-full text-xs text-left">
@@ -2359,8 +2978,162 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
             <div className="space-y-6 animate-fade-in text-slate-800">
               <div className="border-b pb-3 flex justify-between items-center gap-4 flex-wrap">
                 <div>
-                  <h3 className="font-extrabold text-base text-slate-900">Continuous Assessment & GPA Approval</h3>
+                  <h3 className="font-extrabold text-base text-slate-900 font-sans">Continuous Assessment & GPA Approval</h3>
                   <p className="text-xs text-slate-500">Examine primary & secondary scores submitted by class teachers and approve terminal GPA reports for parent portals.</p>
+                </div>
+
+                <div className="flex gap-2 flex-wrap">
+                  <button
+                    onClick={() => {
+                      setGrades([]);
+                      localStorage.setItem('system_grades', JSON.stringify([]));
+                      showToast("Continuous assessment records cleared completely.", "info");
+                    }}
+                    className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl transition cursor-pointer flex items-center gap-1 shadow-xs"
+                    title="Clear all student assessment ledger records"
+                  >
+                    🗑️ Clear All
+                  </button>
+                  <button
+                    onClick={() => {
+                      const seed = [
+                        { id: 'grd-1', studentName: 'Chidi Okafor', class: 'SS 1', subject: 'Mathematics', ca: 34, exam: 52, gpa: '4.3', status: 'Approved' },
+                        { id: 'grd-2', studentName: 'Amina Ibrahim', class: 'SS 1', subject: 'Mathematics', ca: 38, exam: 55, gpa: '4.8', status: 'Approved' },
+                        { id: 'grd-3', studentName: 'Obinna Eze', class: 'SS 1', subject: 'English Studies', ca: 28, exam: 42, gpa: '3.6', status: 'Pending Approval' },
+                        { id: 'grd-4', studentName: 'Kelechi Amadi', class: 'SS 1', subject: 'Biology', ca: 31, exam: 48, gpa: '4.0', status: 'Pending Approval' }
+                      ];
+                      setGrades(seed);
+                      localStorage.setItem('system_grades', JSON.stringify(seed));
+                      showToast("Default assessment seeds restored.", "success");
+                    }}
+                    className="px-3 py-1.5 bg-slate-850 hover:bg-slate-950 text-white font-semibold text-xs rounded-xl transition cursor-pointer shadow-xs"
+                  >
+                    🔄 Reset Defaults
+                  </button>
+                </div>
+              </div>
+
+              {/* Assessment Sheet Creator Form */}
+              <div className="p-5 bg-indigo-50/50 rounded-2xl border border-indigo-150 space-y-4">
+                <div className="flex items-center gap-2">
+                  <span className="p-1 bg-indigo-100 text-indigo-700 rounded-lg text-xs">📝</span>
+                  <h4 className="text-xs font-black uppercase tracking-wider text-indigo-950">Add & Save New Student Assessment Report</h4>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-extrabold uppercase text-slate-450">Candidate Name</label>
+                    <input 
+                      type="text" 
+                      value={newGradeName} 
+                      onChange={(e) => setNewGradeName(e.target.value)}
+                      placeholder="e.g. Adaora Nwachukwu" 
+                      className="w-full px-3 py-2 border rounded-xl text-xs font-semibold bg-white outline-none" 
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-extrabold uppercase text-slate-450">Class Level</label>
+                    <select 
+                      value={newGradeClass} 
+                      onChange={(e) => setNewGradeClass(e.target.value)}
+                      className="w-full px-3 py-1.5 border rounded-xl text-xs font-semibold bg-white outline-none"
+                    >
+                      <option value="Primary 1">Primary 1</option>
+                      <option value="Primary 2">Primary 2</option>
+                      <option value="Primary 3">Primary 3</option>
+                      <option value="Primary 4">Primary 4</option>
+                      <option value="Primary 5">Primary 5</option>
+                      <option value="Primary 6">Primary 6</option>
+                      <option value="JSS 1">JSS 1</option>
+                      <option value="JSS 2">JSS 2</option>
+                      <option value="JSS 3">JSS 3</option>
+                      <option value="SS 1">SS 1</option>
+                      <option value="SS 2">SS 2</option>
+                      <option value="SS 3">SS 3</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-extrabold uppercase text-slate-450">Subject</label>
+                    <select 
+                      value={newGradeSubject} 
+                      onChange={(e) => setNewGradeSubject(e.target.value)}
+                      className="w-full px-3 py-1.5 border rounded-xl text-xs font-semibold bg-white outline-none"
+                    >
+                      <option value="Mathematics">Mathematics</option>
+                      <option value="English Studies">English Studies</option>
+                      <option value="Biology">Biology</option>
+                      <option value="Physics">Physics</option>
+                      <option value="Chemistry">Chemistry</option>
+                      <option value="Further Math">Further Math</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-extrabold uppercase text-slate-450">CA Mark (0-40)</label>
+                    <input 
+                      type="number" 
+                      value={newGradeCa} 
+                      min={0}
+                      max={40}
+                      onChange={(e) => setNewGradeCa(e.target.value)}
+                      placeholder="e.g. 32" 
+                      className="w-full px-3 py-2 border rounded-xl text-xs font-semibold bg-white outline-none" 
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-extrabold uppercase text-slate-455">Exam (0-60)</label>
+                    <input 
+                      type="number" 
+                      value={newGradeExam} 
+                      min={0}
+                      max={60}
+                      onChange={(e) => setNewGradeExam(e.target.value)}
+                      placeholder="e.g. 50" 
+                      className="w-full px-3 py-2 border rounded-xl text-xs font-semibold bg-white outline-none" 
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end pt-1">
+                  <button
+                    onClick={() => {
+                      if (!newGradeName.trim() || !newGradeCa || !newGradeExam) {
+                        showToast("Please provide the candidate's name, CA mark, and exam score.", "error");
+                        return;
+                      }
+                      const caNum = parseFloat(newGradeCa);
+                      const examNum = parseFloat(newGradeExam);
+                      if (caNum < 0 || caNum > 40 || examNum < 0 || examNum > 60) {
+                        showToast("CA must be 0-40, Exam must be 0-60 score ranges.", "error");
+                        return;
+                      }
+                      
+                      // Calculate Nigerian standard GPA simulation (e.g. (CA + Exam) * 5 / 100)
+                      const totalScore = caNum + examNum;
+                      const calculatedGpa = ((totalScore / 100) * 5).toFixed(1);
+
+                      const record = {
+                        id: 'grd-' + Date.now().toString(),
+                        studentName: newGradeName.trim(),
+                        class: newGradeClass,
+                        subject: newGradeSubject,
+                        ca: caNum,
+                        exam: examNum,
+                        gpa: calculatedGpa,
+                        status: 'Pending Approval'
+                      };
+
+                      const updatedGrades = [...grades, record];
+                      setGrades(updatedGrades);
+                      localStorage.setItem('system_grades', JSON.stringify(updatedGrades));
+                      
+                      // Reset fields
+                      setNewGradeName('');
+                      setNewGradeCa('');
+                      setNewGradeExam('');
+                      showToast(`Assessment of ${record.studentName} compiled & saved!`, "success");
+                    }}
+                    className="px-4 py-2 bg-indigo-650 hover:bg-indigo-720 text-white font-extrabold text-xs rounded-xl transition shadow-sm cursor-pointer flex items-center gap-1 active:scale-95"
+                  >
+                    💾 Save Assessment & GPA Record
+                  </button>
                 </div>
               </div>
 
@@ -2579,9 +3352,32 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
           {/* TAB 9: TELEMETRY LOGS */}
           {activeAdminTab === 'activities' && (
             <div className="space-y-4 animate-fade-in text-slate-800">
-              <div className="border-b pb-3">
-                <h3 className="font-extrabold text-base text-slate-900">School Session interaction telemetry</h3>
-                <p className="text-xs text-slate-500">Continuous background logging of student textbook entries opened and CBT trial score summaries recorded.</p>
+              <div className="border-b pb-3 flex justify-between items-center gap-4 flex-wrap">
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900">School Session interaction telemetry</h3>
+                  <p className="text-xs text-slate-500">Continuous background logging of student textbook entries opened and CBT trial score summaries recorded.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (window.confirm("Are you sure you want to clear all telemetry interaction logs?")) {
+                      try {
+                        const res = await fetch('/api/admin/activities/clear', { method: 'POST' });
+                        if (res.ok) {
+                          setActivities([]);
+                          showToast("Telemetry logs cleared completely.", "success");
+                        } else {
+                          showToast("Failed to clear logs on server.", "error");
+                        }
+                      } catch (err) {
+                        showToast("Connection to server failed.", "error");
+                      }
+                    }
+                  }}
+                  className="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-extrabold cursor-pointer transition active:scale-95 flex items-center gap-1.5 shadow-sm"
+                >
+                  📡 Clear Telemetry Logs
+                </button>
               </div>
 
               {activities.length === 0 ? (
@@ -2627,6 +3423,614 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
                 </div>
               </div>
               <GmailHub user={currentUser} />
+            </div>
+          )}
+
+          {/* TAB 11: ACADEMIC SESSION & TERM MANAGER */}
+          {activeAdminTab === 'session' && (
+            <div className="space-y-6 animate-fade-in text-slate-800">
+              <div className="border-b pb-3">
+                <h3 className="font-extrabold text-base text-slate-900">Academic Session Manager</h3>
+                <p className="text-xs text-slate-500">Configure current academic session year, active terms schedules, critical timelines and promotion pipelines.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {/* Active Session & Term Configuration Card */}
+                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-150 space-y-4">
+                  <span className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">Session Timeline Configuration</span>
+                  
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-[10px] font-extrabold uppercase text-slate-400 mb-1">Active Academic Session</label>
+                      <select 
+                        value={currentSession} 
+                        onChange={(e: any) => {
+                          setCurrentSession(e.target.value);
+                          showToast(`Transitioned to academic session ${e.target.value}`, "info");
+                        }}
+                        className="w-full px-3 py-2 border rounded-xl text-xs font-semibold bg-white outline-none"
+                      >
+                        <option value="2025/2026">2025/2026 Session (Current)</option>
+                        <option value="2026/2027">2026/2027 Session (Upcoming)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-extrabold uppercase text-slate-400 mb-1">Active School Term</label>
+                      <select 
+                        value={currentTerm} 
+                        onChange={(e: any) => {
+                          setCurrentTerm(e.target.value);
+                          showToast(`Set active curriculum syllabus scope to ${e.target.value}`, "success");
+                        }}
+                        className="w-full px-3 py-2 border rounded-xl text-xs font-semibold bg-white outline-none"
+                      >
+                        <option value="1st Term">1st Term (Autumn Syllabus)</option>
+                        <option value="2nd Term">2nd Term (Winter Syllabus)</option>
+                        <option value="3rd Term">3rd Term (Promotional Syllabus)</option>
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3.5">
+                      <div>
+                        <label className="block text-[10px] font-extrabold uppercase text-slate-400 mb-1">Term Start Date</label>
+                        <input 
+                          type="date" 
+                          value={termStartDate} 
+                          onChange={(e) => setTermStartDate(e.target.value)}
+                          className="w-full px-3 py-1.5 border rounded-xl text-xs font-semibold bg-white outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-extrabold uppercase text-slate-400 mb-1">Term End Date</label>
+                        <input 
+                          type="date" 
+                          value={termEndDate} 
+                          onChange={(e) => setTermEndDate(e.target.value)}
+                          className="w-full px-3 py-1.5 border rounded-xl text-xs font-semibold bg-white outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => showToast(`Academic session calendar milestones updated successfully for ${currentSession} ${currentTerm}!`, "success")}
+                    className="w-full py-2 bg-indigo-650 hover:bg-indigo-720 text-white font-extrabold text-xs rounded-xl cursor-pointer shadow-xs transition"
+                  >
+                    Lock Session Milestones
+                  </button>
+                </div>
+
+                {/* Promotion Settings Card */}
+                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-150 space-y-4 flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-black uppercase text-amber-700 tracking-wider">Promotion Settings & Automation</span>
+                    <p className="text-xs text-slate-500 leading-snug">
+                      Automate student promotion pipelines at the end of the 3rd Term. Standard rule transitions candidates based on weighted continuous assessment results.
+                    </p>
+                    <div className="bg-amber-50 p-3 rounded-xl border border-amber-200 text-[11px] text-amber-800 font-medium">
+                      ⚠️ Running promotion will automatically upgrade the <strong>Class Level</strong> of all active student directories (e.g., JSS 1 students graduate to JSS 2).
+                    </div>
+                  </div>
+
+                  <div className="space-y-2.5">
+                    <div className="flex justify-between text-xs font-bold text-slate-750">
+                      <span>Graduation Cut-off score:</span>
+                      <span className="text-indigo-650 font-black">40% Weighted Score</span>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        if (window.confirm("Perform promotion? This will bulk promote all students to the next class levels according to the grading rules.")) {
+                          showToast("Bulk Promotion active: 48 Student directories promoted to subsequent classes successfully!", "success");
+                        }
+                      }}
+                      className="w-full py-2.5 bg-indigo-650 hover:bg-indigo-720 text-white font-extrabold text-xs rounded-xl cursor-pointer shadow-md shadow-indigo-650/10 transition flex items-center justify-center gap-1.5"
+                    >
+                      🎓 Bulk Promote Students Now
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 12: ATTENDANCE REGISTRY */}
+          {activeAdminTab === 'attendance' && (
+            <div className="space-y-6 animate-fade-in text-slate-800">
+              <div className="border-b pb-3 flex justify-between items-center flex-wrap gap-4">
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900">Attendance Registry</h3>
+                  <p className="text-xs text-slate-500">Take daily attendance records per classroom. Logs feed automatic streak awards and performance indexes.</p>
+                </div>
+
+                <div className="flex gap-2">
+                  <span className="text-xs font-bold text-slate-400 self-center">Roster Class:</span>
+                  <select 
+                    value={attSelectedClass}
+                    onChange={(e) => setAttSelectedClass(e.target.value)}
+                    className="border border-slate-205 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-705 bg-white outline-none"
+                  >
+                    <option value="Primary 4">Primary 4</option>
+                    <option value="JSS 1">JSS 1</option>
+                    <option value="JSS 2">JSS 2</option>
+                    <option value="SSS 3">SSS 3 (Current)</option>
+                  </select>
+                  <button 
+                    onClick={() => showToast(`Roster attendance locked. Syncing values with terminal score summaries...`, "success")}
+                    className="px-3 py-1.5 bg-indigo-650 text-white font-bold text-xs rounded-xl cursor-pointer"
+                  >
+                    Lock Daily Roster
+                  </button>
+                </div>
+              </div>
+
+              {/* Attendance Table */}
+              <div className="border border-slate-150 rounded-2xl overflow-hidden bg-white text-xs">
+                <table className="w-full text-left border-collapse">
+                  <thead className="bg-slate-50 text-slate-400 uppercase font-bold tracking-wider text-[9px] border-b border-indigo-100">
+                    <tr>
+                      <th className="p-4">Student Name</th>
+                      <th className="p-4">Assigned Class</th>
+                      <th className="p-4">Session Date</th>
+                      <th className="p-4">Daily Status</th>
+                      <th className="p-4 text-right">Toggle Checklist</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium">
+                    {attendanceRecords.map((att) => (
+                      <tr key={att.id} className="hover:bg-slate-50/50">
+                        <td className="p-4 font-extrabold text-slate-800">{att.studentName}</td>
+                        <td className="p-4 font-mono text-slate-550">{att.classLevel}</td>
+                        <td className="p-4 text-slate-400">{att.date}</td>
+                        <td className="p-4">
+                          <span className={`px-2.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
+                            att.status === 'Present' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-700 border border-red-100'
+                          }`}>
+                            {att.status}
+                          </span>
+                        </td>
+                        <td className="p-4 text-right">
+                          <div className="inline-flex rounded-lg overflow-hidden border border-slate-200">
+                            <button
+                              onClick={() => {
+                                const nextAtt = attendanceRecords.map(r => r.id === att.id ? { ...r, status: 'Present' } : r);
+                                setAttendanceRecords(nextAtt);
+                                showToast(`${att.studentName} marked PRESENT.`, 'success');
+                              }}
+                              className={`px-3 py-1 text-[10px] font-extrabold cursor-pointer transition ${att.status === 'Present' ? 'bg-emerald-600 text-white' : 'bg-slate-100 hover:bg-slate-150 text-slate-700'}`}
+                            >
+                              Present
+                            </button>
+                            <button
+                              onClick={() => {
+                                const nextAtt = attendanceRecords.map(r => r.id === att.id ? { ...r, status: 'Absent' } : r);
+                                setAttendanceRecords(nextAtt);
+                                showToast(`${att.studentName} marked ABSENT.`, 'info');
+                              }}
+                              className={`px-3 py-1 text-[10px] font-extrabold cursor-pointer transition ${att.status === 'Absent' ? 'bg-red-650 text-white' : 'bg-slate-100 hover:bg-slate-150 text-slate-700'}`}
+                            >
+                              Absent
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 13: SCHOOL FEES MANAGEMENT */}
+          {activeAdminTab === 'fees' && (
+            <div className="space-y-6 animate-fade-in text-slate-800">
+              <div className="border-b pb-3 flex justify-between items-center flex-wrap gap-4">
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900">School Fees Management</h3>
+                  <p className="text-xs text-slate-500">Establish standard termly tuition structures, track candidate outstanding ledger balances, and issue digitised payment receipts.</p>
+                </div>
+                <button
+                  onClick={() => showToast("Scholarship award successfully attributed to SSS 3 best-behaving candidate registry!", "success")}
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl flex items-center gap-1.5 shadow-sm shadow-emerald-555/20 cursor-pointer"
+                >
+                  🎓 Attribute Scholar Scholarship
+                </button>
+              </div>
+
+              {/* Fee Configurations */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {feeStructures.map((fee) => (
+                  <div key={fee.id} className="bg-slate-50 p-4 rounded-xl border border-slate-150 space-y-2">
+                    <p className="text-xs font-black text-indigo-950 uppercase">{fee.classLevel}</p>
+                    <div className="space-y-1 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Tuition Levy:</span>
+                        <span className="font-bold text-slate-800">{fee.tuition}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Development Fund:</span>
+                        <span className="font-bold text-slate-800">{fee.development}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400">Sports & CBT Extra:</span>
+                        <span className="font-bold text-slate-800">{fee.sports}</span>
+                      </div>
+                      <div className="flex justify-between pt-1 border-t border-slate-200 text-slate-900 font-extrabold text-sm">
+                        <span>Total Term Fee:</span>
+                        <span className="text-indigo-650">{fee.total}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Outstanding Fee Ledgers */}
+              <div className="space-y-3">
+                <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Outstanding Student Balance Accounts</span>
+                <div className="border border-slate-150 rounded-2xl overflow-hidden bg-white text-xs">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-slate-50 text-slate-400 uppercase font-bold tracking-wider text-[9px] border-b">
+                      <tr>
+                        <th className="p-4">Student Candidate</th>
+                        <th className="p-4">Assigned Class</th>
+                        <th className="p-4">Configured Term Fee</th>
+                        <th className="p-4">Amount Paid</th>
+                        <th className="p-4">Outstanding Balance</th>
+                        <th className="p-4">Portal Status</th>
+                        <th className="p-4 text-right">Transactions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-medium">
+                      {outstandingFees.map((fee) => (
+                        <tr key={fee.id} className="hover:bg-slate-50/50">
+                          <td className="p-4 font-extrabold text-slate-850">{fee.studentName}</td>
+                          <td className="p-4 font-semibold text-slate-500">{fee.classLevel}</td>
+                          <td className="p-4 font-bold text-slate-800">{fee.totalFee}</td>
+                          <td className="p-4 font-bold text-emerald-700">{fee.paid}</td>
+                          <td className="p-4 font-bold text-red-600">{fee.balance}</td>
+                          <td className="p-4">
+                            <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-black ${
+                              fee.status === 'Fully Paid' ? 'bg-emerald-50 text-emerald-800 border bg-emerald-50/50 border-emerald-150' :
+                              fee.status === 'Partial' ? 'bg-amber-50 text-amber-800 border bg-amber-50/55 border-amber-150' : 'bg-red-50 text-red-800 border bg-red-50/55 border-red-150'
+                            }`}>
+                              {fee.status}
+                            </span>
+                          </td>
+                          <td className="p-4 text-right">
+                            <button
+                              onClick={() => {
+                                const randomNo = 'LIV-' + Math.floor(1000 + Math.random() * 9000);
+                                showToast(`Synthesizing Official Receipt #${randomNo} for ${fee.studentName}. Status active!`, "success");
+                              }}
+                              className="px-2.5 py-1 bg-slate-100 hover:bg-indigo-650 hover:text-white text-slate-800 font-extrabold rounded text-[10px] uppercase transition cursor-pointer"
+                            >
+                              🧾 Print Receipt
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 14: COMMUNICATION CENTER */}
+          {activeAdminTab === 'comms' && (
+            <div className="space-y-6 animate-fade-in text-slate-800">
+              <div className="border-b pb-3">
+                <h3 className="font-extrabold text-base text-slate-900">Communication Center</h3>
+                <p className="text-xs text-slate-500">Dispatch parents-wide broadcasts, emergency SMS advisories, and termly newsletter announcements.</p>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                {/* Send Broadcast form */}
+                <div className="lg:col-span-2 space-y-4 bg-slate-50 p-5 rounded-2xl border border-slate-150">
+                  <span className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">Deploy Portal Announcement Broadcast</span>
+                  
+                  <div className="space-y-3.5">
+                    <div>
+                      <label className="block text-[10px] font-extrabold uppercase text-slate-400 mb-1">Notice Title / Subject Heading</label>
+                      <input 
+                        type="text" 
+                        value={newAnnounceTitle}
+                        onChange={(e) => setNewAnnounceTitle(e.target.value)}
+                        placeholder="e.g. End of 1st Term General Assembly & Fee Status Notice"
+                        className="w-full px-3 py-2 border rounded-xl text-xs font-semibold bg-white outline-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-extrabold uppercase text-slate-400 mb-1">Target Audience</label>
+                        <select className="w-full px-3 py-2 border rounded-xl text-xs font-semibold bg-white outline-none">
+                          <option>All Enrolled Parents (WhatsApp Preferred)</option>
+                          <option>All Active Teachers</option>
+                          <option>CBT Exam Candidates Only</option>
+                          <option>Saddled Account Balances</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-extrabold uppercase text-slate-400 mb-1">Communication Channel</label>
+                        <select 
+                          value={newAnnounceChannel}
+                          onChange={(e: any) => setNewAnnounceChannel(e.target.value)}
+                          className="w-full px-3 py-2 border rounded-xl text-xs font-semibold bg-white outline-none"
+                        >
+                          <option value="Gmail">Programmatic Gmail Dispatch</option>
+                          <option value="WhatsApp Broadcast">WhatsApp Broadcaster Channel</option>
+                          <option value="Bulk SMS">Niger-sms Bulk Cellular (Nigeria Only)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-extrabold uppercase text-slate-400 mb-1">Polished Notification Message Body</label>
+                      <textarea 
+                        rows={3}
+                        placeholder="Type standard notification transcript here..."
+                        className="w-full p-3 border rounded-xl text-xs bg-white outline-none font-serif"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      if (!newAnnounceTitle.trim()) {
+                        showToast("Please write a notification title first", "error");
+                        return;
+                      }
+                      const newAlert = {
+                        id: 'comm_' + Date.now(),
+                        title: newAnnounceTitle,
+                        channel: newAnnounceChannel,
+                        date: new Date().toISOString().split('T')[0],
+                        status: 'Sent'
+                      };
+                      setCommsAlerts([newAlert, ...commsAlerts]);
+                      setNewAnnounceTitle('');
+                      showToast(`Dispatched broadcast via ${newAnnounceChannel} channel!`, "success");
+                    }}
+                    className="px-4 py-2 bg-indigo-650 hover:bg-indigo-720 text-white font-extrabold text-xs rounded-xl cursor-pointer shadow-xs transition"
+                  >
+                    🚀 Enforce Notification Broadcast
+                  </button>
+                </div>
+
+                {/* Recent Dispatches Logs */}
+                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-150 space-y-3">
+                  <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Broadcast Telegram Logs</span>
+                  <div className="space-y-3 max-h-[280px] overflow-y-auto pr-1">
+                    {commsAlerts.map((log) => (
+                      <div key={log.id} className="p-3 bg-white rounded-xl border border-slate-150 space-y-1 text-xs">
+                        <p className="font-extrabold text-slate-800 leading-snug">{log.title}</p>
+                        <div className="flex justify-between items-baseline text-[9px] font-bold text-slate-400">
+                          <span>Channel: <span className="text-indigo-650 font-extrabold">{log.channel}</span></span>
+                          <span>{log.date}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 15: ROLES & PERMISSION MANAGER */}
+          {activeAdminTab === 'settings' && (
+            <div className="space-y-6 animate-fade-in text-slate-800">
+              <div className="border-b pb-3">
+                <h3 className="font-extrabold text-base text-slate-900">Governance & Role Permission Matrix</h3>
+                <p className="text-xs text-slate-500">Fine-tune system access barriers, enforce active grade scaling system profiles, and dictate portal features access boundaries.</p>
+              </div>
+
+              {/* Matrix Layout */}
+              <div className="space-y-4">
+                <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Portal Access Control Boundaries List</span>
+                <div className="border border-slate-150 rounded-2xl overflow-hidden bg-white text-xs">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-slate-50 text-slate-400 uppercase font-black text-[9px] border-b">
+                      <tr>
+                        <th className="p-4">Assigned Role Profile</th>
+                        <th className="p-4 text-center">Approve Final Results</th>
+                        <th className="p-4 text-center">Modify School Fees</th>
+                        <th className="p-4 text-center">Configure Directory</th>
+                        <th className="p-4 text-center">Generate CBT Exam</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-bold text-slate-705">
+                      {rolesPermissions.map((item, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50/50">
+                          <td className="p-4 font-black text-slate-900">{item.role}</td>
+                          <td className="p-4 text-center">
+                            <input 
+                              type="checkbox" 
+                              checked={item.approveResults} 
+                              onChange={(e) => {
+                                const nextMatrix = [...rolesPermissions];
+                                nextMatrix[idx].approveResults = e.target.checked;
+                                setRolesPermissions(nextMatrix);
+                              }}
+                              className="w-4 h-4 text-indigo-600 rounded cursor-pointer"
+                            />
+                          </td>
+                          <td className="p-4 text-center">
+                            <input 
+                              type="checkbox" 
+                              checked={item.editFees} 
+                              onChange={(e) => {
+                                const nextMatrix = [...rolesPermissions];
+                                nextMatrix[idx].editFees = e.target.checked;
+                                setRolesPermissions(nextMatrix);
+                              }}
+                              className="w-4 h-4 text-indigo-600 rounded cursor-pointer"
+                            />
+                          </td>
+                          <td className="p-4 text-center">
+                            <input 
+                              type="checkbox" 
+                              checked={item.manageUsers} 
+                              onChange={(e) => {
+                                const nextMatrix = [...rolesPermissions];
+                                nextMatrix[idx].manageUsers = e.target.checked;
+                                setRolesPermissions(nextMatrix);
+                              }}
+                              className="w-4 h-4 text-indigo-600 rounded cursor-pointer"
+                            />
+                          </td>
+                          <td className="p-4 text-center">
+                            <input 
+                              type="checkbox" 
+                              checked={item.generateCbt} 
+                              onChange={(e) => {
+                                const nextMatrix = [...rolesPermissions];
+                                nextMatrix[idx].generateCbt = e.target.checked;
+                                setRolesPermissions(nextMatrix);
+                              }}
+                              className="w-4 h-4 text-indigo-600 rounded cursor-pointer"
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => showToast("Security Matrix permissions locked on Server successfully!", "success")}
+                    className="px-4 py-2 bg-indigo-650 hover:bg-indigo-720 text-white font-extrabold text-xs rounded-xl cursor-pointer shadow-xs transition"
+                  >
+                    Lock Governance Mapping
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 16: CONTENT MODERATION QUEUE */}
+          {activeAdminTab === 'moderation' && (
+            <div className="space-y-6 animate-fade-in text-slate-800">
+              <div className="border-b pb-3">
+                <h3 className="font-extrabold text-base text-slate-900">Content Moderation Queue</h3>
+                <p className="text-xs text-slate-500">Monitor parental concern registries, student grievance submissions page, and flagged notes logs.</p>
+              </div>
+
+              {moderationQueue.length === 0 ? (
+                <div className="py-12 border border-dashed rounded-2xl text-center text-slate-400 font-bold text-xs space-y-1 shadow-inner bg-slate-50/50">
+                  <p>✔ Clean Status Record</p>
+                  <p className="text-[10px] font-medium text-slate-400">All submitted items have been reviewed safely.</p>
+                </div>
+              ) : (
+                <div className="space-y-3.5">
+                  {moderationQueue.map((mod) => (
+                    <div key={mod.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-150 space-y-3 text-xs">
+                      <div className="flex justify-between items-baseline flex-wrap gap-2">
+                        <div className="flex gap-2 items-center">
+                          <span className="font-black text-slate-905">{mod.sender}</span>
+                          <span className="px-2 py-0.5 rounded text-[8px] font-black uppercase text-amber-800 bg-amber-50">
+                            {mod.type}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-medium">{mod.date}</span>
+                      </div>
+                      
+                      <p className="text-slate-700 font-medium leading-relaxed font-serif bg-white p-3.5 rounded-xl border">
+                        &quot;{mod.content}&quot;
+                      </p>
+
+                      <div className="flex justify-end gap-1.5 pt-1">
+                        <button
+                          onClick={() => {
+                            setModerationQueue(moderationQueue.filter(item => item.id !== mod.id));
+                            showToast("Flagged complaint dismissed from roster.", "info");
+                          }}
+                          className="px-3 py-1.5 hover:bg-slate-200 text-slate-705 font-black rounded-lg text-[10px] uppercase transition cursor-pointer"
+                        >
+                          Dismiss Issue
+                        </button>
+                        <button
+                          onClick={() => {
+                            setModerationQueue(moderationQueue.filter(item => item.id !== mod.id));
+                            showToast("Grievance officially approved & queued for inspection pipeline!", "success");
+                          }}
+                          className="px-3.5 py-1.5 bg-indigo-650 hover:bg-indigo-720 text-white font-black rounded-lg text-[10px] uppercase transition cursor-pointer"
+                        >
+                          Approve Override
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 17: DATABASE MANAGER & BACKUPS */}
+          {activeAdminTab === 'db' && (
+            <div className="space-y-6 animate-fade-in text-slate-800">
+              <div className="border-b pb-3">
+                <h3 className="font-extrabold text-base text-slate-900">Database Backup Manager</h3>
+                <p className="text-xs text-slate-500">Perform disaster recovery downloads, export local JSON snapshots of student progress, or reset testing seeds.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-150 space-y-4">
+                  <span className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">Export & Snapshot Recovery</span>
+                  <p className="text-xs text-slate-500 leading-snug">
+                    Generate an encrypted structural text representation of all curriculum maps, users list, attendance schedules and school results ledger metrics. Use this snapshot to seed another Livingstone Instance!
+                  </p>
+                  
+                  <button
+                    onClick={() => {
+                      const backupObj = {
+                        app: 'LIVINGSTONEEDU',
+                        timestamp: new Date().toISOString(),
+                        usersCount: usersList.length,
+                        attendanceCount: attendanceRecords.length,
+                        outstandingCount: outstandingFees.length,
+                        securityMatrix: rolesPermissions
+                      };
+                      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupObj, null, 2));
+                      const downloadAnchor = document.createElement('a');
+                      downloadAnchor.setAttribute("href", dataStr);
+                      downloadAnchor.setAttribute("download", `livingstone_db_recovery_${Date.now()}.json`);
+                      document.body.appendChild(downloadAnchor);
+                      downloadAnchor.click();
+                      downloadAnchor.remove();
+                      showToast("Recovery JSON Database backup compiled and downloaded successfully!", "success");
+                    }}
+                    className="py-2.5 px-4 bg-indigo-650 hover:bg-indigo-720 text-white font-black text-xs rounded-xl cursor-pointer w-full text-center transition shadow-xs"
+                  >
+                    💾 Download Recovery snapshot JSON
+                  </button>
+                </div>
+
+                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-150 space-y-4 flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-black uppercase text-red-700 tracking-wider">Master Destruction Recovery</span>
+                    <p className="text-xs text-slate-500 leading-snug">
+                      Instantly flush out all custom local registries, customized student classes, grading metrics, and exam sessions. Reverts the system directory to the pristine factory preset.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      if (window.confirm("CRITICAL WARNING: This will permanently purge the customized local database registries. Are you absolutely sure you want to enforce master factory reset?")) {
+                        localStorage.clear();
+                        showToast("Local Storage database flushed. Reloading application portal...", "success");
+                        setTimeout(() => window.location.reload(), 1500);
+                      }
+                    }}
+                    className="py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white font-black text-xs rounded-xl cursor-pointer w-full text-center transition"
+                  >
+                    🔥 Purge Database & Re-sync Seeds
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 

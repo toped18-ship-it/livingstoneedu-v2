@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { ClassLevel, User, Subject, TermNumber, WeekNumber, LessonProgress, LessonContent } from '../types';
 import { getSubjectsForClass, getWeeklyTopicTitle, getLessonContent } from '../data/curriculum';
 import { SubjectIcon } from './SubjectIcon';
+import { rtdbGet, NODES } from '../lib/rtdbService';
 import { 
   BookOpen, ChevronRight, CheckCircle, Search, HelpCircle, 
   Flame, Award, ArrowLeft, RotateCcw, AlertCircle, Save, Sparkles,
@@ -17,6 +18,8 @@ interface LearningHubProps {
   demoUsageCount: number;
   onIncrementDemoUsage: () => number;
   onCustomizeSubjects?: () => void;
+  selectedSubjectId?: string;
+  setSelectedSubjectId?: (id: string) => void;
 }
 
 export function LearningHub({ 
@@ -27,7 +30,9 @@ export function LearningHub({
   onPaymentTrigger,
   demoUsageCount,
   onIncrementDemoUsage,
-  onCustomizeSubjects
+  onCustomizeSubjects,
+  selectedSubjectId: propsSelectedSubjectId,
+  setSelectedSubjectId: propsSetSelectedSubjectId
 }: LearningHubProps) {
   // Speech synthesis states
   const [currentlySpeaking, setCurrentlySpeaking] = useState<string | null>(null);
@@ -83,7 +88,19 @@ export function LearningHub({
   }, [user.classLevel, user.selectedSubjectIds]);
 
   // Selected State
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
+  const [localSubjectId, setLocalSubjectId] = useState<string>('');
+  const selectedSubjectId = propsSelectedSubjectId !== undefined && propsSelectedSubjectId !== '' ? propsSelectedSubjectId : localSubjectId;
+  const setSelectedSubjectId = propsSelectedSubjectId !== undefined && propsSetSelectedSubjectId ? propsSetSelectedSubjectId : setLocalSubjectId;
+
+  // Auto-tune subject on curriculum switch if current subject is no longer available
+  React.useEffect(() => {
+    if (subjects.length > 0) {
+      const exists = subjects.some(s => s.id === selectedSubjectId);
+      if (!exists) {
+        setSelectedSubjectId(subjects[0].id);
+      }
+    }
+  }, [subjects, selectedSubjectId, setSelectedSubjectId]);
 
   const selectedSubject = useMemo(() => {
     return subjects.find(s => s.id === selectedSubjectId) || subjects[0] || null;
@@ -213,17 +230,50 @@ export function LearningHub({
     setIsGeneratingAI(true);
     setAiError('');
     try {
+      // 1. Retrieve the curriculum node from Firebase Realtime Database
+      const rtdbCurriculum = await rtdbGet(NODES.CURRICULUM);
+      let matchedCurriculum: any = null;
+      
+      const targetTerm = selectedTerm === 1 ? '1st Term' : selectedTerm === 2 ? '2nd Term' : '3rd Term';
+      const targetWeek = selectedWeek;
+      const targetClass = user.classLevel || 'SS 1';
+      const targetSubject = selectedSubject.name;
+      
+      if (rtdbCurriculum) {
+        // Find entry with matching class, subject, term, and week
+        const keys = Object.keys(rtdbCurriculum);
+        for (const k of keys) {
+          const item = rtdbCurriculum[k];
+          if (
+            item &&
+            String(item.class).toLowerCase() === targetClass.toLowerCase() &&
+            String(item.subject).toLowerCase() === targetSubject.toLowerCase() &&
+            String(item.term).toLowerCase() === targetTerm.toLowerCase() &&
+            Number(item.week) === Number(targetWeek)
+          ) {
+            matchedCurriculum = item;
+            break;
+          }
+        }
+      }
+      
+      if (!matchedCurriculum) {
+        throw new Error(`The lesson note generator could not find any official curriculum entry in the database for Class: ${targetClass}, Subject: ${targetSubject}, Term: ${targetTerm}, Week: ${targetWeek}. Please publish a topic in the Admin Panel curriculum node first!`);
+      }
+      
+      // 2. We use the custom retrieved topic and description for generator API
       const response = await fetch('/api/gemini/generate-lesson-note', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          classLevel: user.classLevel,
-          subject: selectedSubject.name,
-          term: selectedTerm,
-          week: selectedWeek,
-          focusTopic: lesson.title,
+          classLevel: matchedCurriculum.class,
+          subject: matchedCurriculum.subject,
+          term: matchedCurriculum.term,
+          week: `Week ${matchedCurriculum.week}`,
+          focusTopic: matchedCurriculum.topic,
+          topicDescription: matchedCurriculum.details,
           isEndOfTerm: selectedWeek === 12
         })
       });
