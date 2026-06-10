@@ -1,0 +1,6 @@
+{
+  "name": "LIVINGSTONEEDU",
+  "description": "An interactive learning portal for Primary 1-6, JSS 1-3, and SS 1-3 following the official Nigerian curriculum with termly (1st-3rd) and weekly (1-12) lesson modules and quizzes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

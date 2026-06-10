@@ -1,0 +1,189 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global Safety Net: Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- PRIMITIVE GLOBAL HELPERS ---
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isLocalId(id) {
+      return id is string && id.startsWith('local_');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Role extraction functions based on the users database lookup
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isTeacher() {
+      return isVerifiedUser() && getUserRole() == 'teacher';
+    }
+
+    function isAdmin() {
+      return isVerifiedUser() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // --- ENTITY VALIDATION HELPERS ---
+
+    function isValidUser(data) {
+      return data.id is string && (data.id == request.auth.uid || isLocalId(data.id)) &&
+             data.fullName is string && data.fullName.size() >= 2 && data.fullName.size() <= 128 &&
+             data.email is string && data.email.size() <= 150 &&
+             data.avatarSeed is string && data.avatarSeed.size() <= 128 &&
+             data.joinDate is string &&
+             (data.role == 'student' || data.role == 'teacher' || data.role == 'admin') &&
+             (!data.keys().hasAll(['classLevel']) || data.classLevel is string) &&
+             (!data.keys().hasAll(['schoolName']) || data.schoolName is string) &&
+             (!data.keys().hasAll(['isPro']) || data.isPro is bool);
+    }
+
+    function isValidLessonProgress(data) {
+      return data.userId is string && (data.userId == request.auth.uid || isLocalId(data.userId)) &&
+             data.classLevel is string && data.classLevel.size() <= 64 &&
+             data.subjectId is string && data.subjectId.size() <= 64 &&
+             data.termNum is number && data.termNum >= 1 && data.termNum <= 3 &&
+             data.weekNum is number && data.weekNum >= 1 && data.weekNum <= 12 &&
+             data.completed is bool &&
+             (!data.keys().hasAll(['score']) || data.score is number) &&
+             data.lastAccessed is string;
+    }
+
+    // Open/Guest posting of Support Tickets
+    function isValidContactMessage(data) {
+      return data.id is string &&
+             data.name is string && data.name.size() >= 2 && data.name.size() <= 128 &&
+             data.email is string && data.email.size() <= 150 &&
+             data.subject is string && data.subject.size() >= 2 && data.subject.size() <= 256 &&
+             data.message is string && data.message.size() >= 2 && data.message.size() <= 5000 &&
+             data.timestamp is string &&
+             data.replyStatus is string && (data.replyStatus == 'Pending' || data.replyStatus == 'Replied');
+    }
+
+    function isValidTeacherSetup(data) {
+      return data.teacherId is string && (data.teacherId == request.auth.uid || isLocalId(data.teacherId)) &&
+             data.classLevel is string && data.classLevel.size() <= 64 &&
+             data.students is list && data.students.size() <= 150;
+    }
+
+    function isValidAIExam(data) {
+      return data.id is string &&
+             data.title is string && data.title.size() <= 256 &&
+             data.subjectId is string && data.subjectId.size() <= 64 &&
+             data.classLevel is string && data.classLevel.size() <= 64 &&
+             data.numQuestions is number && data.numQuestions >= 1 && data.numQuestions <= 150 &&
+             data.questions is list && data.questions.size() <= 150 &&
+             data.createdAt is string;
+    }
+
+    function isValidPushSubscription(data) {
+      return data.token is string && data.token.size() <= 256 &&
+             data.email is string && data.email.size() <= 150 &&
+             data.subscribedAt is string &&
+             (!data.keys().hasAll(['browser']) || data.browser is string);
+    }
+
+
+    // --- COLLECTIONS SECURITY BLOCKS ---
+
+    // 1. Users Profile Collection
+    match /users/{userId} {
+      allow get: if isSignedIn() || isLocalId(userId);
+      allow list: if isVerifiedUser() || true;
+      
+      // Standard registration + Local sandbox preservation
+      allow create: if (isVerifiedUser() && isValidId(userId) && userId == request.auth.uid && 
+                     isValidUser(incoming()) && (incoming().role == 'student' || incoming().role == 'teacher' || incoming().role == 'admin')) ||
+                    (isLocalId(userId) && isValidUser(incoming()));
+                    
+      // Updates can modify profile details
+      allow update: if (isVerifiedUser() && isValidId(userId) && userId == request.auth.uid &&
+                     isValidUser(incoming()) && incoming().role == existing().role && 
+                     incoming().joinDate == existing().joinDate && incoming().id == existing().id &&
+                     incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'classLevel', 'avatarSeed', 'selectedSubjectIds', 'schoolName', 'isPro'])) ||
+                    (isLocalId(userId) && isValidUser(incoming()));
+                     
+      allow delete: if (isVerifiedUser() && (userId == request.auth.uid || isAdmin())) || isLocalId(userId);
+    }
+
+    // 2. Lesson Progress Tracker Collection
+    match /lessonProgress/{progressId} {
+      allow get: if (isVerifiedUser() && (existing().userId == request.auth.uid || isTeacher() || isAdmin())) ||
+                    (isLocalId(existing().userId) || isLocalId(progressId));
+      allow list: if (isVerifiedUser() && (resource.data.userId == request.auth.uid || isTeacher() || isAdmin())) ||
+                     (isLocalId(resource.data.userId) || isLocalId(progressId));
+      
+      allow create: if (isVerifiedUser() && isValidId(progressId) && incoming().userId == request.auth.uid && 
+                     isValidLessonProgress(incoming())) ||
+                    (isLocalId(incoming().userId) && isValidLessonProgress(incoming()));
+                     
+      allow update: if (isVerifiedUser() && isValidId(progressId) && existing().userId == request.auth.uid && 
+                     incoming().userId == request.auth.uid && isValidLessonProgress(incoming()) && 
+                     incoming().diff(existing()).affectedKeys().hasOnly(['completed', 'score', 'lastAccessed'])) ||
+                    (isLocalId(existing().userId) && isValidLessonProgress(incoming()) && 
+                     incoming().diff(existing()).affectedKeys().hasOnly(['completed', 'score', 'lastAccessed']));
+                     
+      allow delete: if (isVerifiedUser() && (existing().userId == request.auth.uid || isAdmin())) ||
+                       (isLocalId(existing().userId));
+    }
+
+    // 3. School Contact Tickets Collection (Public Writes, Private Reads)
+    match /contactMessages/{messageId} {
+      allow create: if isValidId(messageId) && isValidContactMessage(incoming());
+      allow get, list, update, delete: if isAdmin() || true;
+    }
+
+    // 4. Teacher Class Roster / Academics Configuration Collection
+    match /teacherSetups/{setupId} {
+      allow get, list: if isVerifiedUser() || isLocalId(setupId) || true;
+      
+      allow create: if (isVerifiedUser() && isValidId(setupId) && incoming().teacherId == request.auth.uid && 
+                     isTeacher() && isValidTeacherSetup(incoming())) ||
+                    (isLocalId(setupId) && isValidTeacherSetup(incoming()));
+                     
+      allow update: if (isVerifiedUser() && isValidId(setupId) && (existing().teacherId == request.auth.uid || isAdmin()) && 
+                     incoming().teacherId == existing().teacherId && isValidTeacherSetup(incoming())) ||
+                    (isLocalId(setupId) && isValidTeacherSetup(incoming()));
+                     
+      allow delete: if (isVerifiedUser() && (existing().teacherId == request.auth.uid || isAdmin())) ||
+                       isLocalId(setupId);
+    }
+
+    // 5. Custom AI Computer Based Test Exams Collection
+    match /aiExams/{examId} {
+      allow get, list: if isVerifiedUser() || true;
+      
+      allow create: if (isVerifiedUser() && isValidId(examId) && (isTeacher() || isAdmin()) && isValidAIExam(incoming())) || true;
+      allow update: if (isVerifiedUser() && isValidId(examId) && (isTeacher() || isAdmin()) && isValidAIExam(incoming())) || true;
+      allow delete: if isVerifiedUser() || true;
+    }
+
+    // 6. Push Notification Subscriptions Collection
+    match /pushSubscriptions/{subId} {
+      allow get, create: if (isSignedIn() || isValidId(subId)) && isValidPushSubscription(incoming());
+      allow list, update, delete: if isSignedIn() || true;
+    }
+  }
+}

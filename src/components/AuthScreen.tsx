@@ -1,0 +1,560 @@
+import React, { useState } from 'react';
+import { ClassLevel } from '../types';
+import { ALL_CLASSES } from '../data/curriculum';
+import { BookOpen, User, Mail, GraduationCap, ArrowRight, Sparkles, Check, Lock } from 'lucide-react';
+
+interface AuthScreenProps {
+  onAuthComplete: (user: { fullName: string; email: string; classLevel?: ClassLevel; avatarSeed: string; role?: 'student' | 'teacher' | 'admin'; schoolName?: string }) => void;
+}
+
+const AVATAR_TEMPLATES = [
+  { seed: 'scholar', label: '🎓 Tech Scholar', color: 'bg-blue-100 text-blue-800 border-blue-300' },
+  { seed: 'science', label: '🔬 Science Whiz', color: 'bg-sky-100 text-sky-800 border-sky-300' },
+  { seed: 'math', label: '📐 Math Champion', color: 'bg-amber-100 text-amber-800 border-amber-300' },
+  { seed: 'writer', label: '✍️ Literary Star', color: 'bg-fuchsia-100 text-fuchsia-800 border-fuchsia-300' },
+  { seed: 'artist', label: '🎨 Creative Artist', color: 'bg-violet-100 text-violet-800 border-violet-300' },
+  { seed: 'agricultural', label: '🌱 Eco Farmer', color: 'bg-lime-100 text-lime-800 border-lime-300' },
+];
+
+export function AuthScreen({ onAuthComplete }: AuthScreenProps) {
+  const [isSignUp, setIsSignUp] = useState(true);
+  const [role, setRole] = useState<'student' | 'teacher'>('student');
+  const [isAdminMode, setIsAdminMode] = useState(false);
+  const [passcode, setPasscode] = useState('');
+  const [logoClicks, setLogoClicks] = useState(0);
+  
+  // Registration States
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [schoolName, setSchoolName] = useState('Livingstone Educational Academy');
+  const [avatarSeed, setAvatarSeed] = useState('scholar');
+  const [signupPassword, setSignupPassword] = useState('');
+  const [error, setError] = useState('');
+
+  // Login States
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    if (isSignUp) {
+      if (!fullName.trim()) {
+        setError('Please enter your full name');
+        return;
+      }
+      if (!email.trim() || !email.includes('@')) {
+        setError('Please enter a valid email address');
+        return;
+      }
+      if (role === 'teacher' && !schoolName.trim()) {
+        setError('Please specify your school name');
+        return;
+      }
+      if (!signupPassword || signupPassword.length < 4) {
+        setError('Please enter a password of at least 4 characters');
+        return;
+      }
+      
+      // Save credentials locally
+      const mockUserList = JSON.parse(localStorage.getItem('hub_users') || '[]');
+      const userExists = mockUserList.some((u: any) => u.email.toLowerCase() === email.toLowerCase());
+      
+      if (userExists) {
+        setError('An account with this email already exists. Try signing in!');
+        return;
+      }
+
+      const newUser = {
+        fullName: fullName.trim(),
+        email: email.trim().toLowerCase(),
+        password: signupPassword,
+        avatarSeed,
+        role,
+        schoolName: role === 'teacher' ? schoolName.trim() : undefined,
+        id: 'user_' + Date.now().toString()
+      };
+
+      mockUserList.push(newUser);
+      localStorage.setItem('hub_users', JSON.stringify(mockUserList));
+      onAuthComplete(newUser);
+
+      // Trigger automatic Gmail notification & welcome onboarding emails
+      fetch('/api/notify-signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: newUser.fullName,
+          email: newUser.email,
+          role: newUser.role,
+          schoolName: newUser.schoolName || 'Livingstone Educational Academy'
+        })
+      }).catch(err => console.error('Failed to dispatch signup emails:', err));
+    } else {
+      // Sign In Logic
+      if (!loginEmail.trim() || !loginEmail.includes('@')) {
+        setError('Please enter a valid email address');
+        return;
+      }
+
+      const lowerEmail = loginEmail.trim().toLowerCase();
+      const isOwnerEmail = lowerEmail === 'toped18@gmail.com';
+
+      if (isAdminMode || isOwnerEmail) {
+        const adminPass = passcode.trim() || loginPassword.trim();
+        if (!adminPass) {
+          setError('Please provide administrative passcode or password (admin123).');
+          return;
+        }
+
+        const isPasscodeCorrect = adminPass === 'owner7799' || adminPass === 'admin123';
+
+        if (isOwnerEmail && isPasscodeCorrect) {
+          const adminProfile = {
+            fullName: 'App Owner (Tope)',
+            email: 'toped18@gmail.com',
+            avatarSeed: 'scholar',
+            role: 'admin' as const,
+            schoolName: 'Livingstone Educational Academy'
+          };
+          onAuthComplete(adminProfile);
+          return;
+        } else {
+          setError('Access Denied. Only the verified App Owner (toped18@gmail.com) is permitted to access the Administration system with the passcode.');
+          return;
+        }
+      }
+
+      if (!loginPassword.trim()) {
+        setError('Please enter your password');
+        return;
+      }
+
+      const mockUserList = JSON.parse(localStorage.getItem('hub_users') || '[]');
+      const matchedUser = mockUserList.find((u: any) => u.email.toLowerCase() === lowerEmail);
+
+      if (matchedUser) {
+        if (matchedUser.password && matchedUser.password !== loginPassword.trim()) {
+          setError('Incorrect password. Please verify and try again.');
+          return;
+        }
+        // If matched user has role admin and is not the owner, force student role for public security
+        if (matchedUser.role === 'admin' && matchedUser.email.toLowerCase() !== 'toped18@gmail.com') {
+          matchedUser.role = 'student';
+        }
+        onAuthComplete(matchedUser);
+      } else {
+        setError('Email not registered yet. Feel free to Create an Account below!');
+      }
+    }
+  };
+
+  const handleDemoLogin = (userRole: 'primary' | 'jss' | 'ss' | 'teacher') => {
+    if (userRole === 'teacher') {
+      const targetUser = {
+        fullName: 'Mrs. Funke Alao',
+        email: 'funke@livingstone.ng',
+        avatarSeed: 'scholar',
+        role: 'teacher' as const,
+        schoolName: 'Livingstone Educational Academy'
+      };
+      const mockUserList = JSON.parse(localStorage.getItem('hub_users') || '[]');
+      const exists = mockUserList.some((u: any) => u.email.toLowerCase() === targetUser.email.toLowerCase());
+      if (!exists) {
+        mockUserList.push({ ...targetUser, id: 'user_teacher_demo' });
+        localStorage.setItem('hub_users', JSON.stringify(mockUserList));
+      }
+      onAuthComplete(targetUser);
+      return;
+    }
+
+    const demoUsers = {
+      primary: {
+        fullName: 'Chidi Okafor',
+        email: 'chidi@gmail.com',
+        classLevel: 'Primary 4' as ClassLevel,
+        avatarSeed: 'scholar',
+        role: 'student' as const,
+      },
+      jss: {
+        fullName: 'Aminat Bello',
+        email: 'aminat@gmail.com',
+        classLevel: 'JSS 3' as ClassLevel,
+        avatarSeed: 'science',
+        role: 'student' as const,
+      },
+      ss: {
+        fullName: 'Tunde Adebayo',
+        email: 'tunde@gmail.com',
+        classLevel: 'SS 3' as ClassLevel,
+        avatarSeed: 'math',
+        role: 'student' as const,
+      }
+    };
+
+    const targetUser = demoUsers[userRole];
+    const mockUserList = JSON.parse(localStorage.getItem('hub_users') || '[]');
+    const exists = mockUserList.some((u: any) => u.email.toLowerCase() === targetUser.email.toLowerCase());
+    if (!exists) {
+      mockUserList.push({ ...targetUser, id: 'user_' + userRole });
+      localStorage.setItem('hub_users', JSON.stringify(mockUserList));
+    }
+    
+    onAuthComplete(targetUser);
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        {/* Brand Header */}
+        <div 
+          onClick={() => {
+            setLogoClicks(prev => {
+              if (prev + 1 >= 5) {
+                setIsAdminMode(curr => !curr);
+                setIsSignUp(false);
+                setLoginEmail('toped18@gmail.com');
+                setPasscode('admin123');
+                return 0;
+              }
+              return prev + 1;
+            });
+          }}
+          className="flex justify-center items-center gap-2 mb-4 cursor-pointer select-none"
+          title="Curriculum Portal"
+        >
+          <div className="p-2.5 bg-blue-600 rounded-xl shadow-md shadow-blue-200">
+            <GraduationCap className="h-8 w-8 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 leading-none">LIVINGSTONEEDU</h1>
+            <p className="text-xs font-semibold text-blue-600 uppercase tracking-widest mt-1">National Curriculum Portal</p>
+          </div>
+        </div>
+        
+        <h2 className="text-center text-3xl font-extrabold text-slate-800 leading-tight">
+          {isSignUp ? "Create your profile" : "Sign in to your dashboard"}
+        </h2>
+        <p className="mt-2 text-center text-sm text-slate-600">
+          Access terms 1-3, weeks 1-12 curriculum lessons, practice quizzes & classroom administration.
+        </p>
+      </div>
+
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-xl">
+        <div className="bg-white py-8 px-6 shadow-xl rounded-2xl border border-slate-100 sm:px-10">
+          
+          {/* Role Choice Selector Tab (Only during SignUp) */}
+          {isSignUp && (
+            <div className="mb-6">
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 text-center">
+                Select Your Educational Capacity
+              </label>
+              <div className="grid grid-cols-2 gap-3 p-1 bg-slate-100 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setRole('student')}
+                  className={`py-2 text-xs font-black rounded-lg transition-all cursor-pointer ${
+                    role === 'student' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  👨‍🎓 Student Account
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRole('teacher')}
+                  className={`py-2 text-xs font-black rounded-lg transition-all cursor-pointer ${
+                    role === 'teacher' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  👩‍🏫 Teacher / School Account
+                </button>
+              </div>
+            </div>
+          )}
+
+          <form className="space-y-6" onSubmit={handleSubmit}>
+            {error && (
+              <div className="p-3 bg-red-50 border-l-4 border-red-500 rounded text-xs font-medium text-red-700 font-sans">
+                {error}
+              </div>
+            )}
+
+            {isSignUp ? (
+              // Sign Up Form
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Full Name */}
+                  <div>
+                    <label htmlFor="name" className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                      Full Name
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                        <User size={16} />
+                      </div>
+                      <input
+                        id="name"
+                        type="text"
+                        required
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        placeholder={role === 'teacher' ? "e.g. Mrs. Funke Alao" : "e.g. Obi Emeka"}
+                        className="block w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Email */}
+                  <div>
+                    <label htmlFor="email" className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                      Email Address
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                        <Mail size={16} />
+                      </div>
+                      <input
+                        id="email"
+                        type="email"
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="e.g. admin@school.ng"
+                        className="block w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Password input */}
+                <div>
+                  <label htmlFor="signup_password" className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                    Account Access Password
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <Lock size={16} />
+                    </div>
+                    <input
+                      id="signup_password"
+                      type="password"
+                      required
+                      value={signupPassword}
+                      onChange={(e) => setSignupPassword(e.target.value)}
+                      placeholder="e.g. Enter secure password (min 4 characters)"
+                      className="block w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Optional School Name (Teacher Only) */}
+                {role === 'teacher' && (
+                  <div>
+                    <label htmlFor="school" className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                      School / Institution Name
+                    </label>
+                    <input
+                      id="school"
+                      type="text"
+                      required
+                      value={schoolName}
+                      onChange={(e) => setSchoolName(e.target.value)}
+                      placeholder="e.g. Livingstone Educational Academy"
+                      className="block w-full px-3.5 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none font-bold text-slate-700"
+                    />
+                  </div>
+                )}
+
+                {/* Select Avatar seed */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                    Choose Character / Study Badge
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {AVATAR_TEMPLATES.map((tpl) => {
+                      const isSelected = avatarSeed === tpl.seed;
+                      return (
+                        <button
+                          key={tpl.seed}
+                          type="button"
+                          onClick={() => setAvatarSeed(tpl.seed)}
+                          className={`relative py-2 px-3 text-xs border rounded-xl flex items-center justify-between transition-all ${tpl.color} ${
+                            isSelected ? 'ring-2 ring-blue-600 scale-[1.02] shadow-sm font-bold' : 'opacity-85 hover:opacity-100'
+                          }`}
+                        >
+                          <span>{tpl.label}</span>
+                          {isSelected && <Check size={12} className="text-blue-700 absolute right-1.5 top-1.5" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Button */}
+                <div>
+                  <button
+                    type="submit"
+                    className="w-full py-2.5 px-4 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-600/10 active:scale-[0.99] transition flex items-center justify-center gap-2 cursor-pointer font-black uppercase tracking-wider"
+                  >
+                    <span>Register {role === 'teacher' ? 'Teacher' : 'Student'} Profile</span>
+                    <ArrowRight size={16} />
+                  </button>
+                </div>
+              </>
+            ) : (
+              // Sign In Form
+              <>
+                <div>
+                  <label htmlFor="login_email" className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                    {isAdminMode ? "Owner Applet Secret Key Email" : "Email Address"}
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <Mail size={16} />
+                    </div>
+                    <input
+                      id="login_email"
+                      type="email"
+                      required
+                      value={loginEmail}
+                      onChange={(e) => setLoginEmail(e.target.value)}
+                      placeholder={isAdminMode ? "toped18@gmail.com" : "e.g. user@school.ng"}
+                      className="block w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                    />
+                  </div>
+                </div>
+
+                {!isAdminMode ? (
+                  <div>
+                    <label htmlFor="login_password" className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                      Password
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                        <Lock size={16} />
+                      </div>
+                      <input
+                        id="login_password"
+                        type="password"
+                        required
+                        placeholder="Enter your password"
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
+                        className="block w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <label htmlFor="login_passcode" className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
+                      Owner Secret Passcode Key
+                    </label>
+                    <input
+                      id="login_passcode"
+                      type="password"
+                      required
+                      placeholder="Enter Owner Key"
+                      value={passcode}
+                      onChange={(e) => setPasscode(e.target.value)}
+                      className="block w-full px-4 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none font-bold text-slate-700"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <button
+                    type="submit"
+                    className="w-full py-2.5 px-4 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-600/10 active:scale-[0.99] transition flex items-center justify-center gap-2 cursor-pointer font-black uppercase tracking-wider"
+                  >
+                    <span>{isAdminMode ? "Verify Owner Signature" : "Sign In and Load Dashboard"}</span>
+                    <ArrowRight size={16} />
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Form Toggle Link */}
+            <div className="text-center flex flex-col items-center gap-2 pt-2">
+              <button
+                type="button"
+                className="text-xs text-slate-600 hover:text-blue-755 font-medium underline cursor-pointer"
+                onClick={() => {
+                  setError('');
+                  setIsSignUp(!isSignUp);
+                  setIsAdminMode(false);
+                }}
+              >
+                {isSignUp ? "Already have a registered email? Sign In here" : "Need to register? Create a new Profile here"}
+              </button>
+
+              {!isSignUp && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError('');
+                    const nextMode = !isAdminMode;
+                    setIsAdminMode(nextMode);
+                    if (nextMode) {
+                      setLoginEmail('toped18@gmail.com');
+                      setPasscode('admin123');
+                    } else {
+                      setLoginEmail('');
+                      setPasscode('');
+                    }
+                  }}
+                  className="mt-2 text-xs text-indigo-650 hover:text-indigo-800 font-extrabold flex items-center justify-center gap-1.5 cursor-pointer bg-slate-50 hover:bg-indigo-50/50 px-3 py-1.5 rounded-xl border border-slate-200 hover:border-indigo-200 transition"
+                >
+                  <Lock size={12} className="text-indigo-600" />
+                  <span>{isAdminMode ? "Switch to Regular Student/Teacher Login" : "App Owner & Admin Portal Sign In"}</span>
+                </button>
+              )}
+            </div>
+          </form>
+
+          {/* Quick Demo Accounts Helper */}
+          <div className="mt-8 pt-6 border-t border-slate-100">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest text-center mb-3 flex items-center justify-center gap-1">
+              <Sparkles size={12} className="text-amber-500" />
+              <span>Or log in instantly with demo profiles</span>
+            </h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <button
+                type="button"
+                onClick={() => handleDemoLogin('primary')}
+                className="px-2 py-1.5 text-[11px] font-medium border border-slate-250 rounded-xl text-slate-700 bg-white hover:bg-slate-50 transition shadow-sm flex flex-col items-center cursor-pointer"
+              >
+                <span className="font-bold text-blue-605">Prim. 4</span>
+                <span className="text-[9px] text-slate-400">Student</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDemoLogin('jss')}
+                className="px-2 py-1.5 text-[11px] font-medium border border-slate-250 rounded-xl text-slate-700 bg-white hover:bg-slate-50 transition shadow-sm flex flex-col items-center cursor-pointer"
+              >
+                <span className="font-bold text-[#0d9488]">JSS 3</span>
+                <span className="text-[9px] text-slate-400">Junior High</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDemoLogin('ss')}
+                className="px-2 py-1.5 text-[11px] font-medium border border-slate-250 rounded-xl text-slate-700 bg-white hover:bg-slate-50 transition shadow-sm flex flex-col items-center cursor-pointer"
+              >
+                <span className="font-bold text-sky-655">SS 3</span>
+                <span className="text-[9px] text-slate-400">Senior High</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDemoLogin('teacher')}
+                className="px-2 py-1.5 text-[11px] font-medium border border-indigo-250 rounded-xl text-indigo-700 bg-indigo-50/50 hover:bg-indigo-50 transition shadow-sm flex flex-col items-center cursor-pointer"
+              >
+                <span className="font-bold">TEACHER</span>
+                <span className="text-[9px] text-indigo-400">Class Admin</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

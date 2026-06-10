@@ -1,0 +1,202 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Document mapping unique student, teacher, or admin demographics, preferences, and roles.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Matches the authenticated user's unique Firebase UID."
+        },
+        "fullName": {
+          "type": "string",
+          "description": "Human-readable full name."
+        },
+        "email": {
+          "type": "string",
+          "description": "Verified correspondence email address of user."
+        },
+        "classLevel": {
+          "type": "string",
+          "description": "Class standard from Primary 1 to SS 3."
+        },
+        "avatarSeed": {
+          "type": "string",
+          "description": "Seed for canvas-generated profile pictures."
+        },
+        "joinDate": {
+          "type": "string",
+          "description": "ISO string marking platform registration."
+        },
+        "selectedSubjectIds": {
+          "type": "array",
+          "description": "A list of selected subject standard IDs."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["student", "teacher", "admin"],
+          "description": "Current authorization layer standard in the RBAC hierarchy."
+        },
+        "schoolName": {
+          "type": "string",
+          "description": "Name of primary academic institution enrolled in."
+        },
+        "isPro": {
+          "type": "boolean",
+          "description": "Billing tier configuration identifier."
+        }
+      },
+      "required": ["id", "fullName", "email", "avatarSeed", "joinDate", "role"]
+    },
+    "LessonProgress": {
+      "title": "Lesson Progress Tracker",
+      "description": "Stores state of student's progress and quiz scores across terms and subject units.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The student UID."
+        },
+        "classLevel": {
+          "type": "string"
+        },
+        "subjectId": {
+          "type": "string"
+        },
+        "termNum": {
+          "type": "number"
+        },
+        "weekNum": {
+          "type": "number"
+        },
+        "completed": {
+          "type": "boolean"
+        },
+        "score": {
+          "type": "number"
+        },
+        "lastAccessed": {
+          "type": "string"
+        }
+      },
+      "required": ["userId", "classLevel", "subjectId", "termNum", "weekNum", "completed", "lastAccessed"]
+    },
+    "ContactMessage": {
+      "title": "LMS Contact Query",
+      "description": "Submitted help tickets or correspondence from students, teachers, or parents.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "string"
+        },
+        "replyStatus": {
+          "type": "string",
+          "enum": ["Pending", "Replied"]
+        }
+      },
+      "required": ["id", "name", "email", "subject", "message", "timestamp", "replyStatus"]
+    },
+    "TeacherClassSetup": {
+      "title": "Teacher Classroom and Scores",
+      "description": "Stores current classroom structures, student reports, test marks and attendance data for a teacher.",
+      "type": "object",
+      "properties": {
+        "teacherId": {
+          "type": "string",
+          "description": "Matches the teacher user's UID."
+        },
+        "classLevel": {
+          "type": "string"
+        },
+        "students": {
+          "type": "array",
+          "description": "Holds nested students, including cumulative assessment scoring and attendance history maps."
+        }
+      },
+      "required": ["teacherId", "classLevel", "students"]
+    },
+    "AIExam": {
+      "title": "AI Computer Based Test",
+      "description": "Dynamic custom examination papers generated using AI modules, saved for class execution.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "subjectId": {
+          "type": "string"
+        },
+        "classLevel": {
+          "type": "string"
+        },
+        "numQuestions": {
+          "type": "number"
+        },
+        "questions": {
+          "type": "array"
+        },
+        "createdAt": {
+          "type": "string"
+        }
+      },
+      "required": ["id", "title", "subjectId", "classLevel", "numQuestions", "questions", "createdAt"]
+    },
+    "PushSubscription": {
+      "title": "Push Subscription Details",
+      "description": "FCM device registration token mapping for notifications.",
+      "type": "object",
+      "properties": {
+        "token": { "type": "string" },
+        "email": { "type": "string" },
+        "subscribedAt": { "type": "string" },
+        "browser": { "type": "string" }
+      },
+      "required": ["token", "email", "subscribedAt"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "User profiles, accessible by the authenticated user or an administrator."
+    },
+    "lessonProgress/{progressId}": {
+      "schema": "LessonProgress",
+      "description": "Tracks progress. Authenticated users write their own progress, read their own history."
+    },
+    "contactMessages/{messageId}": {
+      "schema": "ContactMessage",
+      "description": "Correspondence messages securely posted by any user, read strictly by admins or back-offices."
+    },
+    "teacherSetups/{setupId}": {
+      "schema": "TeacherClassSetup",
+      "description": "Academic roster and report records managed by teachers."
+    },
+    "aiExams/{examId}": {
+      "schema": "AIExam",
+      "description": "Custom educational exams editable by teachers and admins, retrievable by active students."
+    },
+    "pushSubscriptions/{subId}": {
+      "schema": "PushSubscription",
+      "description": "Subscribed push tokens."
+    }
+  }
+}
