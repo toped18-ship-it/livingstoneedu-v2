@@ -3,7 +3,7 @@ name: Deploy to InfinityFree
 on:
   push:
     branches:
-      - main # Change this if your default branch is master
+      - main
 
 jobs:
   web-deploy:
@@ -15,11 +15,12 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Sync Files via FTP
-      uses: SamKirkland/FTP-Deploy-Action@4.3.4
+      uses: QuadraSystems/FTP-Deploy-Action@1.1.0
       with:
-        server: ftpupload.net
-        username: ${{ secrets.FTP_if0_42169733}}
-        password: ${{ secrets.FTP_yJBfoEeiZ9fj3}}
+        ftp-server: ftpupload.net
+        ftp-username: ${{ secrets.FTP_if0_42169733}}
+        ftp-password: ${{ secrets.FTP_yJBfoEeiZ9fj3}}
         local-dir: ./
         server-dir: /htdocs/livingstoneedu.great-site.net
+        
         
