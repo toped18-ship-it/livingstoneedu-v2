@@ -15,7 +15,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Sync Files via FTP
-      uses: SebastianVettel/ftp-action@v2.0.0
+      uses: sebastianvettel/ftp-action@v2.0.0
       with:
         host: ftpupload.net
         user: ${{ secrets.FTP_USERNAME }}
