@@ -21,5 +21,5 @@ jobs:
         username: ${{ secrets.FTP_if0_42169733}}
         password: ${{ secrets.FTP_yJBfoEeiZ9fj3}}
         local-dir: ./
-        server-dir: /htdocs/ # Use /yourdomain.com/htdocs/ if hosting multiple domains
+        server-dir: /htdocs/livingstoneedu.great-site.net
         
