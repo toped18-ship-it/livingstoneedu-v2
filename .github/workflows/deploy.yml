@@ -3,23 +3,32 @@ name: Deploy to InfinityFree
 on:
   push:
     branches:
-      - main
+      - main  # Change to your default branch name if different
 
 jobs:
-  web-deploy:
-    name: Deploy Website
+  build-and-deploy:
     runs-on: ubuntu-latest
-    
     steps:
-    - name: Get Latest Code
+    - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Sync Files via FTP
-      uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
       with:
-        server: ftpupload.net
+        node-version: 20
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Build React App
+      run: npm run build
+
+    - name: Deploy via FTP
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      with:
+        server: ${{ secrets.FTP_SERVER }}
         username: ${{ secrets.FTP_USERNAME }}
         password: ${{ secrets.FTP_PASSWORD }}
-        local-dir: ./
+        local-dir: ./dist/
         server-dir: /htdocs/
-    
+        
