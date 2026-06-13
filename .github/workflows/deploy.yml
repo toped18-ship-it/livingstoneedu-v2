@@ -18,8 +18,8 @@ jobs:
       uses: QuadraSystems/FTP-Deploy-Action@1.1.0
       with:
         ftp-server: ftpupload.net
-        ftp-username: ${{ secrets.FTP_if0_42169733}}
-        ftp-password: ${{ secrets.FTP_yJBfoEeiZ9fj3}}
+        ftp-username: ${{ secrets.FTP_USERNAME}}
+        ftp-password: ${{ secrets.FTP_PASSWORD }}
         local-dir: ./
         server-dir: /htdocs/livingstoneedu.great-site.net
         
