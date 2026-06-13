@@ -73,7 +73,7 @@ export function HomeDashboard({ user, progressList, onNavigateToHub, onClassChan
             </div>
             
             <h1 className="text-2.5xl sm:text-4.5xl font-extrabold tracking-tight">
-              Ẹ n lẹ, {user.fullName}! 👋
+              Welcome, {user.fullName}! 👋
             </h1>
             
             <p className="text-xs sm:text-sm text-blue-50 max-w-xl leading-relaxed">
