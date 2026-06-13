@@ -15,11 +15,11 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Sync Files via FTP
-      uses: sebastianvettel/ftp-action@v2.0.0
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.4
       with:
-        host: ftpupload.net
-        user: ${{ secrets.FTP_USERNAME }}
+        server: ftpupload.net
+        username: ${{ secrets.FTP_USERNAME }}
         password: ${{ secrets.FTP_PASSWORD }}
-        localDir: ./
-        remoteDir: /livingstoneedu.great-site.net/htdocs/
+        local-dir: ./
+        server-dir: /livingstoneedu.great-site.net/htdocs/
         
