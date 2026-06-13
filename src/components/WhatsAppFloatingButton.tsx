@@ -7,12 +7,13 @@ interface WhatsAppFloatingButtonProps {
 }
 
 export function WhatsAppFloatingButton({ 
-  contactName = 'Livingstone Support', 
+  contactName = 'LIVINGSTONEEDU', 
   supportGroupUrl = 'https://wa.me/message/AJ4NILOGBTTMJ1' 
 }: WhatsAppFloatingButtonProps) {
   const [showPopup, setShowPopup] = useState(false);
+  const channelUrl = 'https://chat.whatsapp.com/Br0kHET2Ed77TORxkv1ip6';
 
-  // Auto-show a friendly popup greeting after 3 seconds, unless dismissed before
+  // Auto-show a friendly popup greeting after 3.5 seconds, unless dismissed before
   useEffect(() => {
     const isDismissed = localStorage.getItem('whatsapp_popup_dismissed');
     if (!isDismissed) {
@@ -34,44 +35,69 @@ export function WhatsAppFloatingButton({
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end pointer-events-none">
       {/* Interactive Chat Speech Popup Bubble */}
       {showPopup && (
-        <div className="mb-3 w-72 bg-white rounded-2xl p-4 shadow-2xl border border-emerald-100 flex flex-col gap-2.5 animate-bounce-short pointer-events-auto relative">
+        <div className="mb-3 w-80 bg-white rounded-2xl p-5 shadow-2xl border-[3px] border-black flex flex-col gap-3 animate-bounce-short pointer-events-auto relative">
           <button
             onClick={handleDismiss}
-            className="absolute top-2 right-2 p-1 text-slate-400 hover:text-slate-650 rounded-full hover:bg-slate-50 transition cursor-pointer"
+            className="absolute top-3 right-3 p-1 text-slate-500 hover:text-black hover:bg-slate-100 rounded-full transition cursor-pointer border border-transparent hover:border-black"
             title="Dismiss widget"
           >
-            <X size={14} />
+            <X size={14} className="stroke-[2.5]" />
           </button>
           
           <div className="flex items-center gap-2">
-            <span className="flex h-2 w-2 relative">
+            <span className="flex h-2.5 w-2.5 relative">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
             </span>
-            <span className="text-[10px] uppercase font-black text-emerald-600 tracking-wider font-sans">{contactName}</span>
+            <span className="text-[10px] uppercase font-black text-black tracking-wider bg-emerald-200 border border-black px-2 py-0.5 rounded shadow-[1px_1px_0px_black] font-mono">
+              LIVINGSTONE ONLINE
+            </span>
           </div>
 
-          <p className="text-xs text-slate-705 leading-relaxed pr-3 font-sans">
-            Need help with termly subjects, teacher setup, exam compile guides or billing? Contact our support staff directly!
-          </p>
+          <div className="space-y-1">
+            <h4 className="text-xs font-black text-black uppercase tracking-tight">Stay connected with us!</h4>
+            <p className="text-[11px] text-slate-800 leading-relaxed font-semibold">
+              Get the latest homework reviews, academic syllabus plans, exam guides or direct portal billing support.
+            </p>
+          </div>
 
-          <a
-            href={supportGroupUrl}
-            target="_blank"
-            referrerPolicy="no-referrer"
-            rel="noopener noreferrer"
-            onClick={() => {
-              setShowPopup(false);
-              localStorage.setItem('whatsapp_popup_dismissed', 'true');
-            }}
-            className="inline-flex items-center justify-between py-2 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] transition-all text-white text-[11px] font-bold rounded-xl shadow-md shadow-emerald-600/10 cursor-pointer"
-          >
-            <span className="flex items-center gap-1.5 font-sans">
-              <MessageSquare size={12} />
-              <span>Chat with Support</span>
-            </span>
-            <ArrowUpRight size={12} />
-          </a>
+          <div className="flex flex-col gap-2 pt-1">
+            <a
+              href={channelUrl}
+              target="_blank"
+              referrerPolicy="no-referrer"
+              rel="noopener noreferrer"
+              onClick={() => {
+                setShowPopup(false);
+                localStorage.setItem('whatsapp_popup_dismissed', 'true');
+              }}
+              className="inline-flex items-center justify-between py-2 px-3 bg-emerald-400 hover:bg-emerald-500 active:translate-x-[1px] active:translate-y-[1px] transition-all text-black border-2 border-black text-xs font-black rounded-xl shadow-[3px_3px_0px_black] cursor-pointer"
+            >
+              <span className="flex items-center gap-1.5 font-sans">
+                <Users size={14} className="stroke-[2.5]" />
+                <span>Join WhatsApp Channel</span>
+              </span>
+              <ArrowUpRight size={14} className="stroke-[2.5]" />
+            </a>
+
+            <a
+              href={supportGroupUrl}
+              target="_blank"
+              referrerPolicy="no-referrer"
+              rel="noopener noreferrer"
+              onClick={() => {
+                setShowPopup(false);
+                localStorage.setItem('whatsapp_popup_dismissed', 'true');
+              }}
+              className="inline-flex items-center justify-between py-2 px-3 bg-[#e0f2fe] hover:bg-[#bae6fd] active:translate-x-[1px] active:translate-y-[1px] transition-all text-black border-2 border-black text-xs font-black rounded-xl shadow-[3px_3px_0px_black] cursor-pointer"
+            >
+              <span className="flex items-center gap-1.5 font-sans">
+                <MessageSquare size={14} className="stroke-[2.5]" />
+                <span>Message LIVINGSTONEEDU</span>
+              </span>
+              <ArrowUpRight size={14} className="stroke-[2.5]" />
+            </a>
+          </div>
         </div>
       )}
 
@@ -81,8 +107,8 @@ export function WhatsAppFloatingButton({
         target="_blank"
         referrerPolicy="no-referrer"
         rel="noopener noreferrer"
-        title={`Chat with ${contactName}`}
-        className="pointer-events-auto h-14 w-14 rounded-full bg-[#25D366] hover:bg-[#20ba59] active:scale-95 text-white flex items-center justify-center shadow-xl shadow-emerald-500/30 hover:shadow-emerald-600/40 border-2 border-white transition-all cursor-pointer relative group"
+        title="Message LIVINGSTONEEDU on WhatsApp"
+        className="pointer-events-auto h-14 w-14 rounded-full bg-[#25D366] hover:bg-[#20ba59] active:scale-95 text-white flex items-center justify-center shadow-[4px_4px_0px_black] border-[3px] border-black transition-all cursor-pointer relative group"
       >
         {/* WhatsApp Icon in SVG for perfect premium representation */}
         <svg 
@@ -98,13 +124,14 @@ export function WhatsAppFloatingButton({
         </svg>
 
         {/* Floating tooltip on hover */}
-        <span className="absolute right-16 scale-0 group-hover:scale-100 bg-slate-900 text-white text-[10px] font-bold py-1 px-2.5 rounded-lg whitespace-nowrap shadow-md transition-all duration-150">
-          Chat with {contactName} on WhatsApp 🇳🇬
+        <span className="absolute right-18 scale-0 group-hover:scale-100 bg-[#FAFAFA] text-black border-2 border-black shadow-[2px_2px_0px_black] text-[10px] font-black py-1 px-2.5 rounded-lg whitespace-nowrap transition-all duration-150">
+          Message us on WhatsApp 🇳🇬
         </span>
 
         {/* Small live pulse beacon */}
-        <span className="absolute -top-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-red-500 border-2 border-white animate-pulse" />
+        <span className="absolute -top-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-red-500 border-2 border-black animate-pulse" />
       </a>
     </div>
   );
 }
+

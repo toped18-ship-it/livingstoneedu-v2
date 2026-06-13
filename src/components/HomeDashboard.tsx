@@ -58,31 +58,33 @@ export function HomeDashboard({ user, progressList, onNavigateToHub, onClassChan
   };
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      {/* Hero Welcome banner */}
-      <div className="bg-gradient-to-r from-blue-700 via-blue-650 to-indigo-700 rounded-3xl p-6 sm:p-8 text-white shadow-xl shadow-blue-100 relative overflow-hidden">
-        {/* Abstract background graphics */}
-        <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-64 h-64 bg-white/10 rounded-full blur-2xl" />
-        <div className="absolute left-1/3 bottom-0 translate-y-16 w-52 h-52 bg-blue-800/20 rounded-full blur-xl" />
+    <div className="space-y-8 animate-fade-in font-sans">
+      {/* Personalized Active Dashboard Banner */}
+      <div className="bg-gradient-to-r from-blue-700 via-blue-650 to-indigo-700 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
+        {/* Abstract design layout */}
+        <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none select-none" />
+        <div className="absolute left-1/3 bottom-0 translate-y-16 w-52 h-52 bg-blue-800/20 rounded-full blur-xl pointer-events-none select-none" />
 
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-3">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/15 backdrop-blur-md rounded-full text-xs font-semibold">
-              <Star size={12} className="fill-amber-300 text-amber-300" />
+          <div className="space-y-2.5">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/15 backdrop-blur-md rounded-full text-[10px] font-black uppercase tracking-wider">
+              <Star size={11} className="fill-amber-300 text-amber-300 animate-spin-slow" />
               <span>Academic Year 2026/2027</span>
             </div>
-            <h1 className="text-2xl sm:text-4.5xl font-extrabold tracking-tight">
-              Aanu, {user.fullName}!
+            
+            <h1 className="text-2.5xl sm:text-4.5xl font-extrabold tracking-tight">
+              Ẹ n lẹ, {user.fullName}! 👋
             </h1>
-            <p className="text-sm sm:text-base text-blue-50 max-w-xl">
-              Welcome back to your personalized studies companion. You are currently studying the national curriculum for <span className="font-bold underline decoration-amber-300 decoration-2">{user.classLevel}</span>.
+            
+            <p className="text-xs sm:text-sm text-blue-50 max-w-xl leading-relaxed">
+              Welcome back to your personalized academic headquarters. You are currently exploring the official West African NERDC syllabus subjects for <span className="font-bold underline decoration-amber-300 decoration-2">{user.classLevel}</span>.
             </p>
           </div>
 
           <div className="flex gap-3 shrink-0">
             <button
-              onClick={onNavigateToHub}
-              className="px-5 py-2.5 bg-white text-blue-900 hover:bg-slate-50 rounded-xl text-xs sm:text-sm font-semibold shadow-md active:scale-95 transition cursor-pointer"
+              onClick={() => onNavigateToHub()}
+              className="px-5 py-2.5 bg-white text-blue-900 hover:bg-slate-50 rounded-xl text-xs sm:text-xs font-black uppercase tracking-wider shadow-md transition-all cursor-pointer"
             >
               Express Learning Hub
             </button>

@@ -189,19 +189,19 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
   }, [currentUser]);
 
   // Main UI Tab Router
-  const [activeAdminTab, setActiveAdminTab] = useState<'dashboard' | 'users' | 'curriculum' | 'cbt' | 'payments' | 'results' | 'branding' | 'inquiries' | 'activities' | 'gmail' | 'session' | 'attendance' | 'comms' | 'fees' | 'settings' | 'moderation' | 'db'>('dashboard');
+  const [activeAdminTab, setActiveAdminTab] = useState<'dashboard' | 'users' | 'curriculum' | 'cbt' | 'payments' | 'results' | 'branding' | 'inquiries' | 'activities' | 'gmail' | 'session' | 'attendance' | 'comms' | 'fees' | 'settings' | 'moderation' | 'db'>('payments');
 
   // Interactive configurations
-  const [brandName, setBrandName] = useState(currentConfig.brandName);
-  const [appSubtitle, setAppSubtitle] = useState(currentConfig.appSubtitle);
-  const [proPrice, setProPrice] = useState(currentConfig.proPrice);
-  const [supportGroupUrl, setSupportGroupUrl] = useState(currentConfig.supportGroupUrl);
-  const [contactName, setContactName] = useState(currentConfig.contactName);
-  const [paystackLink, setPaystackLink] = useState((currentConfig as any).paystackLink || '');
-  const [flutterwaveLink, setFlutterwaveLink] = useState((currentConfig as any).flutterwaveLink || '');
-  const [bankName, setBankName] = useState((currentConfig as any).bankName || 'WEMA Bank (Paystack Secure)');
-  const [bankAccountNumber, setBankAccountNumber] = useState((currentConfig as any).bankAccountNumber || '9038472910');
-  const [bankAccountName, setBankAccountName] = useState((currentConfig as any).bankAccountName || 'LIVINGSTONEEDU PREMIUM PORTAL');
+  const [brandName, setBrandName] = useState(currentConfig.brandName || 'LIVINGSTONEEDU');
+  const [appSubtitle, setAppSubtitle] = useState(currentConfig.appSubtitle || 'Learning Portal');
+  const [proPrice, setProPrice] = useState('₦10,000');
+  const [supportGroupUrl, setSupportGroupUrl] = useState(currentConfig.supportGroupUrl || 'https://wa.me/message/AJ4NILOGBTTMJ1');
+  const [contactName, setContactName] = useState(currentConfig.contactName || 'Livingtch Brand Agency');
+  const [paystackLink, setPaystackLink] = useState((currentConfig as any).paystackLink || 'https://paystack.com/pay/livingstone-pro-access');
+  const [flutterwaveLink, setFlutterwaveLink] = useState((currentConfig as any).flutterwaveLink || 'https://flutterwave.com/pay/livingstone-secondary-pro');
+  const [bankName, setBankName] = useState('Zenith Bank');
+  const [bankAccountNumber, setBankAccountNumber] = useState('2257503451');
+  const [bankAccountName, setBankAccountName] = useState('temitope oluwaseun fatoye');
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState('');
 
@@ -1463,268 +1463,299 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         {/* Left Side Navigation Sidebar */}
-        <div className="lg:col-span-3 space-y-1.5">
-          <div className="text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2 pl-2">SCHOOL CORE ROOMS</div>
+        <div className="lg:col-span-3 space-y-4">
           
-          <button
-            type="button"
-            onClick={() => setActiveAdminTab('dashboard')}
-            className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-between transition cursor-pointer ${
-              activeAdminTab === 'dashboard'
-                ? 'bg-indigo-650 text-white shadow-md font-black'
-                : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-150'
-            }`}
-          >
-            <span className="flex items-center gap-2.5">
-              <TrendingUp size={14} />
-              <span>SaaS Analytics Center</span>
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveAdminTab('users')}
-            className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-between transition cursor-pointer ${
-              activeAdminTab === 'users'
-                ? 'bg-indigo-650 text-white shadow-md font-black'
-                : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-150'
-            }`}
-          >
-            <span className="flex items-center gap-2.5">
-              <Users size={14} />
-              <span>Academic Directory</span>
-            </span>
-            <span className="text-[9px] bg-slate-100 font-extrabold text-slate-600 px-1.5 py-0.5 rounded">
-              {usersList.length}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveAdminTab('curriculum')}
-            className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-between transition cursor-pointer ${
-              activeAdminTab === 'curriculum'
-                ? 'bg-indigo-650 text-white shadow-md font-black'
-                : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-150'
-            }`}
-          >
-            <span className="flex items-center gap-2.5">
-              <BookOpen size={14} />
-              <span>Curriculum alignment</span>
-            </span>
-            <span className="text-[9px] bg-indigo-50 font-extrabold text-indigo-700 px-1.5 py-0.5 rounded">
-              {curriculums.length}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveAdminTab('cbt')}
-            className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-between transition cursor-pointer ${
-              activeAdminTab === 'cbt'
-                ? 'bg-indigo-650 text-white shadow-md font-black'
-                : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-150'
-            }`}
-          >
-            <span className="flex items-center gap-2.5">
-              <Award size={14} />
-              <span>CBT Examination Banks</span>
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveAdminTab('payments')}
-            className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-between transition cursor-pointer ${
-              activeAdminTab === 'payments'
-                ? 'bg-indigo-650 text-white shadow-md font-black'
-                : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-150'
-            }`}
-          >
-            <span className="flex items-center gap-2.5">
-              <CreditCard size={14} />
-              <span>Payments Ledgers & Sims</span>
-            </span>
-            <span className="text-[9px] bg-emerald-50 font-extrabold text-emerald-800 px-1.5 py-0.5 rounded">
-              ₦
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveAdminTab('results')}
-            className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-between transition cursor-pointer ${
-              activeAdminTab === 'results'
-                ? 'bg-indigo-650 text-white shadow-md font-black'
-                : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-150'
-            }`}
-          >
-            <span className="flex items-center gap-2.5">
-              <FileText size={14} />
-              <span>Continuous Assessment (CA)</span>
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveAdminTab('session')}
-            className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-bold flex items-center gap-2.5 transition cursor-pointer ${
-              activeAdminTab === 'session'
-                ? 'bg-indigo-650 text-white shadow-md font-black'
-                : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-150'
-            }`}
-          >
-            <Calendar size={14} />
-            <span>Academic Session & Term</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveAdminTab('attendance')}
-            className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-bold flex items-center gap-2.5 transition cursor-pointer ${
-              activeAdminTab === 'attendance'
-                ? 'bg-indigo-650 text-white shadow-md font-black'
-                : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-150'
-            }`}
-          >
-            <CheckSquare size={14} />
-            <span>Attendance Registry</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveAdminTab('fees')}
-            className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-bold flex items-center gap-2.5 transition cursor-pointer ${
-              activeAdminTab === 'fees'
-                ? 'bg-indigo-650 text-white shadow-md font-black'
-                : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-150'
-            }`}
-          >
-            <DollarSign size={14} />
-            <span>School Fees Ledgers</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveAdminTab('comms')}
-            className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-bold flex items-center gap-2.5 transition cursor-pointer ${
-              activeAdminTab === 'comms'
-                ? 'bg-indigo-650 text-white shadow-md font-black'
-                : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-150'
-            }`}
-          >
-            <Radio size={14} />
-            <span>Communication Hub</span>
-          </button>
-
-          <div className="text-[10px] font-black uppercase text-slate-400 tracking-wider pt-4 pb-2 pl-2">SUPPORT & CORE CONFIGS</div>
-
-          <button
-            type="button"
-            onClick={() => setActiveAdminTab('branding')}
-            className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-bold flex items-center gap-2.5 transition cursor-pointer ${
-              activeAdminTab === 'branding'
-                ? 'bg-indigo-650 text-white shadow-md font-black'
-                : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-150'
-            }`}
-          >
-            <Settings size={14} />
-            <span>Identity configurations</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveAdminTab('gmail')}
-            className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-bold flex items-center gap-2.5 transition cursor-pointer ${
-              activeAdminTab === 'gmail'
-                ? 'bg-indigo-650 text-white shadow-md font-black'
-                : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-150'
-            }`}
-          >
-            <Mail size={14} />
-            <span>School Gmail manager</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveAdminTab('inquiries')}
-            className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-between transition cursor-pointer ${
-              activeAdminTab === 'inquiries'
-                ? 'bg-indigo-650 text-white shadow-md font-black'
-                : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-150'
-            }`}
-          >
-            <span className="flex items-center gap-2.5">
-              <MessageSquare size={14} />
-              <span>Inquiries counseling Inbox</span>
-            </span>
-            {statsSummary.totalPendingInq > 0 && (
-              <span className="px-1.5 py-0.5 bg-red-650 text-white text-[9px] font-black rounded">
-                {statsSummary.totalPendingInq}
+          {/* Top Group: Academic & Operations */}
+          <div className="bg-white border border-slate-100 p-5 rounded-2xl shadow-sm space-y-2">
+            <h5 className="text-[10px] font-bold uppercase text-amber-900 tracking-wider pb-1.5 border-b border-amber-100/40 flex items-center gap-1.5 mb-2.5 bg-amber-50/50 px-2.5 py-1.5 rounded-lg border border-amber-100/60">
+              <span>📈</span>
+              <span>Academic & Operations</span>
+            </h5>
+            
+            <button
+              type="button"
+              onClick={() => setActiveAdminTab('dashboard')}
+              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
+                activeAdminTab === 'dashboard'
+                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
+                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <TrendingUp size={13} className="stroke-[2.5]" />
+                <span>SaaS Analytics Center</span>
               </span>
-            )}
-          </button>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveAdminTab('activities')}
-            className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-bold flex items-center gap-2.5 transition cursor-pointer ${
-              activeAdminTab === 'activities'
-                ? 'bg-indigo-650 text-white shadow-md font-black'
-                : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-150'
-            }`}
-          >
-            <Clock size={14} />
-            <span>Live interaction telemetry</span>
-          </button>
+            <button
+              type="button"
+              onClick={() => setActiveAdminTab('users')}
+              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
+                activeAdminTab === 'users'
+                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
+                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <Users size={13} className="stroke-[2.5]" />
+                <span>Academic Directory</span>
+              </span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${activeAdminTab === 'users' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                {usersList.length}
+              </span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveAdminTab('settings')}
-            className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-bold flex items-center gap-2.5 transition cursor-pointer ${
-              activeAdminTab === 'settings'
-                ? 'bg-indigo-650 text-white shadow-md font-black'
-                : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-150'
-            }`}
-          >
-            <Shield size={14} />
-            <span>Roles & Permissions Matrix</span>
-          </button>
+            <button
+              type="button"
+              onClick={() => setActiveAdminTab('curriculum')}
+              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
+                activeAdminTab === 'curriculum'
+                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
+                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <BookOpen size={13} className="stroke-[2.5]" />
+                <span>Curriculum Align</span>
+              </span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${activeAdminTab === 'curriculum' ? 'bg-white/20 text-white' : 'bg-blue-50 text-blue-600'}`}>
+                {curriculums.length}
+              </span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveAdminTab('moderation')}
-            className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-between transition cursor-pointer ${
-              activeAdminTab === 'moderation'
-                ? 'bg-indigo-650 text-white shadow-md font-black'
-                : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-150'
-            }`}
-          >
-            <span className="flex items-center gap-2.5">
-              <Eye size={14} />
-              <span>Moderation Queue</span>
-            </span>
-            <span className="px-1.5 py-0.5 bg-indigo-50 font-extrabold text-indigo-700 text-[9px] rounded">
-              {moderationQueue.length}
-            </span>
-          </button>
+            <button
+              type="button"
+              onClick={() => setActiveAdminTab('cbt')}
+              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
+                activeAdminTab === 'cbt'
+                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
+                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <Award size={13} className="stroke-[2.5]" />
+                <span>CBT Exam Banks</span>
+              </span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveAdminTab('db')}
-            className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-bold flex items-center gap-2.5 transition cursor-pointer ${
-              activeAdminTab === 'db'
-                ? 'bg-indigo-650 text-white shadow-md font-black'
-                : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-150'
-            }`}
-          >
-            <Database size={14} />
-            <span>Database Backup Manager</span>
-          </button>
+            <button
+              type="button"
+              onClick={() => setActiveAdminTab('payments')}
+              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
+                activeAdminTab === 'payments'
+                  ? 'bg-[#2563EB] text-white shadow-sm shadow-blue-500/10'
+                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <CreditCard size={13} className="stroke-[2.5]" />
+                <span>Payments & Sims</span>
+              </span>
+              <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md ${activeAdminTab === 'payments' ? 'bg-white/25 text-white' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}>
+                ₦
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveAdminTab('results')}
+              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
+                activeAdminTab === 'results'
+                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
+                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <FileText size={13} className="stroke-[2.5]" />
+                <span>Continuous Assessment (CA)</span>
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveAdminTab('session')}
+              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
+                activeAdminTab === 'session'
+                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
+                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <Calendar size={13} className="stroke-[2.5]" />
+                <span>Academic Session & Term</span>
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveAdminTab('attendance')}
+              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
+                activeAdminTab === 'attendance'
+                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
+                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <CheckSquare size={13} className="stroke-[2.5]" />
+                <span>Attendance Registry</span>
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveAdminTab('fees')}
+              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
+                activeAdminTab === 'fees'
+                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
+                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <DollarSign size={13} className="stroke-[2.5]" />
+                <span>School Fees Ledgers</span>
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveAdminTab('comms')}
+              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
+                activeAdminTab === 'comms'
+                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
+                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <Radio size={13} className="stroke-[2.5]" />
+                <span>Communication Hub</span>
+              </span>
+            </button>
+          </div>
+
+          {/* Support & Core Config Group */}
+          <div className="bg-white border border-slate-100 p-5 rounded-2xl shadow-sm space-y-2">
+            <h5 className="text-[10px] font-bold uppercase text-indigo-900 tracking-wider pb-1.5 border-b border-indigo-100/40 flex items-center gap-1.5 mb-2.5 bg-indigo-50/50 px-2.5 py-1.5 rounded-lg border border-indigo-100/60">
+              <span>🛠️</span>
+              <span>Support & Core Configs</span>
+            </h5>
+
+            <button
+              type="button"
+              onClick={() => setActiveAdminTab('branding')}
+              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
+                activeAdminTab === 'branding'
+                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
+                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <Settings size={13} className="stroke-[2.5]" />
+                <span>Identity Configurations</span>
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveAdminTab('gmail')}
+              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
+                activeAdminTab === 'gmail'
+                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
+                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <Mail size={13} className="stroke-[2.5]" />
+                <span>School Gmail Manager</span>
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveAdminTab('inquiries')}
+              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
+                activeAdminTab === 'inquiries'
+                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
+                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <MessageSquare size={13} className="stroke-[2.5]" />
+                <span>Inquiries Counseling Inbox</span>
+              </span>
+              {statsSummary.totalPendingInq > 0 && (
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${activeAdminTab === 'inquiries' ? 'bg-white/20 text-white animate-pulse' : 'bg-red-50 text-red-500 animate-pulse'}`}>
+                  {statsSummary.totalPendingInq}
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveAdminTab('activities')}
+              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
+                activeAdminTab === 'activities'
+                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
+                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <Clock size={13} className="stroke-[2.5]" />
+                <span>Live Interaction Telemetry</span>
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveAdminTab('settings')}
+              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
+                activeAdminTab === 'settings'
+                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
+                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <Shield size={13} className="stroke-[2.5]" />
+                <span>Roles & Permissions Matrix</span>
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveAdminTab('moderation')}
+              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
+                activeAdminTab === 'moderation'
+                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
+                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <Eye size={13} className="stroke-[2.5]" />
+                <span>Moderation Queue</span>
+              </span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${activeAdminTab === 'moderation' ? 'bg-white/20 text-white' : 'bg-indigo-50 text-indigo-600'}`}>
+                {moderationQueue.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveAdminTab('db')}
+              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
+                activeAdminTab === 'db'
+                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
+                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <Database size={13} className="stroke-[2.5]" />
+                <span>Database Backup Manager</span>
+              </span>
+            </button>
+          </div>
         </div>
 
         {/* Right Side Content Canvas */}
-        <div className="lg:col-span-9 bg-white p-6 rounded-3xl border border-slate-150 shadow-xs">
+        <div className="lg:col-span-9 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
           
           {/* TAB 1: SAAS ANALYTICS SYSTEM */}
           {activeAdminTab === 'dashboard' && (
@@ -3284,217 +3315,247 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
             </div>
           )}
 
-          {/* TAB 5: PAYMENTS ACCORD & SIMULATORS */}
+           {/* TAB 5: PAYMENTS ACCORD & SIMULATORS */}
           {activeAdminTab === 'payments' && (
-            <div className="space-y-6 animate-fade-in text-slate-800">
-              <div className="border-b pb-3 flex justify-between items-center flex-wrap gap-4">
+            <div className="space-y-6 animate-fade-in text-black font-sans">
+              
+              {/* Header section with Neo-Brutalist title banner */}
+              <div className="border-[3px] border-black bg-yellow-300 p-5 rounded-2xl shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] flex justify-between items-center flex-wrap gap-4">
                 <div>
-                  <h3 className="font-extrabold text-base text-slate-900">Payments & Subscriptions Ledger</h3>
-                  <p className="text-xs text-slate-500">Live payment lists coupled with web-hooks simulation indicators for Paystack, Flutterwave, and Stripe portals.</p>
+                  <h3 className="font-black text-xl text-black uppercase tracking-tight">
+                    💸 Payments & Subscriptions Control Center
+                  </h3>
+                  <p className="text-xs text-black/85 font-black mt-1">
+                    Live dynamic billing parameters coupled with interactive parent-facing lookup checkers & portal simulators.
+                  </p>
                 </div>
               </div>
 
               {/* Simulation Hub Box */}
-              <div className="bg-slate-50 p-5 rounded-2xl border border-indigo-200/50 space-y-3.5">
+              <div className="bg-white p-6 rounded-2xl border-[3px] border-black shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] space-y-4">
                 <div>
-                  <h4 className="text-xs font-black uppercase text-indigo-950 flex items-center gap-1.5">
-                    <Smartphone size={15} className="text-indigo-650" />
+                  <h4 className="text-xs font-black uppercase text-black flex items-center gap-2 bg-cyan-300 px-3 py-1.5 rounded-lg border border-black shadow-[2px_2px_0px_rgba(0,0,0,1)] inline-block">
+                    <Smartphone size={14} className="stroke-[2.5]" />
                     <span>NIGERIAN TRANSACTIONS SIMULATION BAY</span>
                   </h4>
-                  <p className="text-[10px] text-slate-500">Instantly simulate successful Flutterwave, Paystack, or Stripe card checkout notifications from parents to verify portal upgrades.</p>
+                  <p className="text-[11px] text-slate-800 font-extrabold mt-2">
+                    Instantly simulate incoming cloud registration receipts to test web-hooks & database status propagation without live currency.
+                  </p>
                 </div>
 
-                <div className="flex gap-2 flex-wrap text-xs font-black">
+                <div className="flex gap-3 flex-wrap text-xs font-black">
                   <button
+                    type="button"
                     onClick={() => handleSimulatePaymentTrigger('Paystack')}
-                    className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1.5"
+                    className="px-5 py-3 bg-emerald-400 hover:bg-emerald-500 text-black border-[3px] border-black rounded-xl shadow-[4px_4px_0px_rgba(0,0,0,1)] transition-all active:translate-x-[2px] active:translate-y-[2px] active:shadow-[2px_2px_0px_rgba(0,0,0,1)] cursor-pointer flex items-center gap-2"
                   >
-                    <span>⚡ Sim PAYSTACK ₦12,500</span>
+                    <span>⚡ SIMULATE PAYSTACK ₦10,000 SUCCESS</span>
                   </button>
                   <button
+                    type="button"
                     onClick={() => handleSimulatePaymentTrigger('Flutterwave')}
-                    className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1.5"
+                    className="px-5 py-3 bg-blue-400 hover:bg-blue-500 text-black border-[3px] border-black rounded-xl shadow-[4px_4px_0px_rgba(0,0,0,1)] transition-all active:translate-x-[2px] active:translate-y-[2px] active:shadow-[2px_2px_0px_rgba(0,0,0,1)] cursor-pointer flex items-center gap-2"
                   >
-                    <span>⚡ Sim FLUTTERWAVE ₦12,500</span>
+                    <span>⚡ SIMULATE FLUTTERWAVE ₦10,000 SUCCESS</span>
                   </button>
                   <button
+                    type="button"
                     onClick={() => handleSimulatePaymentTrigger('Stripe')}
-                    className="px-4 py-2.5 bg-indigo-950 hover:bg-black text-white rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1.5"
+                    className="px-5 py-3 bg-[#e0f2fe] hover:bg-[#bae6fd] text-black border-[3px] border-black rounded-xl shadow-[4px_4px_0px_rgba(0,0,0,1)] transition-all active:translate-x-[2px] active:translate-y-[2px] active:shadow-[2px_2px_0px_rgba(0,0,0,1)] cursor-pointer flex items-center gap-2"
                   >
-                    <span>⚡ Sim STRIPE $10</span>
+                    <span>⚡ SIMULATE STRIPE $15 SUCCESS</span>
                   </button>
                 </div>
               </div>
 
-              {/* Subscription & Payment Link Configuration Hub */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-2">
+              {/* Subscription & Payment Link Configuration Hub - TWO COLUMN WORKSPACE */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pb-4">
                 
-                {/* Configuration form settings */}
-                <div className="bg-white p-5 rounded-2xl border border-slate-150 space-y-4">
-                  <div className="flex items-center gap-2 border-b pb-2">
-                    <span className="p-1.5 bg-blue-50 text-blue-800 rounded-lg text-xs font-black">⚙️</span>
-                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-900">Subscription & Gateway Configuration</h4>
+                {/* Left Column (Subscription & Gateway Configuration) */}
+                <div className="bg-white p-6 rounded-2xl border-[3px] border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] space-y-6">
+                  <div className="flex items-center gap-2 border-b-2 border-black pb-3 bg-yellow-105 p-2 rounded-lg border border-black shadow-[2px_2px_0px_black] bg-amber-200">
+                    <span className="p-1.5 bg-black text-white rounded text-xs font-black">⚙️</span>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-black">Subscription & Gateway Configuration</h4>
                   </div>
 
-                  <form onSubmit={handleSaveConfig} className="space-y-3.5">
-                    <div className="grid grid-cols-2 gap-3">
+                  <form onSubmit={handleSaveConfig} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-extrabold uppercase text-slate-400 block">Subscription Price / Term</label>
+                        <label className="text-[10px] font-black uppercase text-black block tracking-wider">Subscription Price / Term</label>
                         <input
                           type="text"
                           value={proPrice}
                           onChange={(e) => setProPrice(e.target.value)}
-                          placeholder="e.g. ₦5,000"
-                          className="w-full px-3 py-2 border rounded-xl text-xs font-semibold outline-none focus:border-indigo-650"
+                          placeholder="e.g. ₦10,000"
+                          className="w-full px-3 py-3 border-[3px] border-black rounded-xl text-xs font-black bg-white text-black placeholder-slate-500 focus:outline-none focus:bg-yellow-200 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] focus:shadow-[4px_4px_0px_rgba(0,0,0,1)]"
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] font-extrabold uppercase text-slate-400 block">Support Brand Name</label>
+                        <label className="text-[10px] font-black uppercase text-black block tracking-wider">Support Brand Name</label>
                         <input
                           type="text"
                           value={brandName}
                           onChange={(e) => setBrandName(e.target.value)}
-                          className="w-full px-3 py-2 border rounded-xl text-xs font-semibold bg-slate-50 text-slate-500 cursor-not-allowed outline-none"
+                          className="w-full px-3 py-3 border-[3px] border-black rounded-xl text-xs font-black bg-slate-100 text-slate-750 cursor-not-allowed outline-none shadow-[2px_2px_0px_rgba(0,0,0,1)]"
                           readOnly
                         />
                       </div>
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-extrabold uppercase text-slate-400 block">Paystack Secure Checkout Link</label>
+                      <label className="text-[10px] font-black uppercase text-black block tracking-wider">Paystack Secure Checkout Link</label>
                       <input
                         type="url"
                         value={paystackLink}
                         onChange={(e) => setPaystackLink(e.target.value)}
                         placeholder="e.g. https://paystack.com/pay/livingstone-pro-access"
-                        className="w-full px-3 py-2 border rounded-xl text-xs font-semibold outline-none focus:border-indigo-650"
+                        className="w-full px-3 py-3 border-[3px] border-black rounded-xl text-xs font-black bg-white text-black placeholder-slate-500 focus:outline-none focus:bg-yellow-200 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] focus:shadow-[4px_4px_0px_rgba(0,0,0,1)]"
                       />
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] font-extrabold uppercase text-slate-400 block">Flutterwave Secure Checkout Link</label>
+                      <label className="text-[10px] font-black uppercase text-black block tracking-wider">Flutterwave Secure Checkout Link</label>
                       <input
                         type="url"
                         value={flutterwaveLink}
                         onChange={(e) => setFlutterwaveLink(e.target.value)}
                         placeholder="e.g. https://flutterwave.com/pay/livingstone-secondary-pro"
-                        className="w-full px-3 py-2 border rounded-xl text-xs font-semibold outline-none focus:border-indigo-650"
+                        className="w-full px-3 py-3 border-[3px] border-black rounded-xl text-xs font-black bg-white text-black placeholder-slate-500 focus:outline-none focus:bg-yellow-200 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] focus:shadow-[4px_4px_0px_rgba(0,0,0,1)]"
                       />
                     </div>
 
-                    <div className="border-t pt-3 space-y-3">
-                      <p className="text-[10px] font-black uppercase text-indigo-950 tracking-wider">🏦 Bank Transfer Settlement Parameters</p>
+                    <div className="border-t-[3px] border-black pt-4 space-y-4">
+                      <p className="text-xs font-black uppercase text-black tracking-wider flex items-center gap-1.5 bg-cyan-150 border border-black p-2 rounded-lg shadow-[2px_2px_0px_black] w-fit bg-cyan-200">
+                        🏦 Bank Transfer Settlement Parameters
+                      </p>
                       
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
-                          <label className="text-[10px] font-extrabold uppercase text-slate-450 block">Bank Name</label>
+                          <label className="text-[10px] font-black uppercase text-black block tracking-wider">Bank Name</label>
                           <input
                             type="text"
                             value={bankName}
                             onChange={(e) => setBankName(e.target.value)}
-                            placeholder="e.g. Access Bank"
-                            className="w-full px-3 py-2 border rounded-xl text-xs font-semibold outline-none focus:border-indigo-650"
+                            placeholder="e.g. Zenith Bank"
+                            className="w-full px-3 py-3 border-[3px] border-black rounded-xl text-xs font-black bg-white text-black placeholder-slate-500 focus:outline-none focus:bg-yellow-200 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] focus:shadow-[4px_4px_0px_rgba(0,0,0,1)]"
                           />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-[10px] font-extrabold uppercase text-slate-450 block">Account Number</label>
+                          <label className="text-[10px] font-black uppercase text-black block tracking-wider">Account Number</label>
                           <input
                             type="text"
                             value={bankAccountNumber}
                             onChange={(e) => setBankAccountNumber(e.target.value)}
-                            placeholder="e.g. 1029384756"
-                            className="w-full px-3 py-2 border rounded-xl text-xs font-semibold outline-none focus:border-indigo-650"
+                            placeholder="e.g. 2257503451"
+                            className="w-full px-3 py-3 border-[3px] border-black rounded-xl text-xs font-black bg-white text-black placeholder-slate-500 focus:outline-none focus:bg-yellow-200 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] focus:shadow-[4px_4px_0px_rgba(0,0,0,1)]"
                           />
                         </div>
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-[10px] font-extrabold uppercase text-slate-450 block">Account Holder Name</label>
+                        <label className="text-[10px] font-black uppercase text-black block tracking-wider">Account Holder Name</label>
                         <input
                           type="text"
                           value={bankAccountName}
                           onChange={(e) => setBankAccountName(e.target.value)}
-                          placeholder="e.g. LIVINGSTONE SCH AGENCY LTD"
-                          className="w-full px-3 py-2 border rounded-xl text-xs font-semibold outline-none focus:border-indigo-650"
+                          placeholder="e.g. temitope oluwaseun fatoye"
+                          className="w-full px-3 py-3 border-[3px] border-black rounded-xl text-xs font-black bg-white text-black placeholder-slate-500 focus:outline-none focus:bg-yellow-200 transition-all shadow-[2px_2px_0px_rgba(0,0,0,1)] focus:shadow-[4px_4px_0px_rgba(0,0,0,1)]"
                         />
                       </div>
                     </div>
 
-                    <div className="flex justify-end pt-2">
+                    <div className="flex justify-end pt-3">
                       <button
                         type="submit"
                         disabled={isSaving}
-                        className="px-4 py-2 bg-indigo-650 hover:bg-indigo-720 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all active:scale-95 cursor-pointer"
+                        className="px-6 py-3 bg-[#2563EB] hover:bg-[#1d4ed8] text-white font-black text-xs uppercase rounded-xl border-[3px] border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[2px_2px_0px_rgba(0,0,0,1)] transition-all cursor-pointer"
                       >
-                        {isSaving ? "Syncing settings..." : "💾 Save Billing & Subscription Setup"}
+                        {isSaving ? "Syncing configs..." : "💾 Save Billing & Subscription Setup"}
                       </button>
                     </div>
                   </form>
                 </div>
 
-                {/* Simulated payment page preview */}
-                <div className="bg-slate-50 p-5 rounded-2xl border border-dashed border-indigo-200 space-y-4">
-                  <div className="flex justify-between items-center border-b pb-2">
+                {/* Right Column (Live Checkout Page Preview Container mimics a standalone invoice card) */}
+                <div className="bg-white p-6 rounded-2xl border-[3px] border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] space-y-6">
+                  <div className="flex justify-between items-center border-b-2 border-black pb-3 bg-cyan-100 p-2 rounded-lg border border-black shadow-[2px_2px_0px_black]">
                     <div className="flex items-center gap-1.5">
-                      <span className="p-1 bg-emerald-50 text-emerald-800 rounded-lg text-xs">📱</span>
-                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-800">Live Checkout Page Preview</h4>
+                      <span className="p-1 bg-black text-white rounded text-xs">📱</span>
+                      <h4 className="text-xs font-black uppercase tracking-wider text-black">Live Checkout Page Preview</h4>
                     </div>
-                    <span className="text-[9px] font-black text-slate-400 bg-slate-200/50 px-2 py-0.5 rounded uppercase">Parent Viewport</span>
+                    <span className="text-[9px] font-black text-white bg-black px-2 py-1 rounded border border-black uppercase shadow-[1.5px_1.5px_0px_black]">Parent Viewport</span>
                   </div>
 
-                  <p className="text-[10px] text-slate-500 font-medium">This mockup reflects exactly what is displayed to parents or student candidates inside the premium purchase popup portal.</p>
+                  <p className="text-[11px] text-slate-800 font-black leading-relaxed">
+                    This structural container simulates the live responsive invoice layout that parents interact with when unlocking student terms.
+                  </p>
 
-                  {/* Payment Modal Preview Box */}
-                  <div className="bg-white rounded-2xl border shadow-xs overflow-hidden max-w-sm mx-auto flex flex-col">
-                    <div className="bg-gradient-to-r from-blue-700 to-indigo-800 p-4 text-white text-center">
-                      <span className="text-[8px] font-black tracking-widest block uppercase text-blue-200">SECURE EDUCATION CHECKOUT</span>
-                      <h5 className="text-xs font-black uppercase mt-0.5">{brandName || 'SCHOOLPORTAL'} PREMIUM</h5>
+                  {/* Payment Modal Preview Box (Neo-Brutalist Invoice Format) */}
+                  <div className="bg-white rounded-2xl border-[4px] border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] overflow-hidden max-w-sm mx-auto flex flex-col">
+                    <div className="bg-[#2563EB] p-4 text-white text-center border-b-[4px] border-black">
+                      <span className="text-[9px] font-black tracking-widest block uppercase text-yellow-300">SECURE EDUCATION CHECKOUT</span>
+                      <h5 className="text-sm font-black uppercase mt-1">{brandName || 'SCHOOLPORTAL'} PREMIUM TERM</h5>
                     </div>
-                    <div className="p-4 space-y-3.5">
-                      <div className="bg-blue-50/50 rounded-xl p-3 border border-blue-100 flex justify-between items-baseline">
+                    
+                    <div className="p-5 space-y-4">
+                      <div className="bg-yellow-300 rounded-xl p-4 border-[3px] border-black shadow-[3px_3px_0px_rgba(0,0,0,1)] flex justify-between items-center">
                         <div>
-                          <p className="text-[10px] font-black uppercase text-blue-800">PREMIER CLASSROOM PLAN</p>
-                          <p className="text-[9px] text-slate-400">UNLIMITED TRIAL ACCESS</p>
+                          <p className="text-[10px] font-black uppercase text-black tracking-wider">PREMIER CLASSROOM PLAN</p>
+                          <p className="text-[9px] text-black/70 font-bold mt-0.5">UNLIMITED ACCESS LICENSE</p>
                         </div>
-                        <span className="text-lg font-black text-slate-800">{proPrice || "₦5,050"}</span>
+                        <span className="text-2xl font-black text-black select-all bg-white px-2.5 py-1 border-2 border-black rounded shadow-[2px_2px_0px_black]">{proPrice || "₦10,000"}</span>
                       </div>
 
                       {/* Payment connection display */}
-                      <div className="space-y-2">
-                        <span className="text-[9px] font-extrabold uppercase text-slate-400 tracking-wider">Gateways:</span>
+                      <div className="space-y-3">
+                        <span className="text-[10px] font-black uppercase text-black tracking-wider block bg-black text-white px-2 py-0.5 w-fit rounded">
+                          🔌 Secure Gateway Portals:
+                        </span>
                         
-                        {/* Interactive testing click simulator */}
-                        <div className="space-y-1.5">
+                        <div className="space-y-2">
                           {paystackLink ? (
-                            <div className="p-2 bg-emerald-50 text-emerald-800 text-[10px] rounded-lg border border-emerald-150 flex justify-between items-center">
-                              <span className="font-extrabold">⚡ Paystack Link</span>
-                              <span className="text-[8px] text-emerald-600 font-semibold truncate max-w-[150px]">{paystackLink}</span>
-                            </div>
+                            <a
+                              href={paystackLink}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="p-3 bg-emerald-300 text-black text-xs font-black rounded-xl border-[2px] border-black flex justify-between items-center hover:bg-emerald-400 cursor-pointer shadow-[3px_3px_0px_rgba(0,0,0,1)] hover:translate-y-[-1px]"
+                            >
+                              <span>⚡ Paystack Payment link</span>
+                              <span className="text-[8px] bg-white border border-black px-1 py-0.5 rounded font-bold uppercase truncate max-w-[135px]">{paystackLink}</span>
+                            </a>
                           ) : (
-                            <div className="p-2 bg-slate-50 text-slate-400 text-[10px] rounded-lg border border-dashed text-center">
-                              <span>Paystack direct link unconfigured.</span>
+                            <div className="p-3 bg-slate-150 text-slate-550 text-xs rounded-xl border-2 border-dashed border-slate-300 text-center font-bold">
+                              Paystack direct channel unconfigured
                             </div>
                           )}
 
                           {flutterwaveLink ? (
-                            <div className="p-2 bg-blue-50 text-blue-800 text-[10px] rounded-lg border border-blue-150 flex justify-between items-center">
-                              <span className="font-extrabold">⚡ Flutterwave Link</span>
-                              <span className="text-[8px] text-blue-600 font-semibold truncate max-w-[150px]">{flutterwaveLink}</span>
-                            </div>
+                            <a
+                              href={flutterwaveLink}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="p-3 bg-blue-300 text-black text-xs font-black rounded-xl border-[2px] border-black flex justify-between items-center hover:bg-blue-400 cursor-pointer shadow-[3px_3px_0px_rgba(0,0,0,1)] hover:translate-y-[-1px]"
+                            >
+                              <span>⚡ Flutterwave Payment link</span>
+                              <span className="text-[8px] bg-white border border-black px-1 py-0.5 rounded font-bold uppercase truncate max-w-[135px]">{flutterwaveLink}</span>
+                            </a>
                           ) : (
-                            <div className="p-2 bg-slate-50 text-slate-400 text-[10px] rounded-lg border border-dashed text-center">
-                              <span>Flutterwave direct link unconfigured.</span>
+                            <div className="p-3 bg-slate-150 text-slate-550 text-xs rounded-xl border-2 border-dashed border-slate-300 text-center font-bold">
+                              Flutterwave direct channel unconfigured
                             </div>
                           )}
                         </div>
 
                         {/* Bank transfer display mock */}
-                        <div className="border-t pt-2.5 space-y-1">
-                          <span className="text-[9px] font-extrabold uppercase text-slate-400 tracking-wider">Bank Transfer Details:</span>
-                          <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 flex flex-col items-center space-y-0.5">
-                            <span className="text-[9px] font-extrabold text-slate-500 uppercase">{bankName}</span>
-                            <span className="text-sm font-black text-blue-700 font-mono select-all tracking-tight">{bankAccountNumber}</span>
-                            <span className="text-[10px] font-bold text-slate-700">{bankAccountName}</span>
+                        <div className="border-t-2 border-black pt-3 space-y-2">
+                          <span className="text-[10px] font-black uppercase text-black tracking-wider block bg-black text-white px-2 py-0.5 w-fit rounded">
+                            🏛️ Direct Settlement Account:
+                          </span>
+                          
+                          <div className="p-4 bg-orange-150 rounded-xl border-[3px] border-black shadow-[4px_4px_0px_black] flex flex-col items-center space-y-1 bg-orange-100">
+                            <span className="text-[10px] font-black text-black uppercase tracking-wider bg-white border border-black px-2 py-0.5 rounded">{bankName}</span>
+                            <span className="text-lg font-black text-[#2563EB] font-mono select-all tracking-tight bg-white border-[2px] border-black px-3 py-1 rounded shadow-[2.5px_2.5px_0px_rgba(0,0,0,1)]">{bankAccountNumber}</span>
+                            <span className="text-[10px] font-black text-black uppercase tracking-wide pt-1 text-center">{bankAccountName}</span>
                           </div>
                         </div>
                       </div>
@@ -3504,39 +3565,45 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
 
               </div>
 
-              {/* Payments log */}
-              <div className="overflow-x-auto border-y border-slate-150">
-                <table className="w-full text-xs text-left">
-                  <thead className="bg-slate-50 text-slate-400 font-bold uppercase tracking-wider text-[9px]">
-                    <tr>
-                      <th className="p-3">Student payer</th>
-                      <th className="p-3">Gateway</th>
-                      <th className="p-3">Plan description</th>
-                      <th className="p-3">Amount</th>
-                      <th className="p-3 text-right">Receipt status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {payments.map((p) => (
-                      <tr key={p.id} className="hover:bg-slate-50/50">
-                        <td className="p-3">
-                          <p className="font-extrabold text-slate-800">{p.studentName}</p>
-                          <p className="text-[10px] text-slate-400">{p.email}</p>
-                        </td>
-                        <td className="p-3 font-mono font-bold text-indigo-700">{p.gateway}</td>
-                        <td className="p-3 text-slate-505 font-medium">{p.plan}</td>
-                        <td className="p-3 font-black text-slate-900">{p.amount}</td>
-                        <td className="p-3 text-right">
-                          <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${
-                            p.status === 'Approved' ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'
-                          }`}>
-                            {p.status}
-                          </span>
-                        </td>
+              {/* Payments log with Neo-Brutalist styling */}
+              <div className="bg-white border-[3px] border-black rounded-2xl shadow-[5px_5px_0px_rgba(0,0,0,1)] overflow-hidden">
+                <div className="bg-yellow-100 p-4 border-b-2 border-black flex justify-between items-center">
+                  <h4 className="text-xs font-black uppercase text-black tracking-wider">📜 Realtime Academic Payment Audit Stream</h4>
+                  <span className="px-2 py-0.5 bg-black text-white border border-black font-black text-[9px] rounded shadow-[1px_1px_0px_black]">Realtime Ledger Node</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-[#FAFAFA] text-black font-black uppercase border-b-2 border-black text-[9px] tracking-wider">
+                      <tr>
+                        <th className="p-4 border-r border-black">Student payer</th>
+                        <th className="p-4 border-r border-black">Gateway</th>
+                        <th className="p-4 border-r border-black">Plan description</th>
+                        <th className="p-4 border-r border-black">Amount</th>
+                        <th className="p-4 text-right">Receipt status</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y-2 divide-black bg-white">
+                      {payments.map((p) => (
+                        <tr key={p.id} className="hover:bg-yellow-50 font-bold text-black text-xs">
+                          <td className="p-4 border-r border-black">
+                            <p className="font-extrabold text-black">{p.studentName}</p>
+                            <p className="text-[10px] text-slate-705">{p.email}</p>
+                          </td>
+                          <td className="p-4 border-r border-black font-mono font-black text-[#2563EB] uppercase">{p.gateway}</td>
+                          <td className="p-4 border-r border-black text-slate-800">{p.plan}</td>
+                          <td className="p-4 border-r border-black font-black">₦{p.amount ? p.amount.toString().replace('₦', '') : '10,000'}</td>
+                          <td className="p-4 text-right">
+                            <span className={`px-2.5 py-1 rounded text-[9px] font-black uppercase border border-black shadow-[1.5px_1.5px_0px_black] ${
+                              p.status === 'Approved' ? 'bg-emerald-300 text-black animate-pulse' : 'bg-amber-300 text-black'
+                            }`}>
+                              {p.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
             </div>

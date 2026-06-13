@@ -590,13 +590,13 @@ export default function App() {
           <div className="flex h-16 items-center justify-between gap-4">
             
             {/* Logo / Brand Header */}
-            <div className="flex items-center gap-2.5">
-              <div className={`p-2 ${logoBgColorClass} rounded-xl shadow-sm text-white`}>
-                {renderDynamicLogo(22)}
+            <div className="flex items-center gap-2.5 bg-transparent">
+              <div className="p-2 bg-gradient-to-tr from-blue-600 to-indigo-650 rounded-xl shadow-xs text-white">
+                {renderDynamicLogo(18)}
               </div>
               <div>
-                <h1 className="text-sm font-black font-display text-slate-900 tracking-tight leading-none">{appConfig.brandName.toUpperCase()}</h1>
-                <p className={`text-[10px] font-bold ${logoTextColClass} tracking-wider uppercase mt-0.5`}>{appConfig.appSubtitle}</p>
+                <h1 className="text-sm font-extrabold tracking-wider font-sans text-slate-900 uppercase leading-none">{appConfig.brandName}</h1>
+                <p className="text-[9px] font-bold text-slate-400 tracking-widest uppercase mt-1 leading-none">{appConfig.appSubtitle}</p>
               </div>
             </div>
 
@@ -735,8 +735,8 @@ export default function App() {
               </div>
 
               {/* Status avatar icon */}
-              <div className="w-8.5 h-8.5 rounded-full bg-slate-50 border border-slate-200 text-base flex items-center justify-center">
-                👨‍🎓
+              <div className="w-8.5 h-8.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center">
+                <GraduationCap size={15} className="stroke-[2.5]" />
               </div>
 
               {/* Sign out key icon */}
@@ -744,9 +744,9 @@ export default function App() {
                 type="button"
                 onClick={handleSignOut}
                 title="Logout Student Profile"
-                className="p-2 border border-slate-200 text-slate-455 hover:text-red-655 hover:border-red-200 rounded-xl transition cursor-pointer"
+                className="p-2 border border-slate-200 text-slate-455 hover:text-red-555 hover:border-red-200 rounded-xl transition cursor-pointer"
               >
-                <LogOut size={16} />
+                <LogOut size={14} />
               </button>
             </div>
 
@@ -755,76 +755,76 @@ export default function App() {
       </header>
 
       {/* Mobile Tab Floating Rail Toolbar */}
-      <div className="md:hidden sticky top-16 z-30 bg-slate-100 border-b border-slate-250 p-2 flex gap-1 justify-around">
+      <div className="md:hidden sticky top-16 z-30 bg-white/95 backdrop-blur-md border-b border-slate-100 p-2 flex gap-1 justify-around shadow-xs">
         <button
           type="button"
           onClick={() => setActiveTab('home')}
-          className={`flex flex-col items-center py-1 px-1 rounded-lg text-[10px] font-bold tracking-tight transition cursor-pointer ${
-            activeTab === 'home' ? 'bg-white text-blue-700 shadow-sm font-bold' : 'text-slate-600'
+          className={`flex flex-col items-center py-1.5 px-1 rounded-lg text-[10px] font-bold tracking-tight transition duration-200 cursor-pointer ${
+            activeTab === 'home' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600'
           }`}
         >
-          <Home size={14} />
+          <Home size={14} className="stroke-[2.5]" />
           <span>Home</span>
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('hub')}
-          className={`flex flex-col items-center py-1 px-1 rounded-lg text-[10px] font-bold tracking-tight transition cursor-pointer ${
-            activeTab === 'hub' ? 'bg-white text-blue-700 shadow-sm font-bold' : 'text-slate-600'
+          className={`flex flex-col items-center py-1.5 px-1 rounded-lg text-[10px] font-bold tracking-tight transition duration-200 cursor-pointer ${
+            activeTab === 'hub' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600'
           }`}
         >
-          <BookOpen size={14} />
+          <BookOpen size={14} className="stroke-[2.5]" />
           <span>Hub</span>
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('quizzes')}
-          className={`flex flex-col items-center py-1 px-1 rounded-lg text-[10px] font-bold tracking-tight transition cursor-pointer ${
-            activeTab === 'quizzes' ? 'bg-white text-blue-700 shadow-sm font-bold' : 'text-slate-600'
+          className={`flex flex-col items-center py-1.5 px-1 rounded-lg text-[10px] font-bold tracking-tight transition duration-200 cursor-pointer ${
+            activeTab === 'quizzes' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600'
           }`}
         >
-          <Trophy size={14} className={activeTab === 'quizzes' ? 'text-amber-500 fill-amber-300' : ''} />
+          <Trophy size={14} className={`stroke-[2.5] ${activeTab === 'quizzes' ? 'text-amber-500 fill-amber-300' : ''}`} />
           <span>Quiz</span>
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('progress')}
-          className={`flex flex-col items-center py-1 px-1 rounded-lg text-[10px] font-bold tracking-tight transition cursor-pointer ${
-            activeTab === 'progress' ? 'bg-white text-blue-700 shadow-sm font-bold' : 'text-slate-600'
+          className={`flex flex-col items-center py-1.5 px-1 rounded-lg text-[10px] font-bold tracking-tight transition duration-200 cursor-pointer ${
+            activeTab === 'progress' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600'
           }`}
         >
-          <Award size={14} className={activeTab === 'progress' ? 'text-blue-600 fill-blue-300' : ''} />
+          <Award size={14} className={`stroke-[2.5] ${activeTab === 'progress' ? 'text-blue-600 fill-blue-300' : ''}`} />
           <span>Stats</span>
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('faq')}
-          className={`flex flex-col items-center py-1 px-1 rounded-lg text-[10px] font-bold tracking-tight transition cursor-pointer ${
-            activeTab === 'faq' ? 'bg-white text-blue-700 shadow-sm font-bold' : 'text-slate-600'
+          className={`flex flex-col items-center py-1.5 px-1 rounded-lg text-[10px] font-bold tracking-tight transition duration-200 cursor-pointer ${
+            activeTab === 'faq' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600'
           }`}
         >
-          <HelpCircle size={14} />
+          <HelpCircle size={14} className="stroke-[2.5]" />
           <span>FAQ</span>
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('contact')}
-          className={`flex flex-col items-center py-1 px-1 rounded-lg text-[10px] font-bold tracking-tight transition cursor-pointer ${
-            activeTab === 'contact' ? 'bg-white text-blue-700 shadow-sm font-bold' : 'text-slate-600'
+          className={`flex flex-col items-center py-1.5 px-1 rounded-lg text-[10px] font-bold tracking-tight transition duration-200 cursor-pointer ${
+            activeTab === 'contact' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600'
           }`}
         >
-          <MessageSquare size={14} />
+          <MessageSquare size={14} className="stroke-[2.5]" />
           <span>Help</span>
         </button>
         {currentUser?.role === 'admin' && (
           <button
             type="button"
             onClick={() => setActiveTab('admin')}
-            className={`flex flex-col items-center py-1 px-1 rounded-lg text-[10px] font-bold tracking-tight transition cursor-pointer ${
-              activeTab === 'admin' ? 'bg-white text-blue-700 shadow-sm font-bold' : 'text-slate-600'
+            className={`flex flex-col items-center py-1.5 px-1 rounded-lg text-[10px] font-bold tracking-tight transition duration-200 cursor-pointer ${
+              activeTab === 'admin' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600'
             }`}
           >
-            <ShieldCheck size={14} className={activeTab === 'admin' ? 'text-blue-650' : 'text-slate-500'} />
+            <ShieldCheck size={14} className={`stroke-[2.5] ${activeTab === 'admin' ? 'text-blue-650' : 'text-slate-500'}`} />
             <span>Admin</span>
           </button>
         )}
