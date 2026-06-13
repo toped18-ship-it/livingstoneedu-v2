@@ -1,7 +1,11 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
-import admin from 'firebase-admin';
+import * as admin from 'firebase-admin';
+import { initializeApp as initAdminApp, cert as adminCert, getApps as getAdminApps, getApp as getAdminApp } from 'firebase-admin/app';
+import { getDatabase as getAdminDatabase } from 'firebase-admin/database';
+import { getFirestore as getAdminFirestore } from 'firebase-admin/firestore';
+import { getMessaging as getAdminMessaging } from 'firebase-admin/messaging';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 
@@ -65,7 +69,7 @@ function getDB(): AppDB {
   const defaultDB: AppDB = {
     config: {
       brandName: 'LIVINGSTONEEDU',
-      appSubtitle: 'Syllabus Portal',
+      appSubtitle: 'Learning Portal',
       proPrice: '₦5,000',
       supportGroupUrl: 'https://wa.me/message/AJ4NILOGBTTMJ1',
       contactName: 'Livingtch Brand Agency',
@@ -144,15 +148,37 @@ async function startServer() {
     const serviceAccountPath = path.join(process.cwd(), 'firebase-service-account.json');
     if (fs.existsSync(serviceAccountPath)) {
       const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
-      firebaseAdminApp = (admin as any).initializeApp({
-        credential: (admin as any).credential.cert(serviceAccount)
-      });
-      console.log(`[Firebase Admin] Successfully initialized with client email: ${serviceAccount.client_email}`);
+      
+      // Dynamically load databaseURL from firebase-applet-config
+      let dbUrl = "https://livingstoneedu-17aad-default-rtdb.firebaseio.com";
+      try {
+        const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+        if (fs.existsSync(configPath)) {
+          const configDetails = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          if (configDetails.databaseURL) {
+            dbUrl = configDetails.databaseURL;
+          }
+        }
+      } catch (errConfig) {
+        console.warn("[Firebase Admin] Failed reading firebase-applet-config.json for databaseURL:", errConfig);
+      }
+
+      const activeApps = getAdminApps();
+      
+      if (activeApps.length === 0) {
+        firebaseAdminApp = initAdminApp({
+          credential: adminCert(serviceAccount),
+          databaseURL: dbUrl
+        });
+      } else {
+        firebaseAdminApp = getAdminApp();
+      }
+      console.log(`[Firebase Admin Successfully Instantiated via modular SDK] Client email: ${serviceAccount.client_email} and databaseURL: ${dbUrl}`);
     } else {
       console.warn("[Firebase Admin] No service account key found at firebase-service-account.json. Standalone database mode is active.");
     }
-  } catch (error) {
-    console.error("[Firebase Admin] Initialization error ignored for standalone fallback:", error);
+  } catch (error: any) {
+    console.error("[Firebase Admin Error] Primary initialization failed:", error.message || error, error.stack);
   }
 
   // Admin Backend Role verification middleware
@@ -195,6 +221,29 @@ async function startServer() {
     saveDB(db);
     console.log(`[Gmail Connection] Saved access token for ${email || 'cleared'} successfully.`);
     res.json({ success: true, connectedGmailEmail: email || '' });
+  });
+
+  // API Route: Realtime Database privileged test write proxy (handles verification)
+  app.post('/api/rtdb/test-write', async (req, res) => {
+    try {
+      if (firebaseAdminApp) {
+        // Use getAdminDatabase to execute privileged bypass set operations
+        const dbRef = getAdminDatabase(firebaseAdminApp).ref('users/test_user');
+        await dbRef.set({
+          id: 'test_user',
+          status: 'active',
+          verifiedAt: new Date().toISOString(),
+          message: 'Firebase Realtime Database initialized successfully by Livingstone Edu Learning Portal server'
+        });
+        console.log('[RTDB Server Verification] Test write of users/test_user successful utilizing Admin SDK.');
+        return res.json({ success: true });
+      } else {
+        throw new Error("Firebase Admin SDK is not initialized.");
+      }
+    } catch (err: any) {
+      console.error('[RTDB Server Verification Failure] Failed to execute test write through server admin sdk:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
   });
 
   // API Route: Send user signup notification & welcome email using connected administrator Gmail SMTP
@@ -338,7 +387,7 @@ Livingstone Educational Academy Team`;
     }
 
     try {
-      const dbStore = firebaseAdminApp.firestore();
+      const dbStore = getAdminFirestore(firebaseAdminApp);
       const subsSnapshot = await dbStore.collection('pushSubscriptions').get();
       
       const tokens: string[] = [];
@@ -359,7 +408,7 @@ Livingstone Educational Academy Team`;
         });
       }
 
-      const messagingResult = await firebaseAdminApp.messaging().sendEachForMulticast({
+      const messagingResult = await getAdminMessaging(firebaseAdminApp).sendEachForMulticast({
         tokens: tokens,
         notification: {
           title: title,
@@ -711,6 +760,92 @@ Format the output as a clean, plain JSON object with the following schema:
         aiWeaknesses: ['Needs to pay continuous attention to fundamental definitions', 'Revise weekly practical test exercises'],
         isFallback: true
       });
+    }
+  });
+
+  // API Route: Expert NERDC 12-Week Curriculum Generator
+  app.post('/api/gemini/generate-curriculum', async (req, res) => {
+    const { classLevel, subject, term } = req.body;
+
+    console.log(`AI Curriculum Generation request: Class=${classLevel}, Subject=${subject}, Term=${term}`);
+
+    try {
+      if (!process.env.GEMINI_API_KEY) {
+        throw new Error('GEMINI_API_KEY is not configured');
+      }
+
+      const systemPrompt = `You are an expert curriculum design specialist, Nigerian NERDC educational consultant, and syllabus director.
+Your job is to generate a comprehensive, highly structured 12-week Academic Curriculum for the specified Student Class, Subject, and Term.
+The curriculum must align strictly with the official Nigerian NERDC (National Educational Research and Development Council) syllabus guidelines, including appropriate difficulty levels for the target age group, culturally relevant context, and term-appropriate pedagogical goals.
+
+For the requested Class, Subject, and Term, you MUST generate exactly 12 weeks of curriculum content.
+Each week MUST contain:
+1. weekNum: The integer week number from 1 to 12.
+2. topic: A highly descriptive, officially-aligned Topic Title.
+3. objectives: An array of 3 to 4 clear, measurable learning objectives (e.g., "By the end of the lesson, the students should be able to...").
+4. keywords: An array of 3 to 5 vital academic keywords or terms central to that week's topic.
+
+Strictly use Nigerian context and terminology (such as using local examples, naming conventions, and educational terms). Output the result as a raw JSON object matching the requested schema.`;
+
+      const userPrompt = `Generate a full 12-week educational curriculum for Class of Students: "${classLevel}", Subject Matter: "${subject}", Academic Term: "${term}". Ensure extremely professional, high-fidelity alignment with standard Nigerian educational requirements.`;
+
+      const responseSchema = {
+        type: Type.OBJECT,
+        properties: {
+          weeks: {
+            type: Type.ARRAY,
+            description: "Must contain exactly 12 elements representing Week 1 through Week 12 in order.",
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                weekNum: { type: Type.INTEGER },
+                topic: { type: Type.STRING },
+                objectives: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING }
+                },
+                keywords: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING }
+                }
+              },
+              required: ['weekNum', 'topic', 'objectives', 'keywords']
+            }
+          }
+        },
+        required: ['weeks']
+      };
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.5-flash',
+        contents: [systemPrompt, userPrompt],
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema
+        }
+      });
+
+      const responseText = response.text || '';
+      const data = JSON.parse(responseText.trim());
+      res.json({ success: true, curriculum: data.weeks });
+
+    } catch (error: any) {
+      console.warn("Generating curriculum failed. Preparing standard structural fallbacks...", error.message || error);
+      
+      const fallbackWeeks = Array.from({ length: 12 }, (_, i) => {
+        const wk = i + 1;
+        return {
+          weekNum: wk,
+          topic: `${subject} Core Concepts - Series ${wk}`,
+          objectives: [
+            `Analyze core foundational components in ${subject} for week ${wk}`,
+            `Solve and discuss practical theoretical evaluations`,
+            `Apply learning outcomes to Nigerian domestic scenarios`
+          ],
+          keywords: [subject.toLowerCase(), `week ${wk}`, 'nigerian education', 'concepts']
+        };
+      });
+      res.json({ success: true, curriculum: fallbackWeeks, isFallback: true });
     }
   });
 

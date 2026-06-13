@@ -232,35 +232,83 @@ export function LearningHub({
     try {
       // 1. Retrieve the curriculum node from Firebase Realtime Database
       const rtdbCurriculum = await rtdbGet(NODES.CURRICULUM);
+      
+      // Log the exact Firebase path and query result in the browser console for debugging
+      console.log(`[DEBUG] Querying Firebase Realtime Database Path: /curriculum`);
+      console.log(`[DEBUG] Firebase /curriculum Query Result payload:`, rtdbCurriculum);
+
       let matchedCurriculum: any = null;
       
       const targetTerm = selectedTerm === 1 ? '1st Term' : selectedTerm === 2 ? '2nd Term' : '3rd Term';
       const targetWeek = selectedWeek;
       const targetClass = user.classLevel || 'SS 1';
       const targetSubject = selectedSubject.name;
-      
+
       if (rtdbCurriculum) {
-        // Find entry with matching class, subject, term, and week
-        const keys = Object.keys(rtdbCurriculum);
-        for (const k of keys) {
-          const item = rtdbCurriculum[k];
-          if (
-            item &&
-            String(item.class).toLowerCase() === targetClass.toLowerCase() &&
-            String(item.subject).toLowerCase() === targetSubject.toLowerCase() &&
-            String(item.term).toLowerCase() === targetTerm.toLowerCase() &&
-            Number(item.week) === Number(targetWeek)
-          ) {
-            matchedCurriculum = item;
-            break;
+        // Flatten any possible structure (flat or nested) to have uniform search
+        const getFlatCurriculums = (obj: any): any[] => {
+          if (!obj || typeof obj !== 'object') return [];
+          if (obj.topic !== undefined && (obj.class !== undefined || obj.week !== undefined)) {
+            return [obj];
           }
-        }
+          let list: any[] = [];
+          for (const val of Object.values(obj)) {
+            list = list.concat(getFlatCurriculums(val));
+          }
+          return list;
+        };
+
+        const flatList = getFlatCurriculums(rtdbCurriculum);
+        console.log(`[DEBUG] Total flattened curriculum records count: ${flatList.length}`, flatList);
+        
+        // Filter records precisely where:
+        // class === selectedClass
+        // subject === selectedSubject
+        // term === selectedTerm
+        // week === selectedWeek
+        // status === "Published"
+        matchedCurriculum = flatList.find((record: any) => {
+          if (!record) return false;
+          
+          // Must match status === "Published"
+          const recordStatus = record.status || 'Published';
+          if (recordStatus !== 'Published') return false;
+
+          // Standardize spaces and casing to prevent mismatch
+          const norm = (s: string) => String(s).replace(/\s+/g, '').toLowerCase();
+          const normWeek = (w: any) => {
+            if (typeof w === 'number') return w;
+            const m = String(w).match(/\d+/);
+            return m ? parseInt(m[0], 10) : null;
+          };
+
+          const classMatch = norm(record.class) === norm(targetClass);
+          const subjectMatch = norm(record.subject) === norm(targetSubject);
+          const termMatch = norm(record.term) === norm(targetTerm);
+          const weekMatch = normWeek(record.week) === normWeek(targetWeek);
+
+          return classMatch && subjectMatch && termMatch && weekMatch;
+        });
       }
-      
+
       if (!matchedCurriculum) {
-        throw new Error(`The lesson note generator could not find any official curriculum entry in the database for Class: ${targetClass}, Subject: ${targetSubject}, Term: ${targetTerm}, Week: ${targetWeek}. Please publish a topic in the Admin Panel curriculum node first!`);
+        console.warn(`[WARN] No matching curriculum record found in Firebase for Class: ${targetClass}, Subject: ${targetSubject}, Term: ${targetTerm}, Week: ${targetWeek} with status "Published".`);
+        
+        let warningMessage = `The lesson note generator could not find any official curriculum entry in the database for Class: ${targetClass}, Subject: ${targetSubject}, Term: ${targetTerm}, Week: ${targetWeek}. Please publish a topic with status "Published" in the Admin Panel or Teacher Portal curriculum node first!`;
+        
+        if (user.role === 'admin') {
+          warningMessage += ` As an Administrator, you can navigate to the Admin Panel under the 'Curriculum' tab to generate or add this week's alignment structure now.`;
+        } else if (user.role === 'teacher') {
+          warningMessage += ` As a Teacher, you can head to the Teacher Portal and use the 'Curriculum Generator' tab to map your curriculum or edit lessons for this term.`;
+        } else {
+          warningMessage += ` Please request your teacher or school administrator to publish the curriculum mapping inside the School Management Dashboard.`;
+        }
+        
+        throw new Error(warningMessage);
       }
-      
+
+      console.log(`[DEBUG] Successfully located matching curriculum topic: "${matchedCurriculum.topic}"`, matchedCurriculum);
+
       // 2. We use the custom retrieved topic and description for generator API
       const response = await fetch('/api/gemini/generate-lesson-note', {
         method: 'POST',
@@ -273,7 +321,7 @@ export function LearningHub({
           term: matchedCurriculum.term,
           week: `Week ${matchedCurriculum.week}`,
           focusTopic: matchedCurriculum.topic,
-          topicDescription: matchedCurriculum.details,
+          topicDescription: matchedCurriculum.details || matchedCurriculum.topic,
           isEndOfTerm: selectedWeek === 12
         })
       });

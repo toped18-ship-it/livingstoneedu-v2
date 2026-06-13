@@ -18,6 +18,7 @@ import {
   updateProfile,
   User as FirebaseUser
 } from 'firebase/auth';
+import { getSubjectsForClass, getWeeklyTopicTitle, getLessonContent } from '../data/curriculum';
 
 // Define the 17 DB nodes as constants
 export const NODES = {
@@ -136,17 +137,93 @@ export const seedRtdbIfEmpty = async () => {
     console.log('[RTDB Seed] Check if database requires seeding...');
     
     // Check curriculum node
-    const currData = await rtdbGet(NODES.CURRICULUM);
-    if (!currData) {
-      console.log('[RTDB Seed] Seeding curriculum node...');
-      const seedCurriculum = {
-        'curr-1': { id: 'curr-1', class: 'SS 1', subject: 'Mathematics', term: '1st Term', week: 1, topic: 'Number Bases', details: 'Binary, Octal, Hexadecimal conversions and basic operations.', status: 'Published' },
-        'curr-2': { id: 'curr-2', class: 'SS 1', subject: 'English Studies', term: '1st Term', week: 1, topic: 'Parts of Speech', details: 'Focus on Nouns & Pronouns with Nigerian grammar contextual examples.', status: 'Published' },
-        'curr-3': { id: 'curr-3', class: 'JSS 3', subject: 'Basic Science & Tech', term: '1st Term', week: 3, topic: 'Environmental Safety', details: 'Hazardous wastes management & safety precautions in local areas.', status: 'Published' },
-        'curr-4': { id: 'curr-4', class: 'SS 2', subject: 'Physics', term: '2nd Term', week: 4, topic: 'Linear Momentum', details: 'Newtonian Collision mechanics, formula calculations, and WAEC Prep.', status: 'Draft' },
-        'curr-5': { id: 'curr-5', class: 'Primary 5', subject: 'Computer Studies / ICT', term: '1st Term', week: 2, topic: 'Search Engines', details: 'How to find secondary academic materials using web search.', status: 'Published' }
+    const currData = await rtdbGet(NODES.CURRICULUM) || {};
+    
+    const mandatoryClasses = [
+      'Primary 1', 'Primary 2', 'Primary 3', 'Primary 4', 'Primary 5', 'Primary 6',
+      'JSS 1', 'JSS 2', 'JSS 3',
+      'SS 1', 'SS 2', 'SS 3'
+    ];
+    
+    // Check if any of these standard classes are missing in existing curriculum records
+    const existingCurriculumClasses = new Set(Object.values(currData).map((cur: any) => cur?.class));
+    const missingCurriculumClass = mandatoryClasses.some(mc => !existingCurriculumClasses.has(mc));
+
+    if (Object.keys(currData).length < 500 || missingCurriculumClass) {
+      console.log('[RTDB Seed] Seeding missing elements of the 12 classes curriculum node...');
+      
+      const classesToProcess = [
+        'Primary 1', 'Primary 2', 'Primary 3', 'Primary 4', 'Primary 5', 'Primary 6',
+        'JSS 1', 'JSS 2', 'JSS 3',
+        'SS 1', 'SS 2', 'SS 3'
+      ];
+
+      const classMapping: Record<string, string[]> = {
+        'Primary 1': ['Primary 1'],
+        'Primary 2': ['Primary 2'],
+        'Primary 3': ['Primary 3'],
+        'Primary 4': ['Primary 4'],
+        'Primary 5': ['Primary 5'],
+        'Primary 6': ['Primary 6'],
+        'JSS 1': ['JSS 1'],
+        'JSS 2': ['JSS 2'],
+        'JSS 3': ['JSS 3'],
+        'SS 1': ['SS 1', 'SSS 1'],
+        'SS 2': ['SS 2', 'SSS 2'],
+        'SS 3': ['SS 3', 'SSS 3']
       };
-      await rtdbSet(NODES.CURRICULUM, seedCurriculum);
+
+      const seedCurriculum: Record<string, any> = {};
+
+      for (const classLevel of classesToProcess) {
+        const targetClasses = classMapping[classLevel] || [classLevel];
+        const subjects = getSubjectsForClass(classLevel as any);
+        
+        for (const targetClass of targetClasses) {
+          const cleanClass = targetClass.trim().replace(/[.#$[\]/]/g, '_');
+
+          for (const sub of subjects) {
+            const cleanSubj = sub.name.trim().replace(/[.#$[\]/]/g, '_');
+
+            for (const termNum of [1, 2, 3] as const) {
+              const termLabel = `${termNum}${termNum === 1 ? 'st' : termNum === 2 ? 'nd' : 'rd'} Term`;
+
+              for (const weekNum of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const) {
+                const topicTitle = getWeeklyTopicTitle(classLevel as any, sub.id, termNum, weekNum);
+                
+                let objectives: string[] = [];
+                try {
+                  const lesson = getLessonContent(classLevel as any, sub.id, termNum, weekNum);
+                  objectives = lesson.objectives || [];
+                } catch {
+                  objectives = [
+                    `Explain standard rules and operations of ${topicTitle}.`,
+                    `Analyze step-by-step calculations and practical occurrences in Nigeria.`,
+                    `Complete corresponding continuous assessment and exam quizzes.`
+                  ];
+                }
+
+                const keyId = `curr_${cleanClass}_${cleanSubj}_t${termNum}_W${weekNum}`.replace(/\s+/g, '_');
+                
+                seedCurriculum[keyId] = {
+                  id: keyId,
+                  class: targetClass,
+                  subject: sub.name,
+                  term: termLabel,
+                  week: weekNum,
+                  topic: topicTitle,
+                  objectives: objectives,
+                  details: objectives.join('\n') || sub.description || `National syllabus guidelines covering ${topicTitle}.`,
+                  status: 'Published'
+                };
+              }
+            }
+          }
+        }
+      }
+      // Merge with existing ones (currData overrides standard seedCurriculum where key matches)
+      await rtdbSet(NODES.CURRICULUM, { ...seedCurriculum, ...currData });
+      console.log('[RTDB Seed] Seeding complete curriculum successfully finished!');
     }
 
     // Check school settings
@@ -155,7 +232,7 @@ export const seedRtdbIfEmpty = async () => {
       console.log('[RTDB Seed] Seeding school settings node...');
       await rtdbSet(NODES.SCHOOL_SETTINGS, {
         brandName: 'LIVINGSTONEEDU',
-        appSubtitle: 'Syllabus Portal',
+        appSubtitle: 'Learning Portal',
         proPrice: '₦5,000',
         supportGroupUrl: 'https://wa.me/message/AJ4NILOGBTTMJ1',
         contactName: 'Livingtch Brand Agency',
@@ -187,16 +264,41 @@ export const seedRtdbIfEmpty = async () => {
     }
 
     // Check classes
-    const classesData = await rtdbGet(NODES.CLASSES);
-    if (!classesData) {
-      console.log('[RTDB Seed] Seeding classes...');
-      const seedClasses = {
-        'class-1': { id: 'class-1', name: 'Primary 1', section: 'Grade School', studentCount: 0 },
-        'class-2': { id: 'class-2', name: 'Primary 4', section: 'Grade School', studentCount: 0 },
-        'class-3': { id: 'class-3', name: 'JSS 1', section: 'Junior Secondary', studentCount: 0 },
-        'class-4': { id: 'class-4', name: 'SS 1', section: 'Senior Secondary', studentCount: 0 }
-      };
-      await rtdbSet(NODES.CLASSES, seedClasses);
+    const classesData = (await rtdbGet(NODES.CLASSES)) || {};
+    const fullClasses = {
+      'class-1': { id: 'class-1', name: 'Primary 1', section: 'Grade School', studentCount: 0 },
+      'class-2': { id: 'class-2', name: 'Primary 2', section: 'Grade School', studentCount: 0 },
+      'class-3': { id: 'class-3', name: 'Primary 3', section: 'Grade School', studentCount: 0 },
+      'class-4': { id: 'class-4', name: 'Primary 4', section: 'Grade School', studentCount: 0 },
+      'class-5': { id: 'class-5', name: 'Primary 5', section: 'Grade School', studentCount: 0 },
+      'class-6': { id: 'class-6', name: 'Primary 6', section: 'Grade School', studentCount: 0 },
+      'class-7': { id: 'class-7', name: 'JSS 1', section: 'Junior Secondary', studentCount: 0 },
+      'class-8': { id: 'class-8', name: 'JSS 2', section: 'Junior Secondary', studentCount: 0 },
+      'class-9': { id: 'class-9', name: 'JSS 3', section: 'Junior Secondary', studentCount: 0 },
+      'class-10': { id: 'class-10', name: 'SS 1', section: 'Senior Secondary', studentCount: 0 },
+      'class-11': { id: 'class-11', name: 'SS 2', section: 'Senior Secondary', studentCount: 0 },
+      'class-12': { id: 'class-12', name: 'SS 3', section: 'Senior Secondary', studentCount: 0 }
+    };
+
+    const existingClassNames = Object.values(classesData).map((c: any) => c?.name);
+    const missingMandatoryClass = Object.values(fullClasses).some((fc: any) => !existingClassNames.includes(fc.name));
+
+    if (Object.keys(classesData).length < 12 || missingMandatoryClass) {
+      console.log('[RTDB Seed] Seeding missing or all 12 classes with non-destructive merge...');
+      const mergedClasses = { ...fullClasses };
+      Object.keys(classesData).forEach(key => {
+        const item = classesData[key];
+        const fcKey = Object.keys(fullClasses).find(fk => (fullClasses as any)[fk].name === item?.name);
+        if (fcKey) {
+          mergedClasses[fcKey as keyof typeof fullClasses] = {
+            ...mergedClasses[fcKey as keyof typeof fullClasses],
+            ...item
+          };
+        } else {
+          (mergedClasses as any)[key] = item;
+        }
+      });
+      await rtdbSet(NODES.CLASSES, mergedClasses);
     }
 
     // Check subjects

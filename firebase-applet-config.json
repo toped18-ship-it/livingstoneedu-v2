@@ -5,5 +5,6 @@
   "authDomain": "livingstoneedu-17aad.firebaseapp.com",
   "storageBucket": "livingstoneedu-17aad.firebasestorage.app",
   "messagingSenderId": "609898867985",
-  "measurementId": ""
+  "measurementId": "",
+  "databaseURL": "https://livingstoneedu-17aad-default-rtdb.firebaseio.com"
 }

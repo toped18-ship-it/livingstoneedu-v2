@@ -6,8 +6,8 @@ import {
   Edit, Save
 } from 'lucide-react';
 import { User, ClassLevel, TeacherClassSetup, TeacherStudent, AIExam, QuizQuestion } from '../types';
-import { getSubjectsForClass } from '../data/curriculum';
-import { rtdbGet, NODES } from '../lib/rtdbService';
+import { getSubjectsForClass, getWeeklyTopicTitle, getLessonContent } from '../data/curriculum';
+import { rtdbGet, rtdbSet, NODES } from '../lib/rtdbService';
 
 interface TeacherPortalProps {
   user: User;
@@ -25,10 +25,189 @@ const DEMO_STUDENT_NAMES = [
 ];
 
 export function TeacherPortal({ user, onNavigateToHome, isPro, onPaymentTrigger }: TeacherPortalProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'roster' | 'attendance' | 'exam-maker' | 'grader' | 'reports' | 'lesson-notes'>('roster');
+  const [activeSubTab, setActiveSubTab] = useState<'roster' | 'attendance' | 'exam-maker' | 'grader' | 'reports' | 'lesson-notes' | 'curriculum-generator'>('roster');
   
   // Roster Class Level State
   const [classLevel, setClassLevel] = useState<ClassLevel>('SS 1');
+
+  // Curriculum Generator States
+  const [selectedCurriculumClass, setSelectedCurriculumClass] = useState<ClassLevel>('SS 1');
+  const [selectedCurriculumSubject, setSelectedCurriculumSubject] = useState<string>('Mathematics');
+  const [selectedCurriculumTerm, setSelectedCurriculumTerm] = useState<string>('1st Term');
+  
+  const [isGeneratingCurriculum, setIsGeneratingCurriculum] = useState(false);
+  const [generatedCurriculumWeeks, setGeneratedCurriculumWeeks] = useState<any[] | null>(null);
+  const [curriculumStatus, setCurriculumStatus] = useState<string>('');
+  const [editingCurriculumWeeks, setEditingCurriculumWeeks] = useState<Record<number, { topic: string; objectives: string; keywords: string }>>({});
+  const [hasExistingCurriculum, setHasExistingCurriculum] = useState(false);
+
+  const checkExistingCurriculum = async (classLvl: ClassLevel, subj: string, termVal: string) => {
+    try {
+      console.log(`[DEBUG] checkExistingCurriculum querying path: /curriculum for ${classLvl}, ${subj}, ${termVal}`);
+      const rtdbCurriculum = await rtdbGet(NODES.CURRICULUM) || {};
+      
+      const weeksData: any[] = [];
+      const editData: typeof editingCurriculumWeeks = {};
+      
+      // Flatten any potential structure to list of records
+      const getFlatCurriculums = (obj: any): any[] => {
+        if (!obj || typeof obj !== 'object') return [];
+        if (obj.topic !== undefined && (obj.class !== undefined || obj.week !== undefined)) {
+          return [obj];
+        }
+        let list: any[] = [];
+        for (const val of Object.values(obj)) {
+          list = list.concat(getFlatCurriculums(val));
+        }
+        return list;
+      };
+
+      const flatList = getFlatCurriculums(rtdbCurriculum);
+
+      for (let i = 1; i <= 12; i++) {
+        const wkData = flatList.find((record: any) => {
+          if (!record) return false;
+          
+          const norm = (s: string) => String(s).replace(/\s+/g, '').toLowerCase();
+          const normWeek = (w: any) => {
+            if (typeof w === 'number') return w;
+            const m = String(w).match(/\d+/);
+            return m ? parseInt(m[0], 10) : null;
+          };
+
+          return norm(record.class) === norm(classLvl) &&
+                 norm(record.subject) === norm(subj) &&
+                 norm(record.term) === norm(termVal) &&
+                 normWeek(record.week) === i;
+        });
+
+        if (wkData) {
+          const topic = wkData.topic || '';
+          const objectives = Array.isArray(wkData.details) ? wkData.details.join('\n') : wkData.details || wkData.objectives || '';
+          const keywords = Array.isArray(wkData.keywords) ? wkData.keywords.join(', ') : wkData.keywords || '';
+          
+          weeksData.push({
+            weekNum: i,
+            topic,
+            objectives: Array.isArray(wkData.details) ? wkData.details : [objectives],
+            keywords: Array.isArray(wkData.keywords) ? wkData.keywords : [keywords]
+          });
+          
+          editData[i] = { topic, objectives, keywords };
+        }
+      }
+      
+      if (weeksData.length > 0) {
+        setGeneratedCurriculumWeeks(weeksData);
+        setEditingCurriculumWeeks(editData);
+        setHasExistingCurriculum(true);
+        return true;
+      }
+      setHasExistingCurriculum(false);
+      return false;
+    } catch (e) {
+      console.error(e);
+      setHasExistingCurriculum(false);
+      return false;
+    }
+  };
+
+  const handleGenerateCurriculum = async () => {
+    setIsGeneratingCurriculum(true);
+    setCurriculumStatus('Sifting NERDC national standards and planning terms...');
+    setGeneratedCurriculumWeeks(null);
+    setEditingCurriculumWeeks({});
+    
+    // Check duplication first
+    const exists = await checkExistingCurriculum(selectedCurriculumClass, selectedCurriculumSubject, selectedCurriculumTerm);
+    if (exists) {
+      setIsGeneratingCurriculum(false);
+      setCurriculumStatus('Pre-existing curriculum loaded from Realtime Database. Duplication prevented.');
+      return;
+    }
+    
+    try {
+      const res = await fetch('/api/gemini/generate-curriculum', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          classLevel: selectedCurriculumClass,
+          subject: selectedCurriculumSubject,
+          term: selectedCurriculumTerm
+        })
+      });
+      
+      if (!res.ok) throw new Error('API request failed');
+      const data = await res.json();
+      
+      if (data.success && data.curriculum) {
+        setGeneratedCurriculumWeeks(data.curriculum);
+        const initialEdits: typeof editingCurriculumWeeks = {};
+        data.curriculum.forEach((wk: any) => {
+          initialEdits[wk.weekNum] = {
+            topic: wk.topic,
+            objectives: Array.isArray(wk.objectives) ? wk.objectives.join('\n') : wk.objectives || '',
+            keywords: Array.isArray(wk.keywords) ? wk.keywords.join(', ') : wk.keywords || ''
+          };
+        });
+        setEditingCurriculumWeeks(initialEdits);
+        setCurriculumStatus('Curriculum generated successfully via Gemini. Ready for review and edits.');
+      } else {
+        throw new Error('Could not retrieve curriculum data');
+      }
+    } catch (e: any) {
+      console.error(e);
+      setCurriculumStatus(`Generation error: ${e.message || 'Server timeout'}`);
+    } finally {
+      setIsGeneratingCurriculum(false);
+    }
+  };
+
+  const handleSaveCurriculumToDb = async () => {
+    setCurriculumStatus('Saving complete term mapping to Firebase Realtime Database...');
+    try {
+      const rtdbCurriculum = await rtdbGet(NODES.CURRICULUM) || {};
+      const keys = Object.keys(rtdbCurriculum);
+      
+      for (let i = 1; i <= 12; i++) {
+        const edit = editingCurriculumWeeks[i];
+        if (!edit) continue;
+        
+        let foundKey = keys.find(k => {
+          const item = rtdbCurriculum[k];
+          return item &&
+            String(item.class).toLowerCase() === selectedCurriculumClass.toLowerCase() &&
+            String(item.subject).toLowerCase() === selectedCurriculumSubject.toLowerCase() &&
+            String(item.term).toLowerCase() === selectedCurriculumTerm.toLowerCase() &&
+            Number(item.week) === i;
+        });
+        
+        if (!foundKey) {
+          foundKey = `curr_ai_${selectedCurriculumClass.replace(/\s+/g, '_')}_${selectedCurriculumSubject.replace(/\s+/g, '_')}_${selectedCurriculumTerm.replace(/\s+/g, '_')}_W${i}`;
+        }
+        
+        rtdbCurriculum[foundKey] = {
+          id: foundKey,
+          class: selectedCurriculumClass,
+          subject: selectedCurriculumSubject,
+          term: selectedCurriculumTerm,
+          week: i,
+          topic: edit.topic,
+          details: edit.objectives,
+          status: 'Published'
+        };
+      }
+      
+      await rtdbSet(NODES.CURRICULUM, rtdbCurriculum);
+      
+      setCurriculumStatus('Curriculum saved and published to the database! Lesson Note Writer and Classroom modules can now use this syllabus.');
+      setHasExistingCurriculum(true);
+      alert('Success! Custom 12-Week Curriculum has been locked and recorded to Realtime Database.');
+    } catch (e: any) {
+      console.error(e);
+      setCurriculumStatus(`Save error: ${e.message || 'Write permission denied'}`);
+    }
+  };
 
   // Lesson Notes States
   const [selectedClass, setSelectedClass] = useState<string>('SS 1');
@@ -68,6 +247,11 @@ export function TeacherPortal({ user, onNavigateToHome, isPro, onPaymentTrigger 
     try {
       // 1. Retrieve curriculum topic from Firebase Realtime Database curriculum node
       const rtdbCurriculum = await rtdbGet(NODES.CURRICULUM);
+      
+      // Log the exact Firebase path and query result in the browser console for debugging
+      console.log(`[DEBUG] Querying Firebase Realtime Database Path: /curriculum`);
+      console.log(`[DEBUG] Firebase /curriculum Query Result payload:`, rtdbCurriculum);
+
       let matchedCurriculum: any = null;
       
       const targetTerm = selectedTerm; // e.g. "1st Term"
@@ -76,25 +260,61 @@ export function TeacherPortal({ user, onNavigateToHome, isPro, onPaymentTrigger 
       const targetSubject = selectedSubject; // e.g. "Mathematics"
 
       if (rtdbCurriculum) {
-        const keys = Object.keys(rtdbCurriculum);
-        for (const k of keys) {
-          const item = rtdbCurriculum[k];
-          if (
-            item &&
-            String(item.class).toLowerCase() === targetClass.toLowerCase() &&
-            String(item.subject).toLowerCase() === targetSubject.toLowerCase() &&
-            String(item.term).toLowerCase() === targetTerm.toLowerCase() &&
-            Number(item.week) === Number(targetWeek)
-          ) {
-            matchedCurriculum = item;
-            break;
+        // Flatten any possible structure (flat or nested) to have uniform search
+        const getFlatCurriculums = (obj: any): any[] => {
+          if (!obj || typeof obj !== 'object') return [];
+          if (obj.topic !== undefined && (obj.class !== undefined || obj.week !== undefined)) {
+            return [obj];
           }
-        }
+          let list: any[] = [];
+          for (const val of Object.values(obj)) {
+            list = list.concat(getFlatCurriculums(val));
+          }
+          return list;
+        };
+
+        const flatList = getFlatCurriculums(rtdbCurriculum);
+        console.log(`[DEBUG] Total flattened curriculum records count: ${flatList.length}`, flatList);
+
+        // Filter records precisely where:
+        // class === selectedClass
+        // subject === selectedSubject
+        // term === selectedTerm
+        // week === selectedWeek
+        // status === "Published"
+        matchedCurriculum = flatList.find((record: any) => {
+          if (!record) return false;
+
+          // Must match status === "Published"
+          const recordStatus = record.status || 'Published';
+          if (recordStatus !== 'Published') return false;
+
+          // Standardize spaces and casing to prevent mismatch
+          const norm = (s: string) => String(s).replace(/\s+/g, '').toLowerCase();
+          const normWeek = (w: any) => {
+            if (typeof w === 'number') return w;
+            const m = String(w).match(/\d+/);
+            return m ? parseInt(m[0], 10) : null;
+          };
+
+          const classMatch = norm(record.class) === norm(targetClass);
+          const subjectMatch = norm(record.subject) === norm(targetSubject);
+          const termMatch = norm(record.term) === norm(targetTerm);
+          const weekMatch = normWeek(record.week) === normWeek(targetWeek);
+
+          return classMatch && subjectMatch && termMatch && weekMatch;
+        });
       }
 
       if (!matchedCurriculum) {
-        throw new Error(`Could not locate an official registered school curriculum in database for Class: ${targetClass}, Subject: ${targetSubject}, Term: ${targetTerm}, Week: ${targetWeek}. Please check the Admin Panel curriculum tab!`);
+        console.warn(`[WARN] No matching curriculum record found in Firebase for Class: ${targetClass}, Subject: ${targetSubject}, Term: ${targetTerm}, Week: ${targetWeek} with status "Published".`);
+        
+        const warningMessage = `The lesson note generator could not find any official curriculum entry in the database for Class: ${targetClass}, Subject: ${targetSubject}, Term: ${targetTerm}, Week: ${targetWeek}. Please publish a topic with status "Published" in the curriculum node first! You can use the 'Curriculum Generator' tab in this portal to establish it.`;
+        
+        throw new Error(warningMessage);
       }
+
+      console.log(`[DEBUG] Successfully located matching curriculum topic: "${matchedCurriculum.topic}"`, matchedCurriculum);
 
       const res = await fetch('/api/gemini/generate-lesson-note', {
         method: 'POST',
@@ -105,7 +325,7 @@ export function TeacherPortal({ user, onNavigateToHome, isPro, onPaymentTrigger 
           term: matchedCurriculum.term,
           week: `Week ${matchedCurriculum.week}`,
           focusTopic: matchedCurriculum.topic,
-          topicDescription: matchedCurriculum.details,
+          topicDescription: matchedCurriculum.details || matchedCurriculum.topic,
           isEndOfTerm: isEndOfTerm
         })
       });
@@ -638,6 +858,15 @@ ${generatedNote.homeworkAssignment || ''}
           <BookOpen size={14} className="text-indigo-600 animate-pulse" />
           NERDC Lesson Note Writer
         </button>
+        <button
+          onClick={() => setActiveSubTab('curriculum-generator')}
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition flex items-center gap-2 cursor-pointer ${
+            activeSubTab === 'curriculum-generator' ? 'bg-white text-slate-900 shadow-xs border border-violet-200 bg-violet-50/10' : 'text-violet-650 hover:bg-violet-50 bg-violet-50/20 border border-violet-200/30'
+          }`}
+        >
+          <Sparkles size={14} className="text-violet-600 animate-pulse" />
+          NERDC Curriculum Generator
+        </button>
       </div>
 
       {/* Subtab Content Panels */}
@@ -821,13 +1050,13 @@ ${generatedNote.homeworkAssignment || ''}
               <p className="text-[10px] text-slate-405">
                 Set the active grade level for your teaching plan. This shifts what subjects are available of setting.
               </p>
-              <div className="grid grid-cols-2 gap-1.5">
-                {['SS 1', 'SS 2', 'SS 3'].map((item) => (
+              <div className="grid grid-cols-3 gap-1.5">
+                {CLASSES_LIST.map((item) => (
                   <button
                     key={item}
                     onClick={() => { setClassLevel(item as ClassLevel); saveClassSetup({ ...classSetup, classLevel: item as ClassLevel }); }}
-                    className={`py-1.5 px-3 rounded-lg border text-xs font-bold transition ${
-                      classLevel === item ? 'bg-indigo-600 border-indigo-650 text-white shadow-xs' : 'bg-white border-slate-200 text-slate-600'
+                    className={`py-1.5 px-2 rounded-lg border text-[10px] sm:text-xs font-bold transition text-center ${
+                      classLevel === item ? 'bg-indigo-600 border-indigo-650 text-white shadow-xs' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                     }`}
                   >
                     {item}
@@ -2106,6 +2335,218 @@ ${generatedNote.homeworkAssignment || ''}
                 </div>
               )}
 
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* 7. NERDC CURRICULUM GENERATOR */}
+      {activeSubTab === 'curriculum-generator' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* Left form panel */}
+            <div className="bg-white rounded-3xl border border-slate-150 p-6 shadow-sm space-y-4 h-fit">
+              <div className="border-b pb-3">
+                <span className="text-[9px] bg-violet-150 text-violet-750 font-extrabold px-2.5 py-1 rounded-lg uppercase tracking-wider">
+                  AI Planning Assistant
+                </span>
+                <h3 className="font-sans font-black text-slate-800 text-sm mt-1">Curriculum Parameters</h3>
+                <p className="text-[10px] text-slate-400 mt-0.5">Define your target grade, course, and term sequence</p>
+              </div>
+
+              {/* Class Select */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-black text-slate-600 uppercase tracking-tight">Academic Grade Level</label>
+                <select
+                  value={selectedCurriculumClass}
+                  onChange={(e) => {
+                    const val = e.target.value as ClassLevel;
+                    setSelectedCurriculumClass(val);
+                    checkExistingCurriculum(val, selectedCurriculumSubject, selectedCurriculumTerm);
+                  }}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-705 focus:border-violet-600 outline-none bg-slate-50/50"
+                >
+                  {CLASSES_LIST.map((cl) => (
+                    <option key={cl} value={cl}>{cl}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Subject Select */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-black text-slate-600 uppercase tracking-tight">Academic Subject</label>
+                <select
+                  value={selectedCurriculumSubject}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedCurriculumSubject(val);
+                    checkExistingCurriculum(selectedCurriculumClass, val, selectedCurriculumTerm);
+                  }}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-705 focus:border-violet-600 outline-none bg-slate-50/50"
+                >
+                  {['Mathematics', 'English Language', 'Physics', 'Chemistry', 'Biology', 'Economics', 'Government', 'Civic Education', 'Computer Science', 'Commerce', 'Literature in English', 'Financial Accounting', 'Geography', 'Agricultural Science'].map((sub) => (
+                    <option key={sub} value={sub}>{sub}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Term Select */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-black text-slate-600 uppercase tracking-tight">Target Term</label>
+                <select
+                  value={selectedCurriculumTerm}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedCurriculumTerm(val);
+                    checkExistingCurriculum(selectedCurriculumClass, selectedCurriculumSubject, val);
+                  }}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-705 focus:border-violet-600 outline-none bg-slate-50/50"
+                >
+                  {['1st Term', '2nd Term', '3rd Term'].map((tr) => (
+                    <option key={tr} value={tr}>{tr}</option>
+                  ))}
+                </select>
+              </div>
+
+              {curriculumStatus && (
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 text-[10px] text-slate-500 font-medium">
+                  <strong>Status:</strong> {curriculumStatus}
+                </div>
+              )}
+
+              {/* Action Button */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  disabled={isGeneratingCurriculum}
+                  onClick={handleGenerateCurriculum}
+                  className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-violet-600 hover:bg-violet-750 shadow-md shadow-violet-600/10 active:scale-[0.99] transition flex items-center justify-center gap-2 cursor-pointer uppercase tracking-wider disabled:opacity-55"
+                >
+                  <Sparkles size={14} className={isGeneratingCurriculum ? 'animate-spin' : ''} />
+                  <span>{isGeneratingCurriculum ? 'Crafting Syllabus...' : 'Generate 12-Week Curriculum'}</span>
+                </button>
+              </div>
+
+              {generatedCurriculumWeeks && (
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={handleSaveCurriculumToDb}
+                    className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-750 shadow-md shadow-emerald-600/10 active:scale-[0.99] transition flex items-center justify-center gap-2 cursor-pointer uppercase tracking-wider"
+                  >
+                    <Save size={14} />
+                    <span>Save & Publish Curriculum</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Right main board */}
+            <div className="lg:col-span-2">
+              {isGeneratingCurriculum ? (
+                <div className="bg-white rounded-3xl border border-slate-150 p-16 text-center space-y-4 shadow-sm h-full flex flex-col items-center justify-center">
+                  <div className="relative flex items-center justify-center">
+                    <div className="w-16 h-16 rounded-full border-4 border-violet-105 border-t-violet-600 animate-spin" />
+                    <Sparkles className="absolute text-violet-600 animate-pulse" size={24} />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="font-sans font-black text-slate-800 text-sm">Aligning with NERDC Framework...</h4>
+                    <p className="text-[10.5px] text-slate-400 max-w-xs mx-auto">
+                      Gemini is generating complete learning objectives, core themes, weekly topics, and keywords for {selectedCurriculumClass} ({selectedCurriculumSubject}).
+                    </p>
+                  </div>
+                </div>
+              ) : generatedCurriculumWeeks ? (
+                <div className="bg-white rounded-3xl border border-slate-150 p-6 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b">
+                    <div>
+                      <h3 className="font-sans font-black text-slate-800 text-sm">
+                        {selectedCurriculumClass} - {selectedCurriculumSubject} ({selectedCurriculumTerm})
+                      </h3>
+                      <p className="text-[10px] text-slate-400 mt-0.5">
+                        {hasExistingCurriculum ? '⚠️ Live Database Curriculum Loaded' : '✨ Brand New AI-Drafted Scheme'}
+                      </p>
+                    </div>
+                    <span className="text-[9px] bg-violet-100 text-violet-750 font-black px-2.5 py-1 rounded-lg">
+                      12 WEEKS SYLLABUS
+                    </span>
+                  </div>
+
+                  <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1">
+                    {generatedCurriculumWeeks.map((wk) => {
+                      const num = wk.weekNum;
+                      const edit = editingCurriculumWeeks[num] || { topic: '', objectives: '', keywords: '' };
+                      return (
+                        <div key={num} className="p-4 bg-slate-50/50 hover:bg-slate-50 rounded-2xl border border-slate-150 transition space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-black text-violet-750 uppercase tracking-widest bg-violet-50 px-2 py-0.5 rounded-md">
+                              Week {num}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div className="md:col-span-2 space-y-1.5">
+                              <label className="text-[9px] uppercase font-bold text-slate-400">Core Topic</label>
+                              <input
+                                type="text"
+                                value={edit.topic}
+                                onChange={(e) => {
+                                  setEditingCurriculumWeeks({
+                                    ...editingCurriculumWeeks,
+                                    [num]: { ...edit, topic: e.target.value }
+                                  });
+                                }}
+                                className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 font-bold focus:border-violet-600 outline-none bg-white"
+                              />
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <label className="text-[9px] uppercase font-bold text-slate-400">Keywords (Comma Separated)</label>
+                              <input
+                                type="text"
+                                value={edit.keywords}
+                                onChange={(e) => {
+                                  setEditingCurriculumWeeks({
+                                    ...editingCurriculumWeeks,
+                                    [num]: { ...edit, keywords: e.target.value }
+                                  });
+                                }}
+                                className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-805 font-mono focus:border-violet-600 outline-none bg-white"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-[9px] uppercase font-bold text-slate-400 block">Learning Objectives (One objective per line)</label>
+                            <textarea
+                              rows={2}
+                              value={edit.objectives}
+                              onChange={(e) => {
+                                setEditingCurriculumWeeks({
+                                  ...editingCurriculumWeeks,
+                                  [num]: { ...edit, objectives: e.target.value }
+                                });
+                              }}
+                              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-705 focus:border-violet-600 outline-none bg-white font-medium resize-none"
+                              placeholder="e.g. Understand core concepts&#10;Solve linear equations"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-white rounded-3xl border border-slate-150 p-16 text-center text-slate-400 space-y-3 shadow-sm h-full flex flex-col items-center justify-center">
+                  <Sparkles className="mx-auto h-12 w-12 text-slate-100" />
+                  <h3 className="font-sans font-black text-slate-808 text-sm">NERDC Syllabus Draftroom</h3>
+                  <p className="text-[11px] max-w-sm mx-auto text-slate-400">
+                    Map complete, high-quality, professional syllabus sequences aligned with the West African Examinations Council / NECO and NERDC guidelines in seconds.
+                  </p>
+                </div>
+              )}
             </div>
 
           </div>

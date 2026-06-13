@@ -1,7 +1,7 @@
 {
   "config": {
     "brandName": "LIVINGSTONEEDU",
-    "appSubtitle": "Syllabus Portal",
+    "appSubtitle": "Learning Portal",
     "proPrice": "₦5,000",
     "supportGroupUrl": "https://wa.me/message/AJ4NILOGBTTMJ1",
     "contactName": "Livingtch Brand Agency",
@@ -15,6 +15,15 @@
     "stripePublicKey": "pk_test_stripe_12345"
   },
   "activities": [
+    {
+      "id": "act_signup_1781170655776_682",
+      "userName": "Temitope Oluwaseun Daniels",
+      "userEmail": "destinywayinternationalgroupof@gmail.com",
+      "activityType": "Registration",
+      "subject": "Academic Portal",
+      "detail": "Teacher registration completed. Email: destinywayinternationalgroupof@gmail.com.",
+      "timestamp": "2026-06-11T09:37:35.776Z"
+    },
     {
       "id": "act_1780918609052_609",
       "userName": "Aminat Bello",

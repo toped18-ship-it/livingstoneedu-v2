@@ -78,6 +78,8 @@ export function AuthScreen({ onAuthComplete }: AuthScreenProps) {
           email: cleanEmail,
           avatarSeed,
           role,
+          classLevel: (role === 'teacher' ? 'SS 1' : 'Primary 4') as ClassLevel,
+          selectedSubjectIds: role === 'teacher' ? ['physics', 'chemistry', 'further_math'] : ['mathematics', 'english'],
           schoolName: role === 'teacher' ? schoolName.trim() : undefined,
           joinDate: new Date().toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
         };
@@ -164,11 +166,14 @@ export function AuthScreen({ onAuthComplete }: AuthScreenProps) {
           userProfile = await rtdbGet(`${NODES.USERS}/${id}`);
           if (!userProfile) {
             // Build default profile if none exists in Realtime DB yet
+            const isTeacher = isOwnerEmail ? false : false; // we can map based on standard student rules
             userProfile = {
               id,
               fullName: cleanEmail.split('@')[0],
               email: cleanEmail,
               avatarSeed: 'scholar',
+              classLevel: 'Primary 4',
+              selectedSubjectIds: ['mathematics', 'english'],
               role: isOwnerEmail ? 'admin' : 'student'
             };
             await rtdbSet(`${NODES.USERS}/${id}`, userProfile);
@@ -406,31 +411,6 @@ export function AuthScreen({ onAuthComplete }: AuthScreenProps) {
                   </div>
                 )}
 
-                {/* Select Avatar seed */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
-                    Choose Character / Study Badge
-                  </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {AVATAR_TEMPLATES.map((tpl) => {
-                      const isSelected = avatarSeed === tpl.seed;
-                      return (
-                        <button
-                          key={tpl.seed}
-                          type="button"
-                          onClick={() => setAvatarSeed(tpl.seed)}
-                          className={`relative py-2 px-3 text-xs border rounded-xl flex items-center justify-between transition-all ${tpl.color} ${
-                            isSelected ? 'ring-2 ring-blue-600 scale-[1.02] shadow-sm font-bold' : 'opacity-85 hover:opacity-100'
-                          }`}
-                        >
-                          <span>{tpl.label}</span>
-                          {isSelected && <Check size={12} className="text-blue-700 absolute right-1.5 top-1.5" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
                 {/* Button */}
                 <div>
                   <button
@@ -530,47 +510,7 @@ export function AuthScreen({ onAuthComplete }: AuthScreenProps) {
             </div>
           </form>
 
-          {/* Quick Demo Accounts Helper */}
-          <div className="mt-8 pt-6 border-t border-slate-100">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest text-center mb-3 flex items-center justify-center gap-1">
-              <Sparkles size={12} className="text-amber-500" />
-              <span>Or log in instantly with demo profiles</span>
-            </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <button
-                type="button"
-                onClick={() => handleDemoLogin('primary')}
-                className="px-2 py-1.5 text-[11px] font-medium border border-slate-250 rounded-xl text-slate-700 bg-white hover:bg-slate-50 transition shadow-sm flex flex-col items-center cursor-pointer"
-              >
-                <span className="font-bold text-blue-605">Prim. 4</span>
-                <span className="text-[9px] text-slate-400">Student</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDemoLogin('jss')}
-                className="px-2 py-1.5 text-[11px] font-medium border border-slate-250 rounded-xl text-slate-700 bg-white hover:bg-slate-50 transition shadow-sm flex flex-col items-center cursor-pointer"
-              >
-                <span className="font-bold text-[#0d9488]">JSS 3</span>
-                <span className="text-[9px] text-slate-400">Junior High</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDemoLogin('ss')}
-                className="px-2 py-1.5 text-[11px] font-medium border border-slate-250 rounded-xl text-slate-700 bg-white hover:bg-slate-50 transition shadow-sm flex flex-col items-center cursor-pointer"
-              >
-                <span className="font-bold text-sky-655">SS 3</span>
-                <span className="text-[9px] text-slate-400">Senior High</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDemoLogin('teacher')}
-                className="px-2 py-1.5 text-[11px] font-medium border border-indigo-250 rounded-xl text-indigo-700 bg-indigo-50/50 hover:bg-indigo-50 transition shadow-sm flex flex-col items-center cursor-pointer"
-              >
-                <span className="font-bold">TEACHER</span>
-                <span className="text-[9px] text-indigo-400">Class Admin</span>
-              </button>
-            </div>
-          </div>
+
         </div>
       </div>
     </div>

@@ -13,6 +13,7 @@ import { ClassSelector } from './components/ClassSelector';
 import { TeacherPortal } from './components/TeacherPortal';
 import { PaymentModal } from './components/PaymentModal';
 import { AdminPanel } from './components/AdminPanel';
+import { SplashLoadingScreen } from './components/SplashLoadingScreen';
 import { syncUserProfile, syncLessonProgress } from './lib/firebaseSync';
 import { GraduationCap, LogOut, Home, BookOpen, HelpCircle, MessageSquare, ShieldCheck, Heart, Trophy, Award, Zap, Sparkles, Mail } from 'lucide-react';
 import { seedRtdbIfEmpty, rtdbSubscribe, rtdbSet, rtdbGet, NODES } from './lib/rtdbService';
@@ -21,6 +22,7 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isSplashLoading, setIsSplashLoading] = useState(true);
   const [progressList, setProgressList] = useState<LessonProgress[]>([]);
   const [activeTab, setActiveTab] = useState<'home' | 'hub' | 'quizzes' | 'progress' | 'faq' | 'contact' | 'admin'>('home');
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -44,10 +46,18 @@ export default function App() {
     };
   }, []);
 
+  // 1. Splash Loading timeout
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsSplashLoading(false);
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, []);
+
   // Dynamic branding configurations state loaded from full stack JSON DB
   const [appConfig, setAppConfig] = useState({
     brandName: 'LIVINGSTONEEDU',
-    appSubtitle: 'Syllabus Portal',
+    appSubtitle: 'Learning Portal',
     proPrice: '₦5,000',
     supportGroupUrl: 'https://wa.me/message/AJ4NILOGBTTMJ1',
     contactName: 'Livingtch Brand Agency',
@@ -106,11 +116,34 @@ export default function App() {
     }
   }, [appConfig.logoColor]);
 
-  // 1. Database seeding, dynamic branding subscription, and Firebase Auth listener
+  // 1. Subscribe to dynamic school branding configurations on mount (works instantly for Splash Screen & AuthScreen!)
   useEffect(() => {
-    let unsubBranding: (() => void) | null = null;
+    const unsubBranding = rtdbSubscribe(NODES.SCHOOL_SETTINGS, (data) => {
+      if (data && data.brandName) {
+        setAppConfig({
+          brandName: data.brandName,
+          appSubtitle: data.appSubtitle || 'Learning Portal',
+          proPrice: data.proPrice || '₦5,000',
+          supportGroupUrl: data.supportGroupUrl || 'https://wa.me/message/AJ4NILOGBTTMJ1',
+          contactName: data.contactName || 'Livingtch Brand Agency',
+          logoIcon: data.logoIcon || 'GraduationCap',
+          logoColor: data.logoColor || 'blue',
+          logoText: data.logoText || 'LIVINGSTONE',
+          activeGateway: data.activeGateway || 'Paystack',
+          isPaymentLive: !!data.isPaymentLive,
+          paystackPublicKey: data.paystackPublicKey || '',
+          flutterwavePublicKey: data.flutterwavePublicKey || '',
+          stripePublicKey: data.stripePublicKey || ''
+        });
+      }
+    });
+    return () => {
+      unsubBranding();
+    };
+  }, []);
 
-    // Listen to Firebase Auth state changes
+  // 2. Firebase Auth state listener and database seeding
+  useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser && firebaseUser.email) {
         const cleanEmail = firebaseUser.email.toLowerCase();
@@ -118,29 +151,6 @@ export default function App() {
         
         // Seed database with default structure if empty (safely once authenticated)
         seedRtdbIfEmpty();
-
-        // Subscribe to dynamic branding configurations on Firebase RTDB safely
-        if (!unsubBranding) {
-          unsubBranding = rtdbSubscribe(NODES.SCHOOL_SETTINGS, (data) => {
-            if (data && data.brandName) {
-              setAppConfig({
-                brandName: data.brandName,
-                appSubtitle: data.appSubtitle || 'Syllabus Portal',
-                proPrice: data.proPrice || '₦5,000',
-                supportGroupUrl: data.supportGroupUrl || 'https://wa.me/message/AJ4NILOGBTTMJ1',
-                contactName: data.contactName || 'Livingtch Brand Agency',
-                logoIcon: data.logoIcon || 'GraduationCap',
-                logoColor: data.logoColor || 'blue',
-                logoText: data.logoText || 'LIVINGSTONE',
-                activeGateway: data.activeGateway || 'Paystack',
-                isPaymentLive: !!data.isPaymentLive,
-                paystackPublicKey: data.paystackPublicKey || '',
-                flutterwavePublicKey: data.flutterwavePublicKey || '',
-                stripePublicKey: data.stripePublicKey || ''
-              });
-            }
-          });
-        }
 
         // Grab full loaded user profile from RTDB
         const userProfile = await rtdbGet(`${NODES.USERS}/${id}`);
@@ -154,6 +164,8 @@ export default function App() {
             fullName: cleanEmail.split('@')[0],
             email: cleanEmail,
             avatarSeed: 'scholar',
+            classLevel: cleanEmail === 'toped18@gmail.com' ? 'SS 1' : 'Primary 4',
+            selectedSubjectIds: cleanEmail === 'toped18@gmail.com' ? ['physics'] : ['mathematics', 'english'],
             role: cleanEmail === 'toped18@gmail.com' ? 'admin' : 'student',
             joinDate: new Date().toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
           };
@@ -162,11 +174,6 @@ export default function App() {
         }
       } else {
         // Logout or unauthenticated
-        if (unsubBranding) {
-          unsubBranding();
-          unsubBranding = null;
-        }
-
         // Double check local storage if no user logged in to ease refresh
         const loadedProfile = localStorage.getItem('hub_active_user');
         if (loadedProfile) {
@@ -178,9 +185,6 @@ export default function App() {
     });
 
     return () => {
-      if (unsubBranding) {
-        unsubBranding();
-      }
       unsubAuth();
     };
   }, []);
@@ -273,6 +277,12 @@ export default function App() {
     localStorage.setItem('hub_active_user', JSON.stringify(updatedUser));
     syncUserProfile(updatedUser); // Push to Firestore
 
+    // Also persist directly to Realtime Database (RTDB)
+    const id = currentUser.email.replace(/[.@]/g, '_');
+    rtdbSet(`${NODES.USERS}/${id}`, updatedUser).catch(err => {
+      console.error("Failed to sync class preference to RTDB:", err);
+    });
+
     // Update global list as well
     const mockUserList = JSON.parse(localStorage.getItem('hub_users') || '[]');
     const idx = mockUserList.findIndex((u: any) => u.email.toLowerCase() === currentUser.email.toLowerCase());
@@ -295,6 +305,12 @@ export default function App() {
     setCurrentUser(updatedUser);
     localStorage.setItem('hub_active_user', JSON.stringify(updatedUser));
     syncUserProfile(updatedUser); // Push to Firestore
+
+    // Also persist directly to Realtime Database (RTDB)
+    const id = currentUser.email.replace(/[.@]/g, '_');
+    rtdbSet(`${NODES.USERS}/${id}`, updatedUser).catch(err => {
+      console.error("Failed to sync subject preference to RTDB:", err);
+    });
 
     // Update global users database in localStorage as well
     const mockUserList = JSON.parse(localStorage.getItem('hub_users') || '[]');
@@ -421,13 +437,25 @@ export default function App() {
     }
   };
 
-  // 6. If no active user profile is found, render Signup / Signin page
+  // 6. If initial splash loading state is active, render the premium Splash Screen with blue background
+  if (isSplashLoading) {
+    return (
+      <SplashLoadingScreen 
+        brandName={appConfig.brandName}
+        appSubtitle={appConfig.appSubtitle}
+        logoIcon={appConfig.logoIcon}
+        logoText={appConfig.logoText}
+      />
+    );
+  }
+
+  // 7. If no active user profile is found, render Signup / Signin page
   if (!currentUser) {
     return <AuthScreen onAuthComplete={handleAuthComplete} />;
   }
 
   // Step 1: If user has not selected their academic class level yet, prompt them to choose it first!
-  if (currentUser && !currentUser.classLevel && currentUser.role !== 'admin') {
+  if (currentUser && !currentUser.classLevel && currentUser.role === 'student') {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div className="sm:mx-auto sm:w-full sm:max-w-md text-center space-y-3 mb-6 animate-fade-in font-sans">
@@ -447,7 +475,7 @@ export default function App() {
   }
 
   // Step 2: If user is logged in but has not defined their selected subjects yet, prompt them to personalize first!
-  if (currentUser && !currentUser.selectedSubjectIds && currentUser.role !== 'admin') {
+  if (currentUser && !currentUser.selectedSubjectIds && currentUser.role === 'student') {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div className="sm:mx-auto sm:w-full sm:max-w-md text-center space-y-3 mb-6 animate-fade-in font-sans">

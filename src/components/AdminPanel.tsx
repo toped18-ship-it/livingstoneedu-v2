@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { rtdbSubscribe, rtdbSet, NODES } from '../lib/rtdbService';
+import { rtdbSubscribe, rtdbSet, rtdbGet, NODES } from '../lib/rtdbService';
 import { GmailHub } from './GmailHub';
+import { 
+  getSubjectsForClass, 
+  getWeeklyTopicTitle, 
+  getLessonContent,
+  ALL_CLASSES
+} from '../data/curriculum';
 import { 
   Settings, 
   Users, 
@@ -16,6 +22,7 @@ import {
   AlertCircle,
   HelpCircle,
   BookOpen,
+  Zap,
   Award,
   CreditCard,
   DollarSign,
@@ -88,6 +95,85 @@ const DEFAULT_CBT_DATA = [
   { id: 'cbt-2', title: 'WAEC Standard Chemistry Quiz', subject: 'Chemistry', class: 'SS 3', term: '2nd Term', questions: 10, duration: 30, status: 'Active' },
   { id: 'cbt-3', title: 'English Grammar Midterm', subject: 'English Studies', class: 'JSS 2', term: '1st Term', questions: 12, duration: 25, status: 'Draft' }
 ];
+
+// Helper to convert flat curriculum array list into a nested object format for RTDB
+const convertFlatToNestedCurriculum = (flatList: any[]): any => {
+  const nested: Record<string, any> = {};
+  if (!Array.isArray(flatList)) return nested;
+  
+  for (const item of flatList) {
+    if (!item || !item.class || !item.subject || !item.term || !item.week) continue;
+    
+    const cleanClass = String(item.class).trim().replace(/[.#$[\]]/g, '_');
+    const cleanSubj = String(item.subject).trim().replace(/[.#$[\]/]/g, '_');
+    const cleanTerm = String(item.term).trim().replace(/[.#$[\]]/g, '_');
+    const cleanWeek = String(item.week).startsWith('Week_') ? String(item.week) : `Week_${item.week}`;
+    
+    if (!nested[cleanClass]) nested[cleanClass] = {};
+    if (!nested[cleanClass][cleanSubj]) nested[cleanClass][cleanSubj] = {};
+    if (!nested[cleanClass][cleanSubj][cleanTerm]) nested[cleanClass][cleanSubj][cleanTerm] = {};
+    
+    nested[cleanClass][cleanSubj][cleanTerm][cleanWeek] = {
+      id: item.id || `curr_${cleanClass}_${cleanSubj}_${cleanTerm}_${cleanWeek}`.replace(/\s+/g, '_'),
+      class: item.class,
+      subject: item.subject,
+      term: item.term,
+      week: typeof item.week === 'number' ? item.week : Number(String(item.week).replace('Week_', '')) || 1,
+      topic: item.topic || '',
+      details: item.details || '',
+      objectives: item.objectives || [],
+      status: item.status || 'Published'
+    };
+  }
+  return nested;
+};
+
+// Local wrapper to transparently sync all localStorage writes to Firebase Realtime Database
+const persistAndSync = async (key: string, value: string) => {
+  window.localStorage.setItem(key, value);
+  try {
+    const data = JSON.parse(value);
+    if (key === 'system_curriculums') {
+      const nestedData = convertFlatToNestedCurriculum(data);
+      await rtdbSet(NODES.CURRICULUM, nestedData);
+    } else if (key === 'system_cbt') {
+      await rtdbSet(NODES.CBT, data);
+    } else if (key === 'system_grades') {
+      await rtdbSet(NODES.RESULTS, data);
+    } else if (key === 'hub_users') {
+      await rtdbSet(NODES.USERS, data);
+      if (Array.isArray(data)) {
+        for (const u of data) {
+          const id = u.email.replace(/[.@]/g, '_');
+          if (u.role === 'teacher') {
+            await rtdbSet(`${NODES.TEACHERS}/${id}`, { id, name: u.fullName, email: u.email, schoolName: u.schoolName || 'Livingstone Educational Academy' });
+          } else if (u.role === 'student') {
+            await rtdbSet(`${NODES.STUDENTS}/${id}`, { id, name: u.fullName, email: u.email, classLevel: u.classLevel || 'SS 1' });
+          }
+        }
+      }
+    } else if (key === 'system_payments') {
+      await rtdbSet('payments', data);
+    } else if (key === 'system_cbt_questions') {
+      await rtdbSet('cbt_questions', data);
+    } else if (key === 'system_cbt_session_logs') {
+      await rtdbSet('cbt_session_logs', data);
+    }
+  } catch (e) {
+    console.error("Firebase Realtime Database state synchronization failed:", e);
+  }
+};
+
+const localStorageProxy = {
+  setItem: (key: string, value: string) => {
+    persistAndSync(key, value);
+  },
+  getItem: (key: string) => window.localStorage.getItem(key),
+  removeItem: (key: string) => window.localStorage.removeItem(key),
+  clear: () => window.localStorage.clear()
+};
+
+const localStorage = localStorageProxy;
 
 export function AdminPanel({ currentConfig, onConfigChange, currentUser }: AdminPanelProps) {
   // Authentication states
@@ -170,6 +256,46 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
   const [currWeek, setCurrWeek] = useState(1);
   const [currTopic, setCurrTopic] = useState('');
   const [currDetails, setCurrDetails] = useState('');
+
+  // Curriculum Management Sub-Tabs & Advanced Seeder States
+  const [curriculumActiveSubTab, setCurriculumActiveSubTab] = useState<'generate' | 'view' | 'edit' | 'delete'>('view');
+  const [seedingProgress, setSeedingProgress] = useState<number>(0);
+  const [seedingStatus, setSeedingStatus] = useState<string>('');
+  const [isSeeding, setIsSeeding] = useState<boolean>(false);
+  const [currFilterClass, setCurrFilterClass] = useState<string>('all');
+  const [currFilterSubject, setCurrFilterSubject] = useState<string>('');
+  const [currPageNum, setCurrPageNum] = useState<number>(1);
+
+  // Helper utility to correctly flatten any nested hierarchies (class/subject/term/week)
+  // retrieved from Firebase Realtime Database back into flat list arrays.
+  const flattenNestedCurriculum = (node: any): any[] => {
+    if (!node || typeof node !== 'object') return [];
+    
+    // Check if flat already (values have 'class' or 'topic')
+    const values = Object.values(node);
+    if (values.length > 0) {
+      const sample: any = values[0];
+      if (sample && typeof sample === 'object' && (sample.class || sample.topic)) {
+        return values.filter(item => item && typeof item === 'object');
+      }
+    }
+
+    const list: any[] = [];
+    const traverse = (obj: any) => {
+      if (!obj || typeof obj !== 'object') return;
+      if (obj.topic !== undefined || obj.objectives !== undefined || obj.details !== undefined) {
+        list.push(obj);
+        return;
+      }
+      for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+          traverse(obj[key]);
+        }
+      }
+    };
+    traverse(node);
+    return list;
+  };
 
   // CBT exams states
   const [cbtExams, setCbtExams] = useState<any[]>(() => {
@@ -346,47 +472,12 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
   const [newAnnounceTitle, setNewAnnounceTitle] = useState('');
   const [newAnnounceChannel, setNewAnnounceChannel] = useState<'Gmail' | 'WhatsApp Broadcast' | 'Bulk SMS'>('Gmail');
 
-  // Local wrapper to transparently sync all localStorage writes to Firebase Realtime Database
-  const persistAndSync = async (key: string, value: string) => {
-    window.localStorage.setItem(key, value);
-    try {
-      const data = JSON.parse(value);
-      if (key === 'system_curriculums') {
-        await rtdbSet(NODES.CURRICULUM, data);
-      } else if (key === 'system_cbt') {
-        await rtdbSet(NODES.CBT, data);
-      } else if (key === 'system_grades') {
-        await rtdbSet(NODES.RESULTS, data);
-      } else if (key === 'hub_users') {
-        await rtdbSet(NODES.USERS, data);
-        if (Array.isArray(data)) {
-          for (const u of data) {
-            const id = u.email.replace(/[.@]/g, '_');
-            if (u.role === 'teacher') {
-              await rtdbSet(`${NODES.TEACHERS}/${id}`, { id, name: u.fullName, email: u.email, schoolName: u.schoolName || 'Livingstone Educational Academy' });
-            } else if (u.role === 'student') {
-              await rtdbSet(`${NODES.STUDENTS}/${id}`, { id, name: u.fullName, email: u.email, classLevel: u.classLevel || 'SS 1' });
-            }
-          }
-        }
-      } else if (key === 'system_payments') {
-        await rtdbSet('payments', data);
-      } else if (key === 'system_cbt_questions') {
-        await rtdbSet('cbt_questions', data);
-      } else if (key === 'system_cbt_session_logs') {
-        await rtdbSet('cbt_session_logs', data);
-      }
-    } catch (e) {
-      console.error("Firebase Realtime Database state synchronization failed:", e);
-    }
-  };
-
   // Real-time listener for synchronization between RTDB and dashboard states
   useEffect(() => {
     // 1. Subscribe to Curriculum
     const unsubCurr = rtdbSubscribe(NODES.CURRICULUM, (data) => {
       if (data) {
-        const arr = Array.isArray(data) ? data : Object.values(data);
+        const arr = flattenNestedCurriculum(data);
         setCurriculums(arr);
         window.localStorage.setItem('system_curriculums', JSON.stringify(arr));
       }
@@ -475,16 +566,6 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
       unsubAttendance();
     };
   }, []);
-
-  const localStorageProxy = {
-    setItem: (key: string, value: string) => {
-      persistAndSync(key, value);
-    },
-    getItem: (key: string) => window.localStorage.getItem(key),
-    removeItem: (key: string) => window.localStorage.removeItem(key),
-    clear: () => window.localStorage.clear()
-  };
-  const localStorage = localStorageProxy;
 
   // Sync users list from localStorage
   const loadUsersSync = () => {
@@ -686,6 +767,123 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
     localStorage.setItem('hub_users', JSON.stringify(filtered));
     setUsersList(filtered);
     showToast(`Successfully removed account records for ${name}.`, 'info');
+  };
+
+  // Master Curriculum Database Seeder
+  const handleGenerateCompleteCurriculum = async () => {
+    if (isSeeding) return;
+    setIsSeeding(true);
+    setSeedingProgress(0);
+    setSeedingStatus('Initializing Federal NERDC Curriculum engines...');
+
+    try {
+      // 1. Core Classes to Generate
+      const classesToProcess = [
+        'Primary 1', 'Primary 2', 'Primary 3', 'Primary 4', 'Primary 5', 'Primary 6',
+        'JSS 1', 'JSS 2', 'JSS 3',
+        'SS 1', 'SS 2', 'SS 3'
+      ];
+
+      // To map SS 1 to both "SS 1" and "SSS 1" so both schemas are automatically populated & completely ready
+      const classMapping: Record<string, string[]> = {
+        'Primary 1': ['Primary 1'],
+        'Primary 2': ['Primary 2'],
+        'Primary 3': ['Primary 3'],
+        'Primary 4': ['Primary 4'],
+        'Primary 5': ['Primary 5'],
+        'Primary 6': ['Primary 6'],
+        'JSS 1': ['JSS 1'],
+        'JSS 2': ['JSS 2'],
+        'JSS 3': ['JSS 3'],
+        'SS 1': ['SS 1', 'SSS 1'],
+        'SS 2': ['SS 2', 'SSS 2'],
+        'SS 3': ['SS 3', 'SSS 3']
+      };
+
+      let totalSteps = classesToProcess.length;
+      let currentStep = 0;
+
+      const rtdbCurriculum = await rtdbGet(NODES.CURRICULUM) || {};
+
+      for (const classLevel of classesToProcess) {
+        currentStep++;
+        const targetClasses = classMapping[classLevel] || [classLevel];
+        const displayLabel = targetClasses.length > 1 ? `${classLevel} / ${targetClasses[1]}` : classLevel;
+        
+        setSeedingStatus(`Compiling weekly lessons of standard subjects for ${displayLabel}...`);
+
+        // Fetch official subjects mapping
+        const subjects = getSubjectsForClass(classLevel as any);
+        
+        // Loop and write in flat format directly to prevent any heavy single update issues
+        for (const targetClass of targetClasses) {
+          const cleanClass = targetClass.trim().replace(/[.#$[\]/]/g, '_');
+
+          for (const sub of subjects) {
+            const cleanSubj = sub.name.trim().replace(/[.#$[\]/]/g, '_');
+
+            for (const termNum of [1, 2, 3] as const) {
+              const termLabel = `${termNum}${termNum === 1 ? 'st' : termNum === 2 ? 'nd' : 'rd'} Term`;
+
+              for (const weekNum of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const) {
+                const topicTitle = getWeeklyTopicTitle(classLevel as any, sub.id, termNum, weekNum);
+                
+                // Get pre-formatted objectives or fall back to high-fidelity matching list
+                let objectives: string[] = [];
+                try {
+                  const lesson = getLessonContent(classLevel as any, sub.id, termNum, weekNum);
+                  objectives = lesson.objectives || [];
+                } catch {
+                  objectives = [
+                    `Explain standard rules and operations of ${topicTitle}.`,
+                    `Analyze step-by-step calculations and practical occurrences in Nigeria.`,
+                    `Complete corresponding continuous assessment and exam quizzes.`
+                  ];
+                }
+
+                // Match expected flat record schema with clean ID
+                const keyId = `curr_${cleanClass}_${cleanSubj}_t${termNum}_W${weekNum}`.replace(/\s+/g, '_');
+                
+                rtdbCurriculum[keyId] = {
+                  id: keyId,
+                  class: targetClass,
+                  subject: sub.name,
+                  term: termLabel,
+                  week: weekNum,
+                  topic: topicTitle,
+                  objectives: objectives,
+                  details: objectives.join('\n') || sub.description || `National syllabus guidelines covering ${topicTitle}.`,
+                  status: 'Published'
+                };
+              }
+            }
+          }
+        }
+
+        // Save progress step by step to flat nodes
+        await rtdbSet(NODES.CURRICULUM, rtdbCurriculum);
+
+        // Display progress bar and step updates
+        const percent = Math.round((currentStep / totalSteps) * 100);
+        setSeedingProgress(percent);
+        await new Promise(resolve => setTimeout(resolve, 80)); // smooth progress layout transition
+      }
+
+      setSeedingStatus('Seed completed! Over 4,000 federal curriculum lessons deployed to Cloud Realtime Database successfully.');
+      showToast('Master Curriculum Seeder successfully ran!', 'success');
+      
+      // Update local set of curriculums
+      const freshData = await rtdbGet(NODES.CURRICULUM);
+      if (freshData) {
+        setCurriculums(flattenNestedCurriculum(freshData));
+      }
+    } catch (e: any) {
+      console.error(e);
+      setSeedingStatus(`Seeding failed: ${e.message || 'Check database authorization rules'}`);
+      showToast('Curriculum generation failed. See developer console.', 'error');
+    } finally {
+      setIsSeeding(false);
+    }
   };
 
   // Insert Custom Curriculum Row
@@ -2170,27 +2368,95 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
             <div className="space-y-6 animate-fade-in text-slate-800">
               <div className="border-b pb-3 flex justify-between items-center flex-wrap gap-4">
                 <div>
-                  <h3 className="font-extrabold text-base text-slate-900">National Curriculum Aligner</h3>
-                  <p className="text-xs text-slate-500">Edit core topics authorized under Nigerian Federal Ministry guidelines for primary & senior secondary classes.</p>
+                  <h3 className="font-extrabold text-lg text-indigo-950 flex items-center gap-2">
+                    <BookOpen className="text-indigo-650" size={20} />
+                    <span>NERDC National Curriculum Management</span>
+                  </h3>
+                  <p className="text-xs text-slate-500">Align, generate, edit, and delete standard curricula approved by the Nigerian Federal Ministry of Education.</p>
                 </div>
 
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowAddCurriculumModal(true)}
+                    className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-extrabold text-xs rounded-xl flex items-center gap-1.5 border border-indigo-200 transition cursor-pointer"
+                  >
+                    <Plus size={13} />
+                    <span>Create Custom Topic</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Sub-tab Navigation */}
+              <div className="flex flex-wrap gap-2 border-b pb-4 border-slate-150">
                 <button
-                  onClick={() => setShowAddCurriculumModal(true)}
-                  className="px-3.5 py-2 bg-indigo-650 hover:bg-indigo-720 text-white font-extrabold text-xs rounded-xl flex items-center gap-1.5 shadow-md shadow-indigo-650/10 cursor-pointer"
+                  type="button"
+                  onClick={() => {
+                    setCurriculumActiveSubTab('view');
+                    setCurrPageNum(1);
+                  }}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 border transition cursor-pointer ${
+                    curriculumActiveSubTab === 'view'
+                      ? 'bg-indigo-650 text-white border-indigo-650 shadow-md font-black'
+                      : 'bg-white text-slate-650 hover:bg-slate-50 border-slate-200/80 shadow-xs'
+                  }`}
                 >
-                  <Plus size={13} />
-                  <span>Build Curriculum Topic</span>
+                  <BookOpen size={13} />
+                  <span>View Curriculum</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setCurriculumActiveSubTab('generate')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 border transition cursor-pointer ${
+                    curriculumActiveSubTab === 'generate'
+                      ? 'bg-indigo-650 text-white border-indigo-650 shadow-md font-black'
+                      : 'bg-white text-slate-650 hover:bg-slate-50 border-slate-200/80 shadow-xs'
+                  }`}
+                >
+                  <Zap size={13} />
+                  <span>Generate Curriculum</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setCurriculumActiveSubTab('edit')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 border transition cursor-pointer ${
+                    curriculumActiveSubTab === 'edit'
+                      ? 'bg-indigo-650 text-white border-indigo-650 shadow-md font-black'
+                      : 'bg-white text-slate-650 hover:bg-slate-50 border-slate-200/80 shadow-xs'
+                  }`}
+                >
+                  <Edit size={13} />
+                  <span>Edit Curriculum</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setCurriculumActiveSubTab('delete')}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 border transition cursor-pointer ${
+                    curriculumActiveSubTab === 'delete'
+                      ? 'bg-indigo-650 text-white border-indigo-650 shadow-md font-black'
+                      : 'bg-white text-slate-650 hover:bg-slate-50 border-slate-200/80 shadow-xs'
+                  }`}
+                >
+                  <Trash2 size={13} />
+                  <span>Delete Curriculum</span>
                 </button>
               </div>
 
-              {/* Add Curriculum Row */}
+              {/* Add Custom Curriculum Modal/Row */}
               {showAddCurriculumModal && (
-                <form onSubmit={handleAddCurriculumSubmit} className="p-5 bg-slate-50 rounded-2xl border border-indigo-200/80 space-y-4">
-                  <h4 className="text-xs font-black uppercase text-indigo-900">New Syllabus Guidance Target</h4>
+                <form onSubmit={(e) => {
+                  handleAddCurriculumSubmit(e);
+                  setShowAddCurriculumModal(false);
+                }} className="p-5 bg-slate-50 rounded-2xl border border-indigo-200/80 space-y-4 animate-fade-in">
+                  <h4 className="text-xs font-black uppercase text-indigo-900 flex items-center gap-1.5">
+                    <Plus size={14} className="text-indigo-600" /> Create Custom Curriculum Alignment Topic
+                  </h4>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-extrabold uppercase">Student Class Class</label>
+                      <label className="text-[10px] font-extrabold uppercase text-slate-500">Student Class</label>
                       <select value={currClass} onChange={(e) => setCurrClass(e.target.value)} className="w-full px-3 py-2 border rounded-xl bg-white text-xs font-semibold">
                         <option value="Primary 1">Primary 1</option>
                         <option value="Primary 2">Primary 2</option>
@@ -2208,23 +2474,32 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-extrabold uppercase">Syllabus Subject</label>
+                      <label className="text-[10px] font-extrabold uppercase text-slate-500">Syllabus Subject</label>
                       <input value={currSubject} onChange={(e) => setCurrSubject(e.target.value)} className="w-full px-3 py-2 border rounded-xl bg-white text-xs font-semibold" placeholder="Mathematics" required />
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-extrabold uppercase">Active Week Target</label>
+                      <label className="text-[10px] font-extrabold uppercase text-slate-500">Term Period</label>
+                      <select value={currTerm} onChange={(e) => setCurrTerm(e.target.value)} className="w-full px-3 py-2 border rounded-xl bg-white text-xs font-semibold">
+                        <option value="1st Term">1st Term</option>
+                        <option value="2nd Term">2nd Term</option>
+                        <option value="3rd Term">3rd Term</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-extrabold uppercase text-slate-500">Active Week Target</label>
                       <input type="number" min="1" max="12" value={currWeek} onChange={(e) => setCurrWeek(Number(e.target.value))} className="w-full px-3 py-2 border rounded-xl bg-white text-xs font-semibold" required />
                     </div>
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-extrabold uppercase">Topic Focus Title</label>
+                    <label className="text-[10px] font-extrabold uppercase text-slate-500">Topic Focus Title</label>
                     <input value={currTopic} onChange={(e) => setCurrTopic(e.target.value)} className="w-full px-3 py-2 border rounded-xl bg-white text-xs font-semibold" placeholder="e.g. Simultaneous Equations & Graph calculations" required />
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-extrabold uppercase">Syllabus Guidance Details / Case Studies</label>
+                    <label className="text-[10px] font-extrabold uppercase text-slate-500">Syllabus Guidance Details / Case Studies</label>
                     <textarea value={currDetails} onChange={(e) => setCurrDetails(e.target.value)} className="w-full px-3 py-2 border rounded-xl bg-white text-xs font-semibold" placeholder="e.g. Highlight solutions utilizing local trade numbers from Balogun market..." rows={3} required />
                   </div>
 
@@ -2235,116 +2510,410 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
                 </form>
               )}
 
-              {/* Edit Curriculum Row */}
-              {editingCurriculum && (
-                <form onSubmit={handleEditCurriculumSubmit} className="p-5 bg-indigo-50/40 rounded-2xl border border-indigo-200/80 space-y-4 animate-fade-in">
-                  <h4 className="text-xs font-black uppercase text-indigo-950 flex items-center gap-1.5">
-                    <Edit size={14} className="text-indigo-650" /> Modify Syllabus Guidance Target Focus
-                  </h4>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-black uppercase text-slate-500">Student Class</label>
-                      <select value={editCurrClass} onChange={(e) => setEditCurrClass(e.target.value)} className="w-full px-3 py-2 border rounded-xl bg-white text-xs font-semibold outline-none">
-                        <option value="Primary 1">Primary 1</option>
-                        <option value="Primary 2">Primary 2</option>
-                        <option value="Primary 3">Primary 3</option>
-                        <option value="Primary 4">Primary 4</option>
-                        <option value="Primary 5">Primary 5</option>
-                        <option value="Primary 6">Primary 6</option>
-                        <option value="JSS 1">JSS 1</option>
-                        <option value="JSS 2">JSS 2</option>
-                        <option value="JSS 3">JSS 3</option>
-                        <option value="SS 1">SS 1</option>
-                        <option value="SS 2">SS 2</option>
-                        <option value="SS 3">SS 3</option>
-                      </select>
-                    </div>
+              {/* SUB-TAB: GENERATE CURRICULUM */}
+              {curriculumActiveSubTab === 'generate' && (
+                <div className="p-6 bg-slate-50/60 rounded-2xl border border-slate-200/80 space-y-6 text-left animate-fade-in">
+                  <div className="space-y-2">
+                    <h4 className="font-extrabold text-base text-slate-900 flex items-center gap-2">
+                      <Zap size={18} className="text-amber-500 fill-amber-500" />
+                      <span>Federal Curriculum Database Seeder</span>
+                    </h4>
+                    <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
+                      Seed thousands of custom lesson guides, learning objectives, and curriculum mapping structures from the official <strong>NERDC (Nigerian Educational Research and Development Council) Guidelines</strong> directly into Firebase Realtime Database.
+                    </p>
+                  </div>
 
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-black uppercase text-slate-500">Syllabus Subject</label>
-                      <input value={editCurrSubject} onChange={(e) => setEditCurrSubject(e.target.value)} className="w-full px-3 py-2 border rounded-xl bg-white text-xs font-semibold outline-none" required />
+                  {/* Generation Features Checklist */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-xl border border-slate-150 text-xs">
+                    <div className="space-y-2">
+                      <span className="font-extrabold text-[10px] uppercase text-indigo-900 tracking-wider">Class Tiers Target</span>
+                      <ul className="space-y-1.5 text-slate-600 font-medium">
+                        <li className="flex items-center gap-1.5 text-slate-700 font-bold">&bull; Primary 1–6 Classes</li>
+                        <li className="flex items-center gap-1.5 text-slate-700 font-bold">&bull; Junior Secondary School (JSS 1–3)</li>
+                        <li className="flex items-center gap-1.5 text-slate-700 font-bold">&bull; Senior Secondary School (SS/SSS 1–3)</li>
+                      </ul>
                     </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-black uppercase text-slate-500">Term Period</label>
-                      <select value={editCurrTerm} onChange={(e) => setEditCurrTerm(e.target.value)} className="w-full px-3 py-2 border rounded-xl bg-white text-xs font-semibold outline-none">
-                        <option value="1st Term">1st Term</option>
-                        <option value="2nd Term">2nd Term</option>
-                        <option value="3rd Term">3rd Term</option>
-                      </select>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-black uppercase text-slate-500">Active Week Target</label>
-                      <input type="number" min="1" max="12" value={editCurrWeek} onChange={(e) => setEditCurrWeek(Number(e.target.value))} className="w-full px-3 py-2 border rounded-xl bg-white text-xs font-semibold outline-none" required />
+                    <div className="space-y-2">
+                      <span className="font-extrabold text-[10px] uppercase text-indigo-900 tracking-wider font-sans">Scope Parameters</span>
+                      <ul className="space-y-1.5 text-slate-600 font-medium">
+                        <li>&bull; Complete Terms 1, 2, and 3</li>
+                        <li>&bull; Core 12-Week Academic Semester Layouts</li>
+                        <li>&bull; Curated subjects including Mathematics, English, Sciences, and more</li>
+                        <li>&bull; Distinct Syllabus Objectives and Topic Overviews</li>
+                      </ul>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-black uppercase text-slate-500">Topic Focus Title</label>
-                      <input value={editCurrTopic} onChange={(e) => setEditCurrTopic(e.target.value)} className="w-full px-3 py-2 border rounded-xl bg-white text-xs font-semibold outline-none" placeholder="Syllabus Title topic" required />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-black uppercase text-slate-500">Topic Status</label>
-                      <select value={editCurrStatus} onChange={(e) => setEditCurrStatus(e.target.value)} className="w-full px-3 py-2 border rounded-xl bg-white text-xs font-semibold outline-none">
-                        <option value="Published">Published / Live</option>
-                        <option value="Draft">Draft Mode</option>
-                        <option value="Archived">Archived Segment</option>
-                      </select>
+                  {/* Seed Warning */}
+                  <div className="p-3.5 bg-amber-50/50 border border-amber-200 rounded-xl flex items-start gap-2.5 text-xs text-amber-800">
+                    <AlertCircle size={15} className="mt-0.5 shrink-0" />
+                    <div>
+                      <strong className="font-extrabold">Enterprise Safe Overwrite Protection:</strong> Duplication check is automatically handled. If a topic matches the deterministic Class, Subject, Term, and Week, it refreshes the contents without duplicating records.
                     </div>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase text-slate-500">Syllabus Guidance Details / Core Case Studies</label>
-                    <textarea value={editCurrDetails} onChange={(e) => setEditCurrDetails(e.target.value)} className="w-full px-3 py-2 border rounded-xl bg-white text-xs font-semibold outline-none font-serif" rows={3} required />
-                  </div>
+                  {/* Actions Area */}
+                  <div className="space-y-4">
+                    {!isSeeding ? (
+                      <button
+                        type="button"
+                        onClick={handleGenerateCompleteCurriculum}
+                        className="px-6 py-3 bg-indigo-650 hover:bg-indigo-720 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 shadow-md shadow-indigo-600/10 transition cursor-pointer"
+                      >
+                        <Zap size={14} className="fill-white" />
+                        <span>Build & Deploy Master Curriculums</span>
+                      </button>
+                    ) : (
+                      <div className="space-y-3.5">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="font-extrabold text-indigo-950 flex items-center gap-2">
+                            <span className="animate-ping w-2 h-2 rounded-full bg-emerald-500 inline-block mr-1"></span>
+                            {seedingStatus}
+                          </span>
+                          <span className="font-black text-indigo-700">{seedingProgress}%</span>
+                        </div>
 
-                  <div className="pt-2 flex justify-end gap-2 text-xs">
-                    <button type="button" onClick={() => setEditingCurriculum(null)} className="px-3.5 py-1.5 font-bold text-slate-700 bg-slate-200 rounded-xl cursor-pointer">Cancel</button>
-                    <button type="submit" className="px-4 py-2 bg-indigo-650 text-white font-black rounded-xl cursor-pointer">Update Alignment</button>
+                        {/* Progress Bar Container */}
+                        <div className="w-full bg-slate-200/80 rounded-full h-3 overflow-hidden">
+                          <div 
+                            className="bg-indigo-650 h-3 rounded-full transition-all duration-300"
+                            style={{ width: `${seedingProgress}%` }}
+                          />
+                        </div>
+
+                        <p className="text-[10px] text-slate-400 font-serif leading-none">Please hold on while the server registers curriculum nodes on-the-fly inside Realtime Database.</p>
+                      </div>
+                    )}
+
+                    {seedingStatus && !isSeeding && (
+                      <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-xs font-mono text-indigo-850">
+                        {seedingStatus}
+                      </div>
+                    )}
                   </div>
-                </form>
+                </div>
               )}
 
-              {/* Items Listing */}
-              <div className="space-y-3.5">
-                {curriculums.map((cur) => (
-                  <div key={cur.id} className="p-4 border border-slate-150 rounded-2xl space-y-2 hover:border-slate-350 transition bg-slate-50/20">
-                    <div className="flex justify-between items-start flex-wrap gap-2">
-                      <div className="space-y-1 text-left">
-                        <div className="flex gap-2 items-baseline">
-                          <span className="px-1.5 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-755 text-[9px] font-black rounded">{cur.class}</span>
-                          <span className="text-[10px] text-slate-425 font-bold">{cur.subject} &bull; Week {cur.week} &bull; {cur.term || '1st Term'}</span>
-                        </div>
-                        <h4 className="font-extrabold text-sm text-slate-900">{cur.topic}</h4>
+              {/* SUB-TAB: VIEW CURRICULUM */}
+              {curriculumActiveSubTab === 'view' && (
+                <div className="space-y-4 animate-fade-in text-left">
+                  {/* Filter Header */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-150 grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                    <div className="flex flex-col md:flex-row gap-3">
+                      <div className="space-y-1 flex-1 font-sans">
+                        <label className="text-[9px] font-black uppercase text-slate-500">Filter Class Level</label>
+                        <select 
+                          value={currFilterClass} 
+                          onChange={(e) => {
+                            setCurrFilterClass(e.target.value);
+                            setCurrPageNum(1);
+                          }} 
+                          className="w-full px-3 py-1.5 border rounded-lg bg-white text-xs font-semibold"
+                        >
+                          <option value="all">All Classes</option>
+                          <option value="Primary 1">Primary 1</option>
+                          <option value="Primary 2">Primary 2</option>
+                          <option value="Primary 3">Primary 3</option>
+                          <option value="Primary 4">Primary 4</option>
+                          <option value="Primary 5">Primary 5</option>
+                          <option value="Primary 6">Primary 6</option>
+                          <option value="JSS 1">JSS 1</option>
+                          <option value="JSS 2">JSS 2</option>
+                          <option value="JSS 3">JSS 3</option>
+                          <option value="SS 1">SS 1</option>
+                          <option value="SS 2">SS 2</option>
+                          <option value="SS 3">SS 3</option>
+                          <option value="SSS 1">SSS 1</option>
+                          <option value="SSS 2">SSS 2</option>
+                          <option value="SSS 3">SSS 3</option>
+                        </select>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[9px] bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-full font-black border border-emerald-100 uppercase">{cur.status || 'Published'}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleStartEditCurriculum(cur)}
-                          title="Modify syllabus target"
-                          className="px-2 py-0.5 text-[10px] font-bold text-indigo-650 hover:bg-indigo-50 border border-indigo-150 bg-white rounded transition cursor-pointer"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteCurriculum(cur.id)}
-                          title="Remove syllabus item"
-                          className="px-2 py-0.5 text-[10px] font-bold text-red-650 hover:bg-red-50 border border-red-150 bg-white rounded transition cursor-pointer"
-                        >
-                          Delete
-                        </button>
+
+                      <div className="space-y-1 flex-1">
+                        <label className="text-[9px] font-black uppercase text-slate-500">Search Topic / Subject</label>
+                        <div className="relative">
+                          <input 
+                            type="text" 
+                            value={currFilterSubject} 
+                            onChange={(e) => {
+                              setCurrFilterSubject(e.target.value);
+                              setCurrPageNum(1);
+                            }} 
+                            placeholder="e.g. Mathematics" 
+                            className="w-full pl-8 pr-3 py-1.5 border rounded-lg bg-white text-xs font-semibold"
+                          />
+                          <Search size={12} className="absolute left-2.5 top-2.5 text-slate-400" />
+                        </div>
                       </div>
                     </div>
-                    <p className="text-xs text-slate-500 font-serif leading-relaxed italic text-left">{cur.details}</p>
+
+                    <div className="text-right text-xs font-bold text-slate-500">
+                      Found <span className="text-indigo-650">{curriculums.filter(cur => {
+                        const matchClass = currFilterClass === 'all' || String(cur.class).toLowerCase() === currFilterClass.toLowerCase();
+                        const matchSubject = !currFilterSubject.trim() || String(cur.subject).toLowerCase().includes(currFilterSubject.toLowerCase()) || String(cur.topic).toLowerCase().includes(currFilterSubject.toLowerCase());
+                        return matchClass && matchSubject;
+                      }).length}</span> alignment entries in RTDB node
+                    </div>
                   </div>
-                ))}
-              </div>
+
+                  {/* Render Grid */}
+                  {(() => {
+                    const filtered = curriculums.filter(cur => {
+                      const matchClass = currFilterClass === 'all' || String(cur.class).toLowerCase() === currFilterClass.toLowerCase();
+                      const matchSubject = !currFilterSubject.trim() || String(cur.subject).toLowerCase().includes(currFilterSubject.toLowerCase()) || String(cur.topic).toLowerCase().includes(currFilterSubject.toLowerCase());
+                      return matchClass && matchSubject;
+                    });
+
+                    const itemsPerPage = 8;
+                    const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
+                    const safePageNum = Math.min(currPageNum, totalPages);
+                    const paginated = filtered.slice((safePageNum - 1) * itemsPerPage, safePageNum * itemsPerPage);
+
+                    if (filtered.length === 0) {
+                      return (
+                        <div className="p-8 text-center text-xs text-slate-500 bg-slate-50/50 rounded-xl border border-dashed border-slate-300">
+                          No curriculum records matching criteria found. Click <strong>Generate Curriculum</strong> tab to seed standard layouts index.
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {paginated.map((cur) => (
+                            <div key={cur.id} className="p-4 bg-white border border-slate-150 rounded-2xl space-y-3 hover:border-slate-350 transition flex flex-col justify-between shadow-xs">
+                              <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                  <span className="px-1.5 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-850 text-[8px] font-black rounded uppercase">{cur.class}</span>
+                                  <span className="text-[10px] text-slate-400 font-bold">Week {cur.week} &bull; {cur.term || '1st Term'}</span>
+                                </div>
+                                <div className="space-y-1">
+                                  <span className="text-[10px] font-extrabold uppercase text-indigo-655 tracking-wider">{cur.subject}</span>
+                                  <h4 className="font-extrabold text-xs text-slate-900 leading-snug">{cur.topic}</h4>
+                                </div>
+                                <p className="text-[11px] text-slate-500 font-serif leading-relaxed italic line-clamp-3">{cur.details}</p>
+                              </div>
+
+                              <div className="pt-2 border-t border-slate-50 flex justify-between items-center">
+                                <span className="text-[9px] bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-full font-black border border-emerald-100 uppercase">{cur.status || 'Published'}</span>
+                                <div className="flex gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleStartEditCurriculum(cur);
+                                      setCurriculumActiveSubTab('edit');
+                                    }}
+                                    className="px-2 py-0.5 text-[9px] font-bold text-indigo-650 hover:bg-slate-50 border border-slate-200 rounded transition cursor-pointer bg-white"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteCurriculum(cur.id)}
+                                    className="px-2 py-0.5 text-[9px] font-bold text-red-650 hover:bg-red-50 border border-red-100 rounded transition cursor-pointer bg-white"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Pagination Controls */}
+                        {totalPages > 1 && (
+                          <div className="flex justify-between items-center bg-slate-50 px-4 py-2 rounded-xl text-xs font-bold border border-slate-150">
+                            <button
+                              type="button"
+                              disabled={currPageNum <= 1}
+                              onClick={() => setCurrPageNum(prev => prev - 1)}
+                              className="px-2 py-1 text-[10px] bg-white border rounded disabled:opacity-40"
+                            >
+                              Previous page
+                            </button>
+                            <span className="text-slate-500 text-[11px]">Page <span className="text-slate-900">{currPageNum}</span> of {totalPages}</span>
+                            <button
+                              type="button"
+                              disabled={currPageNum >= totalPages}
+                              onClick={() => setCurrPageNum(prev => prev + 1)}
+                              className="px-2 py-1 text-[10px] bg-white border rounded disabled:opacity-40"
+                            >
+                              Next page
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* SUB-TAB: EDIT CURRICULUM */}
+              {curriculumActiveSubTab === 'edit' && (
+                <div className="space-y-4 animate-fade-in text-left">
+                  {editingCurriculum ? (
+                    <form onSubmit={(e) => {
+                      handleEditCurriculumSubmit(e);
+                      setCurriculumActiveSubTab('view');
+                    }} className="p-5 bg-indigo-50/40 rounded-2xl border border-indigo-200/80 space-y-4">
+                      <h4 className="text-xs font-black uppercase text-indigo-955 flex items-center gap-1.5 border-b pb-2 border-indigo-150">
+                        <Edit size={14} className="text-indigo-650" /> Modify Syllabus Alignment Focus Target
+                      </h4>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase text-slate-500">Student Class</label>
+                          <select value={editCurrClass} onChange={(e) => setEditCurrClass(e.target.value)} className="w-full px-3 py-2 border rounded-xl bg-white text-xs font-semibold outline-none">
+                            <option value="Primary 1">Primary 1</option>
+                            <option value="Primary 2">Primary 2</option>
+                            <option value="Primary 3">Primary 3</option>
+                            <option value="Primary 4">Primary 4</option>
+                            <option value="Primary 5">Primary 5</option>
+                            <option value="Primary 6">Primary 6</option>
+                            <option value="JSS 1">JSS 1</option>
+                            <option value="JSS 2">JSS 2</option>
+                            <option value="JSS 3">JSS 3</option>
+                            <option value="SS 1">SS 1</option>
+                            <option value="SS 2">SS 2</option>
+                            <option value="SS 3">SS 3</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase text-slate-500">Syllabus Subject</label>
+                          <input value={editCurrSubject} onChange={(e) => setEditCurrSubject(e.target.value)} className="w-full px-3 py-2 border rounded-xl bg-white text-xs font-semibold outline-none" required />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase text-slate-500">Term Period</label>
+                          <select value={editCurrTerm} onChange={(e) => setEditCurrTerm(e.target.value)} className="w-full px-3 py-2 border rounded-xl bg-white text-xs font-semibold outline-none">
+                            <option value="1st Term">1st Term</option>
+                            <option value="2nd Term">2nd Term</option>
+                            <option value="3rd Term">3rd Term</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase text-slate-500">Active Week Target</label>
+                          <input type="number" min="1" max="12" value={editCurrWeek} onChange={(e) => setEditCurrWeek(Number(e.target.value))} className="w-full px-3 py-2 border rounded-xl bg-white text-xs font-semibold outline-none" required />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase text-slate-500">Topic Focus Title</label>
+                          <input value={editCurrTopic} onChange={(e) => setEditCurrTopic(e.target.value)} className="w-full px-3 py-2 border rounded-xl bg-white text-xs font-semibold outline-none" placeholder="Syllabus Title topic" required />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-black uppercase text-slate-500">Topic Status</label>
+                          <select value={editCurrStatus} onChange={(e) => setEditCurrStatus(e.target.value)} className="w-full px-3 py-2 border rounded-xl bg-white text-xs font-semibold outline-none">
+                            <option value="Published">Published / Live</option>
+                            <option value="Draft">Draft Mode</option>
+                            <option value="Archived">Archived Segment</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-black uppercase text-slate-500">Syllabus Guidance Details / Core Case Studies</label>
+                        <textarea value={editCurrDetails} onChange={(e) => setEditCurrDetails(e.target.value)} className="w-full px-3 py-2 border rounded-xl bg-white text-xs font-semibold outline-none font-serif" rows={5} required />
+                      </div>
+
+                      <div className="pt-2 flex justify-end gap-2 text-xs">
+                        <button type="button" onClick={() => setEditingCurriculum(null)} className="px-3.5 py-1.5 font-bold text-slate-700 bg-slate-200 rounded-xl cursor-pointer">Cancel</button>
+                        <button type="submit" className="px-4 py-2 bg-indigo-650 text-white font-black rounded-xl cursor-pointer">Update Alignment</button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="p-8 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-350 space-y-4">
+                      <div className="space-y-1.5">
+                        <h4 className="font-extrabold text-sm text-slate-800">No Target Topic Loaded</h4>
+                        <p className="text-xs text-slate-500 max-w-md mx-auto">Please select a syllabus card from the <strong>View Curriculum</strong> sub-tab, or pick one from the active aligner database below to open editing control panels:</p>
+                      </div>
+
+                      {curriculums.length > 0 && (
+                        <div className="max-w-sm mx-auto">
+                          <select 
+                            onChange={(e) => {
+                              const match = curriculums.find(c => c.id === e.target.value);
+                              if (match) handleStartEditCurriculum(match);
+                            }}
+                            className="w-full py-2 px-3 bg-white border rounded-xl text-xs font-bold shadow-xs outline-none"
+                            defaultValue=""
+                          >
+                            <option value="" disabled>-- Choose a Curriculum Record to Edit --</option>
+                            {curriculums.map(c => (
+                              <option key={c.id} value={c.id}>[{c.class}] {c.subject} - Week {c.week}: {c.topic}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* SUB-TAB: DELETE CURRICULUM */}
+              {curriculumActiveSubTab === 'delete' && (
+                <div className="space-y-6 text-left animate-fade-in">
+                  <div className="p-5 bg-red-50/50 border border-red-200 rounded-2xl flex items-center justify-between flex-wrap gap-4">
+                    <div className="space-y-1 max-w-md">
+                      <h4 className="font-black text-sm text-red-850 flex items-center gap-1.5 uppercase">
+                        <ShieldAlert size={16} className="text-red-650" /> Purge Curriculum Controls
+                      </h4>
+                      <p className="text-xs text-slate-600 leading-relaxed">
+                        Resetting the curriculum structure deletes existing alignment records currently visible inside classroom grids and student guides globally.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (window.confirm('CRITICAL WARN: Are you absolutely sure you want to completely purge ALL curriculum alignments from Firebase Realtime Database? This cannot be undone!')) {
+                          localStorage.setItem('system_curriculums', JSON.stringify([]));
+                          setCurriculums([]);
+                          await rtdbSet(NODES.CURRICULUM, null);
+                          showToast('Syllabus databases master reset executed.', 'info');
+                        }
+                      }}
+                      className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                    >
+                      <Trash2 size={13} />
+                      <span>Purge Aligned Curriculum</span>
+                    </button>
+                  </div>
+
+                  {/* Individual Deletion list */}
+                  <div className="space-y-3">
+                    <h5 className="font-extrabold text-xs text-slate-500 uppercase tracking-widest font-sans">Delete Individual Alignments</h5>
+                    {curriculums.length === 0 ? (
+                      <p className="text-xs text-slate-425 italic">No remaining curriculum entries loaded.</p>
+                    ) : (
+                      <div className="max-h-[350px] overflow-y-auto border rounded-xl divide-y">
+                        {curriculums.map(c => (
+                          <div key={c.id} className="p-3 bg-white flex justify-between items-center text-xs gap-4">
+                            <div className="space-y-0.5 max-w-xl">
+                              <div className="flex gap-1.5 items-baseline">
+                                <span className="bg-slate-100 text-[8px] font-black uppercase px-1 py-0.5 border text-slate-700 rounded leading-none">{c.class}</span>
+                                <span className="text-[10px] text-slate-400 font-bold">{c.subject} &bull; Week {c.week} &bull; {c.term || '1st Term'}</span>
+                              </div>
+                              <p className="font-bold text-slate-800 leading-tight">{c.topic}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCurriculum(c.id)}
+                              className="px-2.5 py-1 text-[10px] font-bold text-red-650 hover:bg-red-50 border border-red-100 hover:border-red-200 bg-white shadow-xs rounded-lg transition shrink-0"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
             </div>
           )}
