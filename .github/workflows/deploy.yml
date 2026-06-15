@@ -1,36 +1,25 @@
-name: Deploy Website
+
+name: Deploy to InfinityFree
 
 on:
   push:
     branches:
       - main
-      - master
-
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
   web-deploy:
-    name: 🎉 Build & Deploy
+    name: Deploy Website
     runs-on: ubuntu-latest
+    
     steps:
-      - name: 🚚 Get latest code
-        uses: actions/checkout@v4
+    - name: Get Latest Code
+      uses: actions/checkout@v4
 
-      - name: ⚙️ Use Node.js 24
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-
-      - name: 🔨 Install Dependencies & Build
-        run: |
-          npm ci
-          npm run build
-
-      - name: 📂 Sync files via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.server }}
-          username: ${{ secrets.username }}
-          password: ${{ secrets.password }}
-          local-dir: ./dist
+    - name: Sync Files via FTP
+      uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+      with:
+        server: ftpupload.net
+        username: ${{ secrets.FTP_USERNAME }}
+        password: ${{ secrets.FTP_PASSWORD }}
+        local-dir: ./
+        server-dir: /livingstoneedu.great-site.net/htdocs/
