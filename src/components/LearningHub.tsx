@@ -292,19 +292,24 @@ export function LearningHub({
       }
 
       if (!matchedCurriculum) {
-        console.warn(`[WARN] No matching curriculum record found in Firebase for Class: ${targetClass}, Subject: ${targetSubject}, Term: ${targetTerm}, Week: ${targetWeek} with status "Published".`);
+        console.warn(`[WARN] No matching curriculum record found in Firebase. Defaulting to system curriculum database baseline.`);
         
-        let warningMessage = `The lesson note generator could not find any official curriculum entry in the database for Class: ${targetClass}, Subject: ${targetSubject}, Term: ${targetTerm}, Week: ${targetWeek}. Please publish a topic with status "Published" in the Admin Panel or Teacher Portal curriculum node first!`;
-        
-        if (user.role === 'admin') {
-          warningMessage += ` As an Administrator, you can navigate to the Admin Panel under the 'Curriculum' tab to generate or add this week's alignment structure now.`;
-        } else if (user.role === 'teacher') {
-          warningMessage += ` As a Teacher, you can head to the Teacher Portal and use the 'Curriculum Generator' tab to map your curriculum or edit lessons for this term.`;
-        } else {
-          warningMessage += ` Please request your teacher or school administrator to publish the curriculum mapping inside the School Management Dashboard.`;
-        }
-        
-        throw new Error(warningMessage);
+        const defaultTopicTitle = getWeeklyTopicTitle(
+          targetClass as any,
+          selectedSubject.id,
+          selectedTerm,
+          selectedWeek
+        );
+
+        matchedCurriculum = {
+          class: targetClass,
+          subject: selectedSubject.name,
+          term: targetTerm,
+          week: targetWeek,
+          topic: defaultTopicTitle,
+          details: `NERDC standard guidelines lesson structure for ${defaultTopicTitle}`,
+          status: 'Published'
+        };
       }
 
       console.log(`[DEBUG] Successfully located matching curriculum topic: "${matchedCurriculum.topic}"`, matchedCurriculum);

@@ -68,7 +68,9 @@ export default function App() {
     isPaymentLive: false,
     paystackPublicKey: '',
     flutterwavePublicKey: '',
-    stripePublicKey: ''
+    stripePublicKey: '',
+    paystackLink: 'https://paystack.com/pay/livingstone-pro-access',
+    flutterwaveLink: 'https://flutterwave.com/pay/sxagj005oznw'
   });
 
   const renderDynamicLogo = (size: number, customClass?: string) => {
@@ -133,7 +135,9 @@ export default function App() {
           isPaymentLive: !!data.isPaymentLive,
           paystackPublicKey: data.paystackPublicKey || '',
           flutterwavePublicKey: data.flutterwavePublicKey || '',
-          stripePublicKey: data.stripePublicKey || ''
+          stripePublicKey: data.stripePublicKey || '',
+          paystackLink: data.paystackLink || 'https://paystack.com/pay/livingstone-pro-access',
+          flutterwaveLink: data.flutterwaveLink || 'https://flutterwave.com/pay/sxagj005oznw'
         });
       }
     });

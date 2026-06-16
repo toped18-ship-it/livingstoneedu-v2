@@ -244,6 +244,8 @@ export const seedRtdbIfEmpty = async () => {
         paystackPublicKey: 'pk_test_paystack_a1b2c3d4e5f6',
         flutterwavePublicKey: 'FLWPUBK_TEST-a1b2c3d4e5',
         stripePublicKey: 'pk_test_stripe_12345',
+        paystackLink: 'https://paystack.com/pay/livingstone-pro-access',
+        flutterwaveLink: 'https://flutterwave.com/pay/sxagj005oznw',
         tuitionPrimary: '₦55,000',
         tuitionJss: '₦90,000',
         tuitionSss: '₦120,000'
@@ -348,6 +350,15 @@ export const seedRtdbIfEmpty = async () => {
         'grd-3': { id: 'grd-3', studentName: 'Obinna Eze', class: 'SS 1', subject: 'English Studies', ca: 28, exam: 42, gpa: '3.6', status: 'Pending Approval' }
       };
       await rtdbSet(NODES.RESULTS, seedGrades);
+    }
+
+    // Check exams
+    const examsData = await rtdbGet(NODES.EXAMS);
+    if (!examsData) {
+      await rtdbSet(NODES.EXAMS, {
+        'exam-1': { id: 'exam-1', title: '1st Term Examination', subject: 'Mathematics', classLevel: 'SS 1', term: '1st Term', maxScore: 100, date: '2026-06-25' },
+        'exam-2': { id: 'exam-2', title: 'WAEC National Practice Exam', subject: 'English Studies', classLevel: 'SS 3', term: '2nd Term', maxScore: 100, date: '2026-07-01' }
+      });
     }
 
     // Check announcements
