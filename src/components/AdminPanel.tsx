@@ -45,7 +45,9 @@ import {
   CheckSquare,
   Radio,
   Eye,
-  Database
+  Database,
+  BrainCircuit,
+  Loader2
 } from 'lucide-react';
 
 interface InquiryItem {
@@ -189,7 +191,20 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
   }, [currentUser]);
 
   // Main UI Tab Router
-  const [activeAdminTab, setActiveAdminTab] = useState<'dashboard' | 'users' | 'curriculum' | 'cbt' | 'payments' | 'results' | 'branding' | 'inquiries' | 'activities' | 'gmail' | 'session' | 'attendance' | 'comms' | 'fees' | 'settings' | 'moderation' | 'db'>('payments');
+  const [activeAdminTab, setActiveAdminTab] = useState<'dashboard' | 'users' | 'curriculum' | 'cbt' | 'payments' | 'results' | 'branding' | 'inquiries' | 'activities' | 'gmail' | 'session' | 'attendance' | 'comms' | 'fees' | 'settings' | 'moderation' | 'db' | 'ai-notes'>('payments');
+
+  // AI Note Generator states
+  const [selectedClassAdmin, setSelectedClassAdmin] = useState<string>('SS 1');
+  const [selectedSubjectAdmin, setSelectedSubjectAdmin] = useState<string>('Mathematics');
+  const [selectedTermAdmin, setSelectedTermAdmin] = useState<string>('1st Term');
+  const [selectedWeekAdmin, setSelectedWeekAdmin] = useState<number>(1);
+  const [isEndOfTermAdmin, setIsEndOfTermAdmin] = useState<boolean>(false);
+  const [isGeneratingNoteAdmin, setIsGeneratingNoteAdmin] = useState<boolean>(false);
+  const [generatedNoteAdmin, setGeneratedNoteAdmin] = useState<any | null>(null);
+  const [noteErrorAdmin, setNoteErrorAdmin] = useState<string>('');
+  const [lessonSubTabAdmin, setLessonSubTabAdmin] = useState<'blueprint' | 'narrative' | 'activities' | 'assessment'>('blueprint');
+  const [userAnswersAdmin, setUserAnswersAdmin] = useState<Record<number, number>>({});
+  const [showAnswerKeyAdmin, setShowAnswerKeyAdmin] = useState<boolean>(false);
 
   // Interactive configurations
   const [brandName, setBrandName] = useState(currentConfig.brandName || 'LIVINGSTONEEDU');
@@ -707,6 +722,181 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
     const greetingText = `Hello ${item.name},\n\nThis is the Administration team responding to your school inquiry: "${item.subject}".\n\nYou wrote:\n"${item.message}"\n\nHow can we support your education today?`;
     const destUrl = `https://wa.me/message/AJ4NILOGBTTMJ1?text=${encodeURIComponent(greetingText)}`;
     window.open(destUrl, '_blank');
+  };
+
+  // AI Lesson Note generation inside Administrator Panel
+  const handleGenerateLessonNoteAdmin = async () => {
+    setIsGeneratingNoteAdmin(true);
+    setNoteErrorAdmin('');
+    setGeneratedNoteAdmin(null);
+    setUserAnswersAdmin({});
+    setShowAnswerKeyAdmin(false);
+    try {
+      // 1. Query Realtime Database for curriculum guidelines
+      const rtdbCurriculum = await rtdbGet(NODES.CURRICULUM);
+      let matchedCurriculum: any = null;
+      
+      const targetTerm = selectedTermAdmin;
+      const targetWeek = selectedWeekAdmin;
+      const targetClass = selectedClassAdmin;
+      const targetSubject = selectedSubjectAdmin;
+
+      if (rtdbCurriculum) {
+        const getFlatCurriculums = (obj: any): any[] => {
+          if (!obj || typeof obj !== 'object') return [];
+          if (obj.topic !== undefined && (obj.class !== undefined || obj.week !== undefined)) {
+            return [obj];
+          }
+          let list: any[] = [];
+          for (const val of Object.values(obj)) {
+            list = list.concat(getFlatCurriculums(val));
+          }
+          return list;
+        };
+
+        const flatList = getFlatCurriculums(rtdbCurriculum);
+        matchedCurriculum = flatList.find((record: any) => {
+          if (!record) return false;
+          
+          // Must match status === "Published"
+          const recordStatus = record.status || 'Published';
+          if (recordStatus !== 'Published') return false;
+
+          const norm = (s: string) => String(s).replace(/\s+/g, '').toLowerCase();
+          const normWeek = (w: any) => {
+            if (typeof w === 'number') return w;
+            const m = String(w).match(/\d+/);
+            return m ? parseInt(m[0], 10) : null;
+          };
+
+          const classMatch = norm(record.class) === norm(targetClass);
+          const subjectMatch = norm(record.subject) === norm(targetSubject);
+          const termMatch = norm(record.term) === norm(targetTerm);
+          const weekMatch = normWeek(record.week) === normWeek(targetWeek);
+
+          return classMatch && subjectMatch && termMatch && weekMatch;
+        });
+      }
+
+      if (!matchedCurriculum) {
+        const warningMessage = `No active curriculum record found for Class: ${targetClass}, Subject: ${targetSubject}, ${targetTerm}, Week ${targetWeek}. Please publish a curriculum unit first under the "Curriculum Align" tab!`;
+        throw new Error(warningMessage);
+      }
+
+      const res = await fetch('/api/gemini/generate-lesson-note', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          classLevel: matchedCurriculum.class,
+          subject: matchedCurriculum.subject,
+          term: matchedCurriculum.term,
+          week: `Week ${matchedCurriculum.week}`,
+          focusTopic: matchedCurriculum.topic,
+          topicDescription: matchedCurriculum.details || matchedCurriculum.topic,
+          isEndOfTerm: isEndOfTermAdmin
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error('Server returned an error response.');
+      }
+
+      const result = await res.json();
+      if (result.success) {
+        setGeneratedNoteAdmin(result.lessonNote);
+        setLessonSubTabAdmin('blueprint');
+        
+        // Log updated academic activity on backend
+        await adminFetch('/api/admin/log-activity', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userName: currentUser?.fullName || "System Admin",
+            userEmail: currentUser?.email || "admin@livingstone.edu",
+            activityType: 'Admin AI Lesson Note',
+            subject: selectedSubjectAdmin,
+            detail: `Admin synthesized NERDC Lesson Note for ${selectedClassAdmin}, Week ${selectedWeekAdmin} (${selectedTermAdmin})`
+          })
+        });
+      } else {
+        throw new Error(result.error || 'Failed to retrieve lesson contents');
+      }
+    } catch (err: any) {
+      setNoteErrorAdmin(err.message || 'Connection failed compiling lesson note.');
+    } finally {
+      setIsGeneratingNoteAdmin(false);
+    }
+  };
+
+  const handleCopyNoteToClipboardAdmin = () => {
+    if (!generatedNoteAdmin) return;
+    
+    const plainText = `
+${generatedNoteAdmin.topic?.toUpperCase()} - LESSON NOTE
+Subtopic: ${generatedNoteAdmin.subtopic || ''}
+Class Level: ${generatedNoteAdmin.classLevel || ''} | Duration: ${generatedNoteAdmin.duration || ''}
+
+LEARNING OBJECTIVES:
+${generatedNoteAdmin.objectives?.map((o: string, idx: number) => `${idx + 1}. ${o}`).join('\n')}
+
+KEY VOCABULARY:
+${generatedNoteAdmin.keyVocabulary?.join(', ')}
+
+TEACHING MATERIALS:
+${generatedNoteAdmin.teachingMaterials?.map((t: string) => `- ${t}`).join('\n')}
+
+INTRODUCTION:
+${generatedNoteAdmin.introduction || ''}
+
+EXPLANATION STEPS:
+${generatedNoteAdmin.teacherExplanationSteps?.map((s: string, idx: number) => `Step ${idx + 1}: ${s}`).join('\n')}
+
+LESSON NOTE CONTENT:
+${generatedNoteAdmin.detailedLessonNote || ''}
+
+STUDENT ACTIVITIES:
+${generatedNoteAdmin.studentActivities?.map((a: string) => `- ${a}`).join('\n')}
+
+CLASS EXERCISES:
+${generatedNoteAdmin.classExercises?.map((e: string, idx: number) => `Exercise ${idx + 1}: ${e}`).join('\n')}
+
+HOMEWORK:
+${generatedNoteAdmin.homeworkAssignment || ''}
+    `.trim();
+
+    navigator.clipboard.writeText(plainText);
+    showToast('Lesson note copied to clipboard successfully!', 'success');
+  };
+
+  const renderFormattedMarkdownAdmin = (text: string) => {
+    if (!text) return null;
+    return text.split('\n').map((line, idx) => {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('### ')) {
+        return <h3 key={idx} className="text-sm font-black text-slate-900 tracking-tight mt-5 mb-2.5 border-b pb-0.5 font-sans">{trimmed.substring(4)}</h3>;
+      }
+      if (trimmed.startsWith('#### ')) {
+        return <h4 key={idx} className="text-xs font-black text-slate-800 mt-3.5 mb-1.5 font-sans">{trimmed.substring(5)}</h4>;
+      }
+      if (trimmed.startsWith('**') && trimmed.endsWith('**')) {
+        return <h5 key={idx} className="text-xs font-black text-slate-900 mt-2.5 mb-1 font-sans">{trimmed.replace(/\*\*/g, '')}</h5>;
+      }
+      if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
+        return (
+          <li key={idx} className="ml-4 list-disc text-xs text-slate-700 leading-relaxed my-1 font-serif">
+            {trimmed.substring(2)}
+          </li>
+        );
+      }
+      if (trimmed === '') {
+        return <div key={idx} className="h-1.5" />;
+      }
+      return (
+        <p key={idx} className="text-xs text-slate-700 leading-relaxed my-2 font-serif text-justify">
+          {trimmed}
+        </p>
+      );
+    });
   };
 
   // Add new User manually
@@ -1362,7 +1552,7 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
       )}
 
       {/* Screen Title & Quick Actions */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white p-6 rounded-3xl border border-slate-150 shadow-sm hover:border-slate-200 transition">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white p-6 rounded-3xl border border-slate-150 hover:border-slate-200 transition">
         <div className="space-y-1">
           <div className="flex items-center gap-2.5 flex-wrap">
             <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
@@ -1400,7 +1590,7 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
       {/* Main SaaS Dashboard Analytics */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
         
-        <div className="bg-white p-5 rounded-2xl border border-slate-150 shadow-2xs hover:border-slate-250 transition space-y-2">
+        <div className="bg-white p-5 rounded-2xl border border-slate-150 hover:border-slate-200 transition space-y-2">
           <div className="flex justify-between items-center">
             <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Total Registers</span>
             <span className="p-1.5 bg-blue-50 text-blue-600 rounded-lg"><Users size={12} /></span>
@@ -1411,7 +1601,7 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-150 shadow-2xs hover:border-slate-250 transition space-y-2">
+        <div className="bg-white p-5 rounded-2xl border border-slate-150 hover:border-slate-200 transition space-y-2">
           <div className="flex justify-between items-center">
             <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Premium Passes</span>
             <span className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg"><Layers size={12} /></span>
@@ -1422,7 +1612,7 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-150 shadow-2xs hover:border-slate-250 transition space-y-2 col-span-1">
+        <div className="bg-white p-5 rounded-2xl border border-slate-150 hover:border-slate-200 transition space-y-2 col-span-1">
           <div className="flex justify-between items-center">
             <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Total Curriculum</span>
             <span className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg"><BookOpen size={12} /></span>
@@ -1433,18 +1623,18 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-150 shadow-2xs hover:border-slate-250 transition space-y-2">
+        <div className="bg-white p-5 rounded-2xl border border-slate-150 hover:border-slate-200 transition space-y-2">
           <div className="flex justify-between items-center">
             <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider font-sans">Collected Revenue</span>
             <span className="p-1.5 bg-emerald-50 text-emerald-700 rounded-lg"><DollarSign size={12} /></span>
           </div>
           <div>
-            <p className="text-2xl font-black text-emerald-900">₦{statsSummary.revenueSum.toLocaleString()}</p>
+            <p className="text-2xl font-black text-emerald-950">₦{statsSummary.revenueSum.toLocaleString()}</p>
             <p className="text-[10px] text-emerald-600 mt-1 font-semibold">&bull; Paystack & Flutterwave channels</p>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-150 shadow-2xs hover:border-slate-250 transition space-y-2 col-span-2 md:col-span-4 lg:col-span-1">
+        <div className="bg-white p-5 rounded-2xl border border-slate-150 hover:border-slate-200 transition space-y-2 col-span-2 md:col-span-4 lg:col-span-1">
           <div className="flex justify-between items-center">
             <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Need Action</span>
             <span className={`p-1.5 rounded-lg text-[9px] font-black ${statsSummary.totalPendingInq > 0 ? 'bg-red-50 text-red-700 animate-pulse' : 'bg-emerald-50 text-emerald-800'}`}>
@@ -1628,6 +1818,24 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
               <span className="flex items-center gap-2">
                 <Radio size={13} className="stroke-[2.5]" />
                 <span>Communication Hub</span>
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveAdminTab('ai-notes')}
+              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
+                activeAdminTab === 'ai-notes'
+                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
+                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <BrainCircuit size={13} className="stroke-[2.5]" />
+                <span>AI Lesson Note Generator</span>
+              </span>
+              <span className="text-[9px] font-bold px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded-md">
+                AI
               </span>
             </button>
           </div>
@@ -4667,6 +4875,466 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
                   </button>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* TAB 18: AI LESSON NOTE WORKSPACE */}
+          {activeAdminTab === 'ai-notes' && (
+            <div className="space-y-6 animate-fade-in text-slate-800 font-sans">
+              <div className="border-b pb-3 flex justify-between items-center flex-wrap gap-2">
+                <div>
+                  <h3 className="font-extrabold text-base text-slate-900">AI Lesson Note Workbench</h3>
+                  <p className="text-xs text-slate-500">Secure administration interface to compile structured, national-standard Nigeria-wide exam and lesson guidelines.</p>
+                </div>
+                <div className="text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-100 font-black px-2 py-0.5 rounded flex items-center gap-1">
+                  <span>🛡️</span>
+                  <span>Secure Admin Mode</span>
+                </div>
+              </div>
+
+              {/* Grid split: Parameters Left, Note Document Right */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                {/* Control Panel Parameters Column (lg:col-span-4) */}
+                <div className="lg:col-span-4 space-y-4">
+                  <div className="bg-slate-50 p-5 rounded-2xl border border-slate-150 space-y-4">
+                    <h4 className="text-xs font-black uppercase text-slate-700 tracking-wider">Lesson Parameters</h4>
+                    
+                    {/* Class */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-extrabold uppercase text-slate-400">Target Classroom</label>
+                      <select 
+                        value={selectedClassAdmin} 
+                        onChange={(e) => {
+                          setSelectedClassAdmin(e.target.value);
+                          const subjs = getSubjectsForClass(e.target.value);
+                          if (subjs && subjs.length > 0) {
+                            setSelectedSubjectAdmin(subjs[0]);
+                          }
+                        }}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-xs font-semibold"
+                      >
+                        {['Primary 1', 'Primary 2', 'Primary 3', 'Primary 4', 'Primary 5', 'Primary 6', 'JSS 1', 'JSS 2', 'JSS 3', 'SS 1', 'SS 2', 'SS 3'].map((cls) => (
+                          <option key={cls} value={cls}>{cls}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Subject */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-extrabold uppercase text-slate-400">Subject Field</label>
+                      <select 
+                        value={selectedSubjectAdmin} 
+                        onChange={(e) => setSelectedSubjectAdmin(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-xs font-semibold"
+                      >
+                        {(getSubjectsForClass(selectedClassAdmin) || []).map((sub) => (
+                          <option key={sub} value={sub}>{sub}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Academic Term */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-extrabold uppercase text-slate-400">Academic Term</label>
+                      <select 
+                        value={selectedTermAdmin} 
+                        onChange={(e) => setSelectedTermAdmin(e.target.value)}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-xs font-semibold"
+                      >
+                        {['1st Term', '2nd Term', '3rd Term'].map((trm) => (
+                          <option key={trm} value={trm}>{trm}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Syllabus Week */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-extrabold uppercase text-slate-400">Syllabus Week</label>
+                      <select 
+                        value={selectedWeekAdmin} 
+                        onChange={(e) => setSelectedWeekAdmin(parseInt(e.target.value, 10))}
+                        className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-xs font-semibold"
+                      >
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((wk) => (
+                          <option key={wk} value={wk}>Week {wk}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* End of Term Assessment Mode */}
+                    <div className="flex items-center gap-2 pt-2 border-t border-slate-200/60 pb-1">
+                      <input 
+                        type="checkbox" 
+                        id="isEndOfTermAdmin" 
+                        checked={isEndOfTermAdmin} 
+                        onChange={(e) => setIsEndOfTermAdmin(e.target.checked)}
+                        className="rounded border-slate-200 bg-white"
+                      />
+                      <label htmlFor="isEndOfTermAdmin" className="text-[11px] font-extrabold text-slate-600 cursor-pointer">
+                        Simulate End of Term Assessment Mode
+                      </label>
+                    </div>
+
+                    {/* Error Box */}
+                    {noteErrorAdmin && (
+                      <div className="p-3 bg-red-50 text-red-700 text-[10px] font-semibold rounded-xl border border-red-200 leading-relaxed">
+                        {noteErrorAdmin}
+                      </div>
+                    )}
+
+                    {/* Action Trigger Button */}
+                    <button
+                      type="button"
+                      onClick={handleGenerateLessonNoteAdmin}
+                      disabled={isGeneratingNoteAdmin}
+                      className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-705 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition"
+                    >
+                      {isGeneratingNoteAdmin ? (
+                        <>
+                          <Loader2 size={13} className="animate-spin text-white" />
+                          <span>Generating Lesson Guides...</span>
+                        </>
+                      ) : (
+                        <>
+                          <BrainCircuit size={13} />
+                          <span>Compile Lesson Plan Guide</span>
+                        </>
+                      )}
+                    </button>
+                    
+                  </div>
+                </div>
+
+                {/* Display Output Column (lg:col-span-8) */}
+                <div className="lg:col-span-8 space-y-4">
+                  {isGeneratingNoteAdmin && (
+                    <div className="bg-slate-50 rounded-2xl border border-slate-150 p-12 text-center space-y-4 animate-fade-in">
+                      <div className="relative w-12 h-12 mx-auto">
+                        <div className="absolute inset-0 border-4 border-slate-200 rounded-full" />
+                        <div className="absolute inset-0 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                      </div>
+                      <div className="space-y-1">
+                        <h4 className="font-sans font-black text-slate-800 text-xs">Synthesizing NERDC Approved Notes</h4>
+                        <p className="text-[10px] text-slate-400 max-w-xs mx-auto">
+                          Querying national schemas, validating curriculum milestones and formulating structured pedagogical guides...
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {!isGeneratingNoteAdmin && !generatedNoteAdmin && (
+                    <div className="bg-slate-50 border border-dashed border-slate-205 rounded-2xl p-12 text-center text-slate-400">
+                      <BrainCircuit size={28} className="mx-auto text-slate-300 mb-2 stroke-[1.5]" />
+                      <p className="text-xs font-medium">Select academic bounds and trigger compiler to synthesize curriculum lesson layouts.</p>
+                    </div>
+                  )}
+
+                  {!isGeneratingNoteAdmin && generatedNoteAdmin && (
+                    <div className="space-y-4">
+                      {/* Form action control */}
+                      <div className="bg-slate-50 rounded-xl border border-slate-150 p-3 flex justify-between items-center">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => window.print()}
+                            className="px-3 py-1 bg-slate-900 hover:bg-slate-950 text-white font-bold rounded-lg text-[10px] flex items-center gap-1.5 transition cursor-pointer"
+                          >
+                            <Printer size={11} />
+                            Print Sheet
+                          </button>
+                          <button
+                            onClick={handleCopyNoteToClipboardAdmin}
+                            className="px-3 py-1 border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold rounded-lg text-[10px] flex items-center gap-1.5 transition cursor-pointer bg-white"
+                          >
+                            <Download size={11} />
+                            Copy Raw Text
+                          </button>
+                        </div>
+                        <span className="text-[9px] text-slate-450 italic font-medium">
+                          ✓ Standard Pedagogy Compiled
+                        </span>
+                      </div>
+
+                      {/* Lesson Sheet Outer Panel */}
+                      <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                        
+                        {/* Header metadata layout */}
+                        <div className="p-5 text-white space-y-3" style={{ backgroundColor: '#0f172a' }}>
+                          <div className="flex justify-between items-start">
+                            <span className="p-0.5 px-2 text-[8px] bg-white/10 uppercase tracking-wider font-extrabold rounded border border-white/20">
+                              NERDC National Standard Plan
+                            </span>
+                            <span className="text-[9px] font-mono font-medium text-slate-300">
+                              DURATION: {generatedNoteAdmin.duration || '40 Mins'}
+                            </span>
+                          </div>
+
+                          <div className="space-y-0.5">
+                            <h2 className="text-base font-black tracking-tight leading-6 text-white uppercase">
+                              {generatedNoteAdmin.topic || 'Curriculum Subject Guide'}
+                            </h2>
+                            <p className="text-[11px] font-medium italic" style={{ color: '#cbd5e1' }}>
+                              {generatedNoteAdmin.subtopic || 'National syllabus framework outline'}
+                            </p>
+                          </div>
+
+                          <div className="grid grid-cols-4 gap-2 pt-2.5 border-t border-white/15 text-[9px] font-bold text-slate-300">
+                            <div>
+                              <p className="text-slate-400 uppercase text-[7px]">Class</p>
+                              <p className="font-extrabold text-white">{generatedNoteAdmin.classLevel || selectedClassAdmin}</p>
+                            </div>
+                            <div>
+                              <p className="text-slate-400 uppercase text-[7px]">Term</p>
+                              <p className="font-extrabold text-white">{selectedTermAdmin}</p>
+                            </div>
+                            <div>
+                              <p className="text-slate-400 uppercase text-[7px]">Calendar</p>
+                              <p className="font-extrabold text-white">Week {selectedWeekAdmin}</p>
+                            </div>
+                            <div>
+                              <p className="text-slate-400 uppercase text-[7px]">Subject</p>
+                              <p className="font-extrabold text-white">{selectedSubjectAdmin}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Note Subsection Tabs */}
+                        <div className="flex border-b border-slate-200 bg-slate-50 p-1 gap-1">
+                          {[
+                            { key: 'blueprint', label: '📊 Blueprint Specs' },
+                            { key: 'narrative', label: '📖 Lesson Document' },
+                            { key: 'activities', label: '🧪 Tasks & Drills' },
+                            { key: 'assessment', label: '❓ Quiz Room' }
+                          ].map((t) => (
+                            <button
+                              key={t.key}
+                              onClick={() => setLessonSubTabAdmin(t.key as any)}
+                              className={`flex-grow md:flex-none py-1.5 px-3 text-[10px] font-extrabold rounded-lg transition-all ${
+                                lessonSubTabAdmin === t.key ? 'bg-white text-indigo-700 border border-slate-200' : 'text-slate-500 hover:bg-slate-100'
+                              }`}
+                            >
+                              {t.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Note Inner Render Body */}
+                        <div className="p-5 space-y-5">
+                          {/* A. Blueprint Specs */}
+                          {lessonSubTabAdmin === 'blueprint' && (
+                            <div className="space-y-4 animate-fade-in">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-150 space-y-2.5 font-sans">
+                                  <h4 className="text-[11px] font-black uppercase text-indigo-950 border-b pb-1">
+                                    Learning Objectives ({generatedNoteAdmin.objectives?.length || 0})
+                                  </h4>
+                                  <ul className="space-y-2">
+                                    {generatedNoteAdmin.objectives?.map((obj: string, i: number) => (
+                                      <li key={i} className="text-[11px] font-serif text-slate-705 flex gap-2">
+                                        <span className="font-bold text-indigo-600 font-sans">{i + 1}.</span>
+                                        <span>{obj}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+
+                                <div className="space-y-4">
+                                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-150 space-y-2">
+                                    <h5 className="text-[11px] font-black uppercase text-indigo-950 border-b pb-1">
+                                      Required Instructional Materials
+                                    </h5>
+                                    <ul className="space-y-1">
+                                      {generatedNoteAdmin.teachingMaterials?.map((mat: string, i: number) => (
+                                        <li key={i} className="text-[10px] text-slate-600 flex items-baseline gap-1.5">
+                                          <span>&bull;</span>
+                                          <span>{mat}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+
+                                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-150 space-y-2">
+                                    <h5 className="text-[11px] font-black uppercase text-indigo-950 border-b pb-1">
+                                      Vocabulary Core List
+                                    </h5>
+                                    <div className="flex flex-wrap gap-1">
+                                      {generatedNoteAdmin.keyVocabulary?.map((voc: string, i: number) => (
+                                        <span key={i} className="px-2 py-0.5 bg-indigo-50 border border-indigo-100 font-bold text-indigo-750 text-[9px] rounded">
+                                          🔑 {voc}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {generatedNoteAdmin.subjectSpecificFocus && (
+                                <div className="p-4 rounded-xl border border-dashed border-indigo-200 bg-indigo-50/10 space-y-1.5">
+                                  <h5 className="text-[10px] font-black uppercase text-indigo-950">
+                                    🌟 Sub-discipline Focus Areas: {generatedNoteAdmin.subjectSpecificFocus.title}
+                                  </h5>
+                                  <p className="text-[11px] text-slate-705 font-serif leading-relaxed">
+                                    {generatedNoteAdmin.subjectSpecificFocus.content}
+                                  </p>
+                                  {generatedNoteAdmin.subjectSpecificFocus.safeguardsOrMoralLesson && (
+                                    <div className="pt-1.5 border-t border-indigo-100 text-[9px] font-semibold text-slate-500 leading-snug">
+                                      💡 <span className="font-bold text-indigo-850 uppercase">Safety & Values Guard:</span> {generatedNoteAdmin.subjectSpecificFocus.safeguardsOrMoralLesson}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* B. Lesson Document Content */}
+                          {lessonSubTabAdmin === 'narrative' && (
+                            <div className="space-y-4 animate-fade-in font-serif">
+                              <div className="border-l-2 border-indigo-500 bg-indigo-50/20 p-3 text-xs italic text-slate-700 leading-relaxed rounded">
+                                <span className="font-extrabold uppercase tracking-wider text-[9px] font-sans text-indigo-950 block mb-1">Introduction Step</span>
+                                {generatedNoteAdmin.introduction}
+                              </div>
+
+                              <div className="bg-slate-50 p-4 rounded-xl border border-slate-150 space-y-2 font-sans-serif">
+                                <h4 className="text-[11px] font-black uppercase text-indigo-950">Explanation Milestones</h4>
+                                <div className="space-y-1.5">
+                                  {generatedNoteAdmin.teacherExplanationSteps?.map((step: string, idx: number) => (
+                                    <div key={idx} className="flex gap-2 items-start text-[11px] text-slate-705" style={{ fontFamily: 'sans-serif' }}>
+                                      <span className="bg-indigo-600 text-white rounded-full text-[8px] font-mono w-4.5 h-4.5 flex items-center justify-center shrink-0 mt-0.5">
+                                        {idx + 1}
+                                      </span>
+                                      <span className="leading-snug">{step}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div className="prose max-w-none text-slate-800 text-xs">
+                                {renderFormattedMarkdownAdmin(generatedNoteAdmin.detailedLessonNote)}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* C. Tasks & Drills */}
+                          {lessonSubTabAdmin === 'activities' && (
+                            <div className="space-y-4 animate-fade-in font-sans">
+                              <div className="bg-slate-50 p-4 rounded-xl border border-slate-150 space-y-2">
+                                <h4 className="text-[11px] font-black uppercase text-indigo-950 border-b pb-1">Instructional Duties / Activities</h4>
+                                <ul className="space-y-1.5">
+                                  {generatedNoteAdmin.studentActivities?.map((act: string, idx: number) => (
+                                    <li key={idx} className="text-[11px] text-slate-700 flex gap-1.5 items-baseline">
+                                      <span className="text-slate-400 font-bold">&bull;</span>
+                                      <span>{act}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+
+                              <div className="bg-slate-50 p-4 rounded-xl border border-slate-150 space-y-2">
+                                <h4 className="text-[11px] font-black uppercase text-indigo-950 border-b pb-1 font-sans">Class Exercises</h4>
+                                <ul className="space-y-2">
+                                  {generatedNoteAdmin.classExercises?.map((ex: string, i: number) => (
+                                    <li key={i} className="text-[11px] font-serif text-slate-700 flex gap-1.5">
+                                      <span className="font-bold text-slate-500 font-sans">{i + 1}.</span>
+                                      <span>{ex}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+
+                              <div className="bg-indigo-50/20 p-4 rounded-xl border border-indigo-150 space-y-1">
+                                <h4 className="text-[11px] font-black uppercase text-indigo-950 font-sans">Structured Homework Assignment</h4>
+                                <p className="text-[11px] font-serif text-slate-700 leading-snug italic">{generatedNoteAdmin.homeworkAssignment}</p>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* D. Quiz Room */}
+                          {lessonSubTabAdmin === 'assessment' && (
+                            <div className="space-y-4 animate-fade-in font-sans">
+                              <div className="flex justify-between items-center border-b pb-2">
+                                <h4 className="text-[11px] font-black uppercase text-slate-800 font-sans">Standard Interactive Quiz (Segment A)</h4>
+                                <button 
+                                  onClick={() => setShowAnswerKeyAdmin(!showAnswerKeyAdmin)}
+                                  className="px-2.5 py-1 border border-slate-200 bg-white hover:bg-slate-100 text-[9px] font-bold rounded-lg transition"
+                                >
+                                  {showAnswerKeyAdmin ? 'Hide Correct Keys' : 'Reveal Correct Answers'}
+                                </button>
+                              </div>
+
+                              <div className="space-y-3">
+                                {generatedNoteAdmin.quizQuestions?.map((q: any, qIdx: number) => (
+                                  <div key={qIdx} className="p-4 rounded-xl bg-slate-50 border border-slate-150 space-y-2">
+                                    <p className="text-[11px] font-bold text-indigo-950">
+                                      Q{qIdx + 1}: <span className="font-serif font-medium text-slate-800">{q.question}</span>
+                                    </p>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                      {q.options?.map((opt: string, oIdx: number) => {
+                                        const isThisCorrect = String.fromCharCode(65 + oIdx) === q.correctAnswer;
+                                        let btnClass = "border-slate-200 bg-white hover:bg-slate-100 text-slate-700";
+                                        
+                                        if (showAnswerKeyAdmin && isThisCorrect) {
+                                          btnClass = "bg-emerald-50 border-emerald-400 text-emerald-800 font-bold";
+                                        }
+
+                                        return (
+                                          <div
+                                            key={oIdx}
+                                            className={`p-2 rounded-lg border text-left text-[11px] flex gap-2 items-center transition ${btnClass}`}
+                                          >
+                                            <span className="uppercase text-[9px] font-black text-slate-400 bg-slate-100 w-4.5 h-4.5 flex items-center justify-center rounded border shrink-0">
+                                              {String.fromCharCode(65 + oIdx)}
+                                            </span>
+                                            <span className="leading-tight">{opt}</span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+
+                                    {showAnswerKeyAdmin && (
+                                      <div className="pt-2 border-t border-slate-150 text-[10px] text-slate-500 font-sans leading-snug">
+                                        🔑 <span className="font-bold text-emerald-800">Explanation:</span> {q.explanation}
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+
+                              {generatedNoteAdmin.theoryQuestions && (
+                                <div className="space-y-3 pt-3 border-t font-sans">
+                                  <h4 className="text-[11px] font-black uppercase text-indigo-950 border-b pb-1">Theory Discussion Questions (Segment B)</h4>
+                                  {generatedNoteAdmin.theoryQuestions.map((t: any, idx: number) => (
+                                    <div key={idx} className="bg-slate-50 rounded-xl border border-slate-150 p-3.5 space-y-2">
+                                      <p className="text-[11px] font-bold text-slate-850 leading-snug">
+                                        Question {idx + 1}: <span className="font-serif font-medium text-slate-755">{t.question}</span>
+                                      </p>
+                                      {showAnswerKeyAdmin && (
+                                        <div className="p-3 rounded bg-white border border-slate-150 space-y-1.5">
+                                          <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Recommended Model Answer:</p>
+                                          <p className="text-[11px] font-serif text-slate-600 italic">{t.modelAnswer}</p>
+                                          {t.markingScheme && (
+                                            <p className="text-[9px] font-sans text-slate-400 font-semibold border-t pt-1">
+                                              💡 Marking Criteria: {t.markingScheme}
+                                            </p>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+
+              </div>
+
             </div>
           )}
 

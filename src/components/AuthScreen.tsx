@@ -7,7 +7,7 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'fire
 import { rtdbGet, rtdbSet, NODES } from '../lib/rtdbService';
 
 interface AuthScreenProps {
-  onAuthComplete: (user: { fullName: string; email: string; classLevel?: ClassLevel; avatarSeed: string; role?: 'student' | 'teacher' | 'admin'; schoolName?: string }) => void;
+  onAuthComplete: (user: { fullName: string; email: string; classLevel?: ClassLevel; avatarSeed: string; role?: 'student' | 'teacher' | 'admin'; schoolName?: string; isPro?: boolean }) => void;
 }
 
 const AVATAR_TEMPLATES = [
@@ -251,7 +251,7 @@ export function AuthScreen({ onAuthComplete }: AuthScreenProps) {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans selection:bg-blue-550 selection:text-white antialiased">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-16">
+      <div className="max-w-full mx-auto px-4 sm:px-8 lg:px-12 py-8 lg:py-16">
         {/* Main Content Layout Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-14 items-center">
           

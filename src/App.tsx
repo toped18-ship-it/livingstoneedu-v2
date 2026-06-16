@@ -500,7 +500,7 @@ export default function App() {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col justify-between font-sans">
         <header className="sticky top-0 z-20 bg-white border-b border-slate-205 backdrop-blur-md bg-white/95">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-full mx-auto px-4 sm:px-8 lg:px-12">
             <div className="flex h-16 items-center justify-between gap-4">
               <div className="flex items-center gap-2.5">
                 <div className={`p-2 ${logoBgColorClass} rounded-xl shadow-sm text-white`}>
@@ -532,7 +532,7 @@ export default function App() {
           </div>
         </header>
 
-        <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 md:px-0 sm:px-0">
+        <main className="flex-grow max-w-full w-full mx-auto px-4 sm:px-8 lg:px-12 py-8 md:px-0 sm:px-0">
           <TeacherPortal 
             user={currentUser} 
             onNavigateToHome={handleSignOut}
@@ -542,7 +542,7 @@ export default function App() {
         </main>
 
         <footer className="bg-white border-t border-slate-150 py-8 text-center text-slate-500 text-xs">
-          <div className="max-w-7xl mx-auto px-4 flex justify-between items-center text-slate-400">
+          <div className="max-w-full mx-auto px-4 sm:px-8 lg:px-12 flex justify-between items-center text-slate-400">
             <p>&copy; 2026 {appConfig.brandName.toUpperCase()}. Secure Teacher administration.</p>
             <p className="font-bold text-slate-600">Staff Portal Active</p>
           </div>
@@ -562,6 +562,61 @@ export default function App() {
             bankAccountName={(appConfig as any).bankAccountName}
           />
         )}
+      </div>
+    );
+  }
+
+  // If logged in as an administrator, route straight to the specialized standalone Admin Panel Core
+  if (currentUser && currentUser.role === 'admin') {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col justify-between font-sans">
+        <header className="sticky top-0 z-20 bg-white border-b border-slate-205 backdrop-blur-md bg-white/95">
+          <div className="max-w-full mx-auto px-4 sm:px-8 lg:px-12">
+            <div className="flex h-16 items-center justify-between gap-4">
+              <div className="flex items-center gap-2.5 bg-transparent">
+                <div className="p-2 bg-gradient-to-tr from-blue-600 to-indigo-650 rounded-xl shadow-sm text-white">
+                  {renderDynamicLogo(18)}
+                </div>
+                <div>
+                  <h1 className="text-sm font-black text-slate-900 tracking-tight leading-none">{appConfig.brandName.toUpperCase()}</h1>
+                  <p className="text-[10px] font-bold text-slate-400 tracking-wider uppercase mt-1 leading-none font-sans">Administration Command Console</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="hidden sm:flex flex-col text-right text-xs">
+                  <span className="font-extrabold text-slate-850 truncate max-w-40">{currentUser.fullName}</span>
+                  <span className="text-[10px] text-slate-450 font-bold font-sans">System Administrator</span>
+                </div>
+                <div className="w-8.5 h-8.5 rounded-full bg-slate-50 border border-slate-200 text-base flex items-center justify-center">
+                  🛡️
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  title="Logout Administrative Console"
+                  className="p-2 border border-slate-200 text-slate-455 hover:text-red-655 hover:border-red-200 rounded-xl transition cursor-pointer font-bold"
+                >
+                  <LogOut size={16} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-grow max-w-full w-full mx-auto px-4 sm:px-8 lg:px-12 py-8 md:px-0 sm:px-0">
+          <AdminPanel 
+            currentConfig={appConfig}
+            onConfigChange={(newConfig) => setAppConfig(newConfig)}
+            currentUser={currentUser}
+          />
+        </main>
+
+        <footer className="bg-white border-t border-slate-150 py-8 text-center text-slate-500 text-xs">
+          <div className="max-w-full mx-auto px-4 sm:px-8 lg:px-12 flex justify-between items-center text-slate-400">
+            <p>&copy; 2026 {appConfig.brandName.toUpperCase()}. Core App Administration Dashboard.</p>
+            <p className="font-bold text-slate-600">Operational Security Mode Active</p>
+          </div>
+        </footer>
       </div>
     );
   }
@@ -586,7 +641,7 @@ export default function App() {
       
       {/* 2. Page Navigation Bar Header */}
       <header className="sticky top-0 z-20 bg-white border-b border-slate-205 backdrop-blur-md bg-white/95">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-full mx-auto px-4 sm:px-8 lg:px-12">
           <div className="flex h-16 items-center justify-between gap-4">
             
             {/* Logo / Brand Header */}
@@ -831,7 +886,7 @@ export default function App() {
       </div>
 
       {/* 3. Main content body sections with responsive boundaries */}
-      <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="flex-grow max-w-full w-full mx-auto px-4 sm:px-8 lg:px-12 py-8">
         {isRefreshing ? (
           <div className="h-64 flex flex-col items-center justify-center space-y-2">
             <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -950,7 +1005,7 @@ export default function App() {
 
       {/* 4. Elegant footer with credits */}
       <footer className="bg-white border-t border-slate-150 py-8 text-center text-slate-500 space-y-3">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
+        <div className="max-w-full mx-auto px-4 sm:px-8 lg:px-12 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
           
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse" />
