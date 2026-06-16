@@ -359,10 +359,7 @@ export function AuthScreen({ onAuthComplete }: AuthScreenProps) {
               </div>
             </div>
 
-            {/* Trust Footer */}
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-400 font-medium pt-2">
-              <span>Fully Aligned with West African WAEC / NECO Standards</span>
-            </div>
+
           </div>
 
           {/* Right Column: Interactive Clean Login Card with OAuth Disclaimer */}
