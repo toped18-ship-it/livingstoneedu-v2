@@ -361,11 +361,6 @@ export function AuthScreen({ onAuthComplete }: AuthScreenProps) {
 
             {/* Trust Footer */}
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-400 font-medium pt-2">
-              <span className="flex items-center gap-1.5">
-                <ShieldCheck size={14} className="text-green-500 stroke-[2.5]" />
-                Secure Firebase Guard
-              </span>
-              <span>•</span>
               <span>Fully Aligned with West African WAEC / NECO Standards</span>
             </div>
           </div>
