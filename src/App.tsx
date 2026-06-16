@@ -14,6 +14,7 @@ import { TeacherPortal } from './components/TeacherPortal';
 import { PaymentModal } from './components/PaymentModal';
 import { AdminPanel } from './components/AdminPanel';
 import { SplashLoadingScreen } from './components/SplashLoadingScreen';
+import { PWAInstallBanner } from './components/PWAInstallBanner';
 import { syncUserProfile, syncLessonProgress } from './lib/firebaseSync';
 import { GraduationCap, LogOut, Home, BookOpen, HelpCircle, MessageSquare, ShieldCheck, Heart, Trophy, Award, Zap, Sparkles, Mail } from 'lucide-react';
 import { seedRtdbIfEmpty, rtdbSubscribe, rtdbSet, rtdbGet, NODES } from './lib/rtdbService';
@@ -1029,6 +1030,7 @@ export default function App() {
       </footer>
 
       <WhatsAppFloatingButton contactName={appConfig.contactName} supportGroupUrl={appConfig.supportGroupUrl} />
+      <PWAInstallBanner />
     </div>
   );
 }

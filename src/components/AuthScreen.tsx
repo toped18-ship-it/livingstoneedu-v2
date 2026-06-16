@@ -5,6 +5,8 @@ import { BookOpen, User, Mail, GraduationCap, ArrowRight, Sparkles, Check, Lock,
 import { auth } from '../lib/firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { rtdbGet, rtdbSet, NODES } from '../lib/rtdbService';
+import { PWAInstallBanner } from './PWAInstallBanner';
+
 
 interface AuthScreenProps {
   onAuthComplete: (user: { fullName: string; email: string; classLevel?: ClassLevel; avatarSeed: string; role?: 'student' | 'teacher' | 'admin'; schoolName?: string; isPro?: boolean }) => void;
@@ -593,6 +595,9 @@ export function AuthScreen({ onAuthComplete }: AuthScreenProps) {
 
         </div>
       </div>
+      
+      {/* Dynamic Custom PWA Installation Prompt Notification */}
+      <PWAInstallBanner />
     </div>
   );
 }
