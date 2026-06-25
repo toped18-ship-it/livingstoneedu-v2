@@ -74,6 +74,7 @@ export function AuthScreen({ onAuthComplete }: AuthScreenProps) {
           throw authErr;
         });
 
+        const todayDate = new Date().toISOString().split('T')[0];
         const newUser = {
           id,
           fullName: fullName.trim(),
@@ -83,7 +84,9 @@ export function AuthScreen({ onAuthComplete }: AuthScreenProps) {
           classLevel: (role === 'teacher' ? 'SS 1' : 'Primary 4') as ClassLevel,
           selectedSubjectIds: role === 'teacher' ? ['physics', 'chemistry', 'further_math'] : ['mathematics', 'english'],
           schoolName: role === 'teacher' ? schoolName.trim() : undefined,
-          joinDate: new Date().toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
+          joinDate: new Date().toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }),
+          trialSecondsRemaining: role === 'student' ? 900 : undefined,
+          lastTrialAccessDate: role === 'student' ? todayDate : undefined
         };
 
         // 2. Save to rtdb USERS node

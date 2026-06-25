@@ -18,6 +18,8 @@ export interface User {
   role?: 'student' | 'teacher' | 'admin';
   schoolName?: string;
   isPro?: boolean;
+  trialSecondsRemaining?: number;
+  lastTrialAccessDate?: string;
 }
 
 export interface TeacherStudent {

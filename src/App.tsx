@@ -16,7 +16,7 @@ import { AdminPanel } from './components/AdminPanel';
 import { SplashLoadingScreen } from './components/SplashLoadingScreen';
 import { PWAInstallBanner } from './components/PWAInstallBanner';
 import { syncUserProfile, syncLessonProgress } from './lib/firebaseSync';
-import { GraduationCap, LogOut, Home, BookOpen, HelpCircle, MessageSquare, ShieldCheck, Heart, Trophy, Award, Zap, Sparkles, Mail, Sun, Moon } from 'lucide-react';
+import { GraduationCap, LogOut, Home, BookOpen, HelpCircle, MessageSquare, ShieldCheck, Heart, Trophy, Award, Zap, Sparkles, Mail, Sun, Moon, Clock, X } from 'lucide-react';
 import { seedRtdbIfEmpty, rtdbSubscribe, rtdbSet, rtdbGet, NODES } from './lib/rtdbService';
 import { auth } from './lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
@@ -59,6 +59,102 @@ export default function App() {
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     return localStorage.getItem('isDarkMode') === 'true';
   });
+
+  const [trialTimeRemaining, setTrialTimeRemaining] = useState<number | null>(null);
+  const [showTimeExpiredScreen, setShowTimeExpiredScreen] = useState<boolean>(false);
+  const [premiumReminder, setPremiumReminder] = useState<{ title: string; body: string } | null>(null);
+
+  // Synchronize trial timer state with currentUser changes
+  useEffect(() => {
+    if (currentUser && currentUser.role === 'student' && !currentUser.isPro) {
+      const todayDate = new Date().toISOString().split('T')[0];
+      if (currentUser.lastTrialAccessDate !== todayDate) {
+        setTrialTimeRemaining(900);
+      } else if (currentUser.trialSecondsRemaining !== undefined) {
+        setTrialTimeRemaining(currentUser.trialSecondsRemaining);
+      } else {
+        setTrialTimeRemaining(900);
+      }
+    } else {
+      setTrialTimeRemaining(null);
+    }
+  }, [currentUser?.email, currentUser?.isPro, currentUser?.trialSecondsRemaining, currentUser?.lastTrialAccessDate]);
+
+  // 15-minute daily free trial countdown timer logic
+  useEffect(() => {
+    if (!currentUser || currentUser.role !== 'student' || currentUser.isPro || trialTimeRemaining === null || trialTimeRemaining <= 0) {
+      return;
+    }
+
+    // Only count down if in a learning area: hub, quizzes, progress
+    const isLearningArea = ['hub', 'quizzes', 'progress'].includes(activeTab);
+    if (!isLearningArea) return;
+
+    let localSeconds = trialTimeRemaining;
+    let rtdbSyncCounter = 0;
+
+    const timer = setInterval(() => {
+      localSeconds--;
+      
+      if (localSeconds <= 0) {
+        clearInterval(timer);
+        setTrialTimeRemaining(0);
+        
+        // Save zero state to database & state
+        const id = currentUser.email.replace(/[.@]/g, '_');
+        const todayDate = new Date().toISOString().split('T')[0];
+        const updatedUser: User = {
+          ...currentUser,
+          trialSecondsRemaining: 0,
+          lastTrialAccessDate: todayDate
+        };
+        setCurrentUser(updatedUser);
+        localStorage.setItem('hub_active_user', JSON.stringify(updatedUser));
+        rtdbSet(`${NODES.USERS}/${id}`, updatedUser).catch(() => {});
+        setShowTimeExpiredScreen(true);
+        return;
+      }
+
+      setTrialTimeRemaining(localSeconds);
+
+      // Save to localStorage every second so refreshes are flawless
+      const todayDate = new Date().toISOString().split('T')[0];
+      const partialUser = {
+        ...currentUser,
+        trialSecondsRemaining: localSeconds,
+        lastTrialAccessDate: todayDate
+      };
+      localStorage.setItem('hub_active_user', JSON.stringify(partialUser));
+
+      // Reminders at 10 minutes (600s), 5 minutes (300s), 1 minute (60s)
+      if (localSeconds === 600) {
+        setPremiumReminder({
+          title: '⚠️ 10 Minutes Remaining',
+          body: 'You have 10 minutes of free learning remaining today. Go Pro for unlimited access!'
+        });
+      } else if (localSeconds === 300) {
+        setPremiumReminder({
+          title: '⚠️ 5 Minutes Remaining',
+          body: 'Only 5 minutes left! Upgrade to Premium to continue your continuous assessment.'
+        });
+      } else if (localSeconds === 60) {
+        setPremiumReminder({
+          title: '⚠️ 1 Minute Remaining',
+          body: 'Hurry! Only 1 minute left. Upgrade now to avoid being locked out of your lessons.'
+        });
+      }
+
+      // Sync to Realtime Database every 10 seconds (throttled)
+      rtdbSyncCounter++;
+      if (rtdbSyncCounter >= 10) {
+        rtdbSyncCounter = 0;
+        const id = currentUser.email.replace(/[.@]/g, '_');
+        rtdbSet(`${NODES.USERS}/${id}/trialSecondsRemaining`, localSeconds).catch(() => {});
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [currentUser?.email, currentUser?.isPro, activeTab, trialTimeRemaining === null]);
 
   // Toggle HTML dark class
   useEffect(() => {
@@ -268,7 +364,19 @@ export default function App() {
     const userId = currentUser.email.replace(/[.@]/g, '_');
     const unsubUser = rtdbSubscribe(`${NODES.USERS}/${userId}`, (data) => {
       if (data) {
-        setCurrentUser(data);
+        // Prevent infinite loops from the trial timer ticking updates
+        setCurrentUser(prev => {
+          if (!prev) return data;
+          if (
+            prev.isPro !== data.isPro ||
+            prev.role !== data.role ||
+            prev.classLevel !== data.classLevel ||
+            JSON.stringify(prev.selectedSubjectIds) !== JSON.stringify(data.selectedSubjectIds)
+          ) {
+            return { ...prev, ...data };
+          }
+          return prev;
+        });
         window.localStorage.setItem('hub_active_user', JSON.stringify(data));
       }
     });
@@ -292,8 +400,17 @@ export default function App() {
         seedRtdbIfEmpty();
 
         // Grab full loaded user profile from RTDB
-        const userProfile = await rtdbGet(`${NODES.USERS}/${id}`);
+        let userProfile = await rtdbGet(`${NODES.USERS}/${id}`);
+        const todayDate = new Date().toISOString().split('T')[0];
+
         if (userProfile) {
+          if (userProfile.role === 'student' && !userProfile.isPro) {
+            if (userProfile.lastTrialAccessDate !== todayDate) {
+              userProfile.trialSecondsRemaining = 900;
+              userProfile.lastTrialAccessDate = todayDate;
+              await rtdbSet(`${NODES.USERS}/${id}`, userProfile).catch(() => {});
+            }
+          }
           setCurrentUser(userProfile);
           localStorage.setItem('hub_active_user', JSON.stringify(userProfile));
         } else {
@@ -306,7 +423,9 @@ export default function App() {
             classLevel: cleanEmail === 'toped18@gmail.com' ? 'SS 1' : 'Primary 4',
             selectedSubjectIds: cleanEmail === 'toped18@gmail.com' ? ['physics'] : ['mathematics', 'english'],
             role: cleanEmail === 'toped18@gmail.com' ? 'admin' : 'student',
-            joinDate: new Date().toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })
+            joinDate: new Date().toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }),
+            trialSecondsRemaining: cleanEmail === 'toped18@gmail.com' ? undefined : 900,
+            lastTrialAccessDate: cleanEmail === 'toped18@gmail.com' ? undefined : todayDate
           };
           setCurrentUser(fallbackProfile);
           localStorage.setItem('hub_active_user', JSON.stringify(fallbackProfile));
@@ -316,7 +435,16 @@ export default function App() {
         // Double check local storage if no user logged in to ease refresh
         const loadedProfile = localStorage.getItem('hub_active_user');
         if (loadedProfile) {
-          setCurrentUser(JSON.parse(loadedProfile));
+          const parsed = JSON.parse(loadedProfile);
+          if (parsed && parsed.role === 'student' && !parsed.isPro) {
+            const todayDate = new Date().toISOString().split('T')[0];
+            if (parsed.lastTrialAccessDate !== todayDate) {
+              parsed.trialSecondsRemaining = 900;
+              parsed.lastTrialAccessDate = todayDate;
+              localStorage.setItem('hub_active_user', JSON.stringify(parsed));
+            }
+          }
+          setCurrentUser(parsed);
         } else {
           setCurrentUser(null);
         }
@@ -485,6 +613,13 @@ export default function App() {
     setCurrentUser(updated);
     localStorage.setItem('hub_active_user', JSON.stringify(updated));
     
+    // Push updates to Firestore and Realtime Database
+    syncUserProfile(updated);
+    const id = currentUser.email.replace(/[.@]/g, '_');
+    rtdbSet(`${NODES.USERS}/${id}`, updated).catch(err => {
+      console.error("Failed to sync premium state to RTDB:", err);
+    });
+
     // Update local users database as well
     const mockUserList = JSON.parse(localStorage.getItem('hub_users') || '[]');
     const idx = mockUserList.findIndex((u: any) => u.email.toLowerCase() === currentUser.email.toLowerCase());
@@ -493,6 +628,7 @@ export default function App() {
       localStorage.setItem('hub_users', JSON.stringify(mockUserList));
     }
     
+    setShowTimeExpiredScreen(false);
     setIsPaymentModalOpen(false);
   };
 
@@ -924,6 +1060,32 @@ export default function App() {
                 </div>
               )}
 
+              {/* Countdown Timer Badge */}
+              {currentUser && currentUser.role === 'student' && !currentUser.isPro && trialTimeRemaining !== null && (
+                <div 
+                  className={`flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-xl border font-sans text-xs font-black uppercase tracking-wider shadow-sm select-none animate-pulse ${
+                    trialTimeRemaining <= 60 
+                      ? 'bg-red-50 text-red-600 border-red-200' 
+                      : trialTimeRemaining <= 300 
+                        ? 'bg-amber-50 text-amber-600 border-amber-200' 
+                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  }`}
+                  title="Free Learning Time Remaining today"
+                >
+                  <Clock size={11} className={`${
+                    trialTimeRemaining <= 60 
+                      ? 'text-red-500' 
+                      : trialTimeRemaining <= 300 
+                        ? 'text-amber-500' 
+                        : 'text-emerald-500'
+                  }`} />
+                  <span className="text-[9px] hidden md:inline text-slate-500 font-bold uppercase tracking-tight">Free Time:</span>
+                  <span className="font-mono text-[11px] tracking-tight font-extrabold">
+                    {Math.floor(trialTimeRemaining / 60)}:{(trialTimeRemaining % 60).toString().padStart(2, '0')}
+                  </span>
+                </div>
+              )}
+
               {currentUser?.isPro ? (
                 <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-750 rounded-lg border border-amber-200 text-[10px] font-black uppercase tracking-wider">
                   <Sparkles size={11} className="fill-amber-400 text-amber-550" />
@@ -1088,46 +1250,48 @@ export default function App() {
               />
             )}
 
-            {activeTab === 'hub' && (
-              <LearningHub 
-                user={currentUser} 
-                progressList={progressList} 
-                onToggleComplete={handleToggleComplete}
-                isPro={!!currentUser.isPro}
-                onPaymentTrigger={() => setIsPaymentModalOpen(true)}
-                demoUsageCount={demoUsageCount}
-                onIncrementDemoUsage={handleIncrementDemoUsage}
-                onCustomizeSubjects={() => setIsCustomizingSubjects(true)}
-                selectedSubjectId={selectedSubjectId}
-                setSelectedSubjectId={setSelectedSubjectId}
-                curriculums={curriculums}
-                proPrice={appConfig.proPrice}
-              />
-            )}
+            <div className={['hub', 'quizzes', 'progress'].includes(activeTab) && currentUser && currentUser.role === 'student' && !currentUser.isPro && trialTimeRemaining === 0 ? "filter blur-md pointer-events-none select-none transition-all duration-500" : ""}>
+              {activeTab === 'hub' && (
+                <LearningHub 
+                  user={currentUser} 
+                  progressList={progressList} 
+                  onToggleComplete={handleToggleComplete}
+                  isPro={!!currentUser.isPro}
+                  onPaymentTrigger={() => setIsPaymentModalOpen(true)}
+                  demoUsageCount={demoUsageCount}
+                  onIncrementDemoUsage={handleIncrementDemoUsage}
+                  onCustomizeSubjects={() => setIsCustomizingSubjects(true)}
+                  selectedSubjectId={selectedSubjectId}
+                  setSelectedSubjectId={setSelectedSubjectId}
+                  curriculums={curriculums}
+                  proPrice={appConfig.proPrice}
+                />
+              )}
 
-            {activeTab === 'quizzes' && (
-              <InteractiveQuizzes
-                user={currentUser}
-                progressList={progressList}
-                onToggleComplete={handleToggleComplete}
-                isPro={!!currentUser.isPro}
-                onPaymentTrigger={() => setIsPaymentModalOpen(true)}
-                demoUsageCount={demoUsageCount}
-                onIncrementDemoUsage={handleIncrementDemoUsage}
-                curriculums={curriculums}
-                cbtExams={cbtExams}
-                cbtQuestionsRecord={cbtQuestionsRecord}
-                proPrice={appConfig.proPrice}
-              />
-            )}
+              {activeTab === 'quizzes' && (
+                <InteractiveQuizzes
+                  user={currentUser}
+                  progressList={progressList}
+                  onToggleComplete={handleToggleComplete}
+                  isPro={!!currentUser.isPro}
+                  onPaymentTrigger={() => setIsPaymentModalOpen(true)}
+                  demoUsageCount={demoUsageCount}
+                  onIncrementDemoUsage={handleIncrementDemoUsage}
+                  curriculums={curriculums}
+                  cbtExams={cbtExams}
+                  cbtQuestionsRecord={cbtQuestionsRecord}
+                  proPrice={appConfig.proPrice}
+                />
+              )}
 
-            {activeTab === 'progress' && (
-              <StudentProgressPage
-                user={currentUser}
-                progressList={progressList}
-                onNavigateToQuizzes={() => setActiveTab('quizzes')}
-              />
-            )}
+              {activeTab === 'progress' && (
+                <StudentProgressPage
+                  user={currentUser}
+                  progressList={progressList}
+                  onNavigateToQuizzes={() => setActiveTab('quizzes')}
+                />
+              )}
+            </div>
 
             {activeTab === 'faq' && (
               <FaqSection />
@@ -1199,6 +1363,134 @@ export default function App() {
 
       <WhatsAppFloatingButton contactName={appConfig.contactName} supportGroupUrl={appConfig.supportGroupUrl} />
       <PWAInstallBanner />
+
+      {/* 15-Minute Free Daily Trial Locked Modal */}
+      {currentUser && currentUser.role === 'student' && !currentUser.isPro && trialTimeRemaining === 0 && ['hub', 'quizzes', 'progress'].includes(activeTab) && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/50 rounded-3xl shadow-2xl overflow-hidden p-6 sm:p-8 text-center space-y-6 relative">
+            <div className="absolute top-4 right-4">
+              <button 
+                type="button"
+                onClick={() => setActiveTab('home')}
+                className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                title="Go to Home Dashboard"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="mx-auto w-20 h-20 bg-gradient-to-tr from-amber-500 to-amber-600 text-white rounded-full flex items-center justify-center shadow-lg shadow-amber-500/20">
+              <span className="text-4xl">🔒</span>
+            </div>
+
+            <div className="space-y-2">
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-850 dark:text-white tracking-tight leading-tight">
+                Free Learning Time Ended
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">
+                You have used your free 15-minute learning session today.
+              </p>
+            </div>
+
+            <div className="bg-amber-50/50 dark:bg-amber-950/20 border border-amber-100/50 dark:border-amber-900/30 rounded-2xl p-5 text-left space-y-3">
+              <p className="text-xs font-bold text-amber-850 dark:text-amber-400 uppercase tracking-wider">
+                Upgrade to Premium to continue enjoying:
+              </p>
+              <ul className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 space-y-2.5 font-semibold">
+                <li className="flex items-start gap-2.5">
+                  <span className="text-emerald-500 text-base font-black shrink-0">✓</span>
+                  <span>Unlimited interactive lesson notes & local downloads</span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <span className="text-emerald-500 text-base font-black shrink-0">✓</span>
+                  <span>Full First, Second and Third Term academic curriculum</span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <span className="text-emerald-500 text-base font-black shrink-0">✓</span>
+                  <span>Complete Week 1–12 lesson outlines & class notes</span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <span className="text-emerald-500 text-base font-black shrink-0">✓</span>
+                  <span>Over 10,050 exam prep questions & comprehensive explanations</span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <span className="text-emerald-500 text-base font-black shrink-0">✓</span>
+                  <span>Direct 1-on-1 AskAfri Chat Tutor assistant (Gemini AI powered)</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPaymentModalOpen(true);
+                }}
+                className="flex-1 py-3 px-6 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:brightness-110 text-white font-extrabold rounded-2xl shadow-lg transition duration-200 cursor-pointer text-xs uppercase tracking-wider"
+              >
+                Upgrade to Premium Now
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const message = `Hello Parent! I finished my free 15 minutes study session on ${appConfig.brandName}. Please help me pay to unlock unlimited full access for my class notes and exams!`;
+                  window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+                }}
+                className="py-3 px-5 border border-slate-200 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-extrabold rounded-2xl transition duration-200 cursor-pointer text-xs uppercase tracking-wider"
+              >
+                Ask Parent to Pay 📱
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('home')}
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-bold underline cursor-pointer"
+            >
+              Go back to Home Dashboard
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Premium Reminders Slide-in Banner Toast */}
+      {premiumReminder && (
+        <div className="fixed bottom-6 right-6 z-[120] max-w-sm w-full bg-slate-900 text-white border border-slate-800 rounded-2xl shadow-2xl p-4 flex gap-3.5 animate-slide-in">
+          <div className="w-10 h-10 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+            <Clock size={20} className="animate-pulse" />
+          </div>
+          <div className="flex-1 space-y-1">
+            <h4 className="text-sm font-black text-amber-400">{premiumReminder.title}</h4>
+            <p className="text-xs text-slate-300 font-medium leading-relaxed">{premiumReminder.body}</p>
+            <div className="flex gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setPremiumReminder(null);
+                  setIsPaymentModalOpen(true);
+                }}
+                className="text-[10px] font-black text-amber-400 uppercase tracking-wider hover:underline"
+              >
+                Upgrade Now
+              </button>
+              <button
+                type="button"
+                onClick={() => setPremiumReminder(null)}
+                className="text-[10px] font-black text-slate-400 uppercase tracking-wider hover:underline"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+          <button 
+            type="button"
+            onClick={() => setPremiumReminder(null)} 
+            className="text-slate-500 hover:text-white shrink-0 self-start"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

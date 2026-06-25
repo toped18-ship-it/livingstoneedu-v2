@@ -27,6 +27,7 @@ export function PaymentModal({
   bankAccountNumber = '9038472910',
   bankAccountName = 'LIVINGSTONEEDU PREMIUM PORTAL'
 }: PaymentModalProps) {
+  const [selectedPlan, setSelectedPlan] = useState<'weekly' | 'monthly' | 'term' | 'annual'>('term');
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'transfer'>('card');
   const [cardNumber, setCardNumber] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
@@ -34,6 +35,24 @@ export function PaymentModal({
   const [transferConfirmed, setTransferConfirmed] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorInput, setErrorInput] = useState('');
+
+  interface PlanOption {
+    id: 'weekly' | 'monthly' | 'term' | 'annual';
+    name: string;
+    price: string;
+    period: string;
+    desc: string;
+    isPopular?: boolean;
+  }
+
+  const plans: PlanOption[] = [
+    { id: 'weekly', name: 'Weekly Plan', price: '₦500', period: 'week', desc: 'Continuous weekly learning access' },
+    { id: 'monthly', name: 'Monthly Plan', price: '₦2,000', period: 'month', desc: 'Popular month-to-month booster' },
+    { id: 'term', name: 'Term Plan', price: '₦5,000', period: 'term', desc: 'Aligned with Nigerian school terms', isPopular: true },
+    { id: 'annual', name: 'Annual Plan', price: '₦15,000', period: 'year', desc: 'Maximum discount full year prep' }
+  ];
+
+  const activePlanObj = plans.find(p => p.id === selectedPlan)!;
 
   const handlePay = (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,28 +102,67 @@ export function PaymentModal({
         {/* Content */}
         <div className="p-6 space-y-5 flex-1 overflow-y-auto">
           
+          {/* Plan Selection Grid */}
+          <div className="space-y-2">
+            <label className="block text-[10px] uppercase font-black text-slate-400 tracking-wider">Select Premium Plan</label>
+            <div className="grid grid-cols-2 gap-2">
+              {plans.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedPlan(p.id);
+                    setTransferConfirmed(false);
+                  }}
+                  className={`p-3 rounded-2xl border text-left transition relative flex flex-col justify-between cursor-pointer ${
+                    selectedPlan === p.id 
+                      ? 'bg-amber-50/70 border-amber-500 ring-2 ring-amber-400/25' 
+                      : 'bg-white border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  {p.isPopular && (
+                    <span className="absolute -top-1.5 -right-1.5 bg-amber-500 text-[8px] text-white font-black px-1.5 py-0.5 rounded-full uppercase tracking-widest shadow-sm">
+                      Popular
+                    </span>
+                  )}
+                  <div>
+                    <span className={`text-[9px] font-black uppercase tracking-tight block ${selectedPlan === p.id ? 'text-amber-900' : 'text-slate-400'}`}>
+                      {p.name}
+                    </span>
+                    <span className="text-base font-black text-slate-800 tracking-tight block mt-0.5">
+                      {p.price}
+                    </span>
+                  </div>
+                  <span className="text-[9px] text-slate-400 block mt-1 leading-none">
+                    per {p.period}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Package details */}
           <div className="bg-blue-50/60 rounded-2xl border border-blue-105 p-4 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-extrabold text-blue-800 uppercase tracking-wide">Premier School Plan</span>
-              <span className="px-2 py-0.5 bg-blue-100 text-[10px] font-black tracking-tight text-blue-800 rounded-lg">TERMLY ACCESS</span>
+              <span className="px-2 py-0.5 bg-blue-100 text-[10px] font-black tracking-tight text-blue-800 rounded-lg uppercase">{activePlanObj.name}</span>
             </div>
             <div className="flex items-baseline gap-1">
-              <span className="text-2xl font-black text-slate-800">{proPrice}</span>
-              <span className="text-xs text-slate-400">per school / classroom per term</span>
+              <span className="text-2xl font-black text-slate-800">{activePlanObj.price}</span>
+              <span className="text-xs text-slate-400">per student per {activePlanObj.period}</span>
             </div>
             <ul className="text-[11px] text-slate-500 space-y-1 pt-1 border-t border-blue-100/60">
               <li className="flex items-center gap-1.5 text-slate-600 font-bold">
-                <Check size={11} className="text-blue-600" />
-                Unlocks SS1-SS3 Physics, Chemistry, Further Math
+                <Check size={11} className="text-blue-600 shrink-0" />
+                Unlocks All Subjects (English, Mathematics, etc.)
               </li>
               <li className="flex items-center gap-1.5 text-slate-600 font-bold">
-                <Check size={11} className="text-blue-600" />
-                Full reports card download & automated printing
+                <Check size={11} className="text-blue-600 shrink-0" />
+                Week 1–12, Term 1–3 Lesson Notes
               </li>
               <li className="flex items-center gap-1.5 text-slate-600 font-bold">
-                <Check size={11} className="text-blue-600" />
-                Unlimited AI Exam Question setting and Grading
+                <Check size={11} className="text-blue-600 shrink-0" />
+                Unlimited Quizzes, CBT Exams & AskAfri AI Tutor
               </li>
             </ul>
           </div>
@@ -237,7 +295,7 @@ export function PaymentModal({
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{bankName}</span>
                   <span className="text-lg font-black text-blue-700 select-all font-mono tracking-tight">{bankAccountNumber}</span>
                   <span className="text-xs font-extrabold text-slate-700">{bankAccountName}</span>
-                  <span className="text-[10px] text-slate-400">(Transfer exactly {proPrice} and check confirmation box below)</span>
+                  <span className="text-[10px] text-slate-400">(Transfer exactly {activePlanObj.price} and check confirmation box below)</span>
                 </div>
 
                 <label className="flex items-center gap-2.5 p-1 bg-blue-50/50 rounded-xl border border-blue-105 cursor-pointer text-left">
@@ -275,7 +333,7 @@ export function PaymentModal({
                   </>
                 ) : (
                   <>
-                    <span>Submit & Pay {proPrice}</span>
+                    <span>Submit & Pay {activePlanObj.price}</span>
                   </>
                 )}
               </button>
