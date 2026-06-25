@@ -801,13 +801,13 @@ export default function App() {
           <div className="flex h-16 items-center justify-between gap-4">
             
             {/* Logo / Brand Header */}
-            <div className="flex items-center gap-2.5 bg-transparent">
-              <div className="p-2 bg-gradient-to-tr from-blue-600 to-indigo-650 rounded-xl shadow-xs text-white">
-                {renderDynamicLogo(18)}
+            <div className="flex items-center gap-1.5 sm:gap-2.5 bg-transparent shrink-0">
+              <div className="p-1.5 sm:p-2 bg-gradient-to-tr from-blue-600 to-indigo-650 rounded-xl shadow-xs text-white">
+                {renderDynamicLogo(16)}
               </div>
               <div>
-                <h1 className="text-sm font-extrabold tracking-wider font-sans text-slate-900 uppercase leading-none">{appConfig.brandName}</h1>
-                <p className="text-[9px] font-bold text-slate-400 tracking-widest uppercase mt-1 leading-none">{appConfig.appSubtitle}</p>
+                <h1 className="text-xs sm:text-sm font-extrabold tracking-wider font-sans text-slate-900 uppercase leading-none">{appConfig.brandName}</h1>
+                <p className="text-[8px] sm:text-[9px] font-bold text-slate-400 tracking-widest uppercase mt-0.5 sm:mt-1 leading-none">{appConfig.appSubtitle}</p>
               </div>
             </div>
 
@@ -902,30 +902,30 @@ export default function App() {
             </nav>
 
             {/* User Profile Summary trigger */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 sm:gap-3">
               {/* Network Connectivity status with simulated toggling capability */}
               {!effectiveIsOnline ? (
                 <div 
                   onClick={() => setIsSimulatedOffline(false)}
-                  className="flex items-center gap-1.5 px-3 py-1 bg-red-50 text-red-700 rounded-lg border border-red-200 text-[10px] font-extrabold uppercase tracking-wider animate-pulse hover:bg-red-100 transition cursor-pointer" 
-                  title="Offline Mode: Progress is cached locally and will sync once you reconnect to the internet in pro version. Click to reconnect!"
+                  className="flex items-center gap-1 px-1.5 py-1 bg-red-50 text-red-700 rounded-lg border border-red-200 text-[10px] font-extrabold uppercase tracking-wider animate-pulse hover:bg-red-100 transition cursor-pointer" 
+                  title="Offline Mode: Progress is cached locally and will sync once you reconnect to the internet. Click to reconnect!"
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping"></span>
-                  <span>Offline Caching</span>
+                  <span className="hidden sm:inline">Offline Caching</span>
                 </div>
               ) : (
                 <div 
                   onClick={() => setIsSimulatedOffline(true)}
-                  className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-155 text-[10px] font-extrabold uppercase tracking-wider hover:bg-emerald-100/60 transition cursor-pointer" 
+                  className="flex items-center gap-1 px-1.5 py-1 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-155 text-[10px] font-extrabold uppercase tracking-wider hover:bg-emerald-100/60 transition cursor-pointer" 
                   title="All systems synchronized. Click to simulate Offline mode!"
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                  <span>Connected</span>
+                  <span className="hidden sm:inline">Connected</span>
                 </div>
               )}
 
               {currentUser?.isPro ? (
-                <div className="hidden xs:flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-750 rounded-lg border border-amber-200 text-[10px] font-black uppercase tracking-wider">
+                <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-750 rounded-lg border border-amber-200 text-[10px] font-black uppercase tracking-wider">
                   <Sparkles size={11} className="fill-amber-400 text-amber-550" />
                   <span>Pro Active</span>
                 </div>
@@ -933,10 +933,11 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setIsPaymentModalOpen(true)}
-                  className="flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:brightness-110 transition shadow-sm cursor-pointer"
+                  className="flex items-center gap-1 p-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:brightness-110 transition shadow-sm cursor-pointer sm:px-3 sm:py-1 sm:gap-1.5"
+                  title={`Go Pro (${appConfig.proPrice})`}
                 >
                   <Zap size={11} className="fill-white" />
-                  <span>Go Pro ({appConfig.proPrice})</span>
+                  <span className="hidden sm:inline">Go Pro ({appConfig.proPrice})</span>
                 </button>
               )}
 
@@ -946,7 +947,7 @@ export default function App() {
               </div>
 
               {/* Status avatar icon */}
-              <div className="w-8.5 h-8.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center">
+              <div className="hidden sm:flex w-8.5 h-8.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 items-center justify-center">
                 <GraduationCap size={15} className="stroke-[2.5]" />
               </div>
 
@@ -955,7 +956,7 @@ export default function App() {
                 type="button"
                 onClick={() => setIsDarkMode(!isDarkMode)}
                 title="Toggle Theme"
-                className="p-2 border border-slate-200 text-slate-455 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer flex items-center justify-center font-bold"
+                className="p-1.5 sm:p-2 border border-slate-200 text-slate-455 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer flex items-center justify-center font-bold"
               >
                 {isDarkMode ? <Sun size={14} className="text-amber-500 fill-amber-300 animate-pulse" /> : <Moon size={14} />}
               </button>
@@ -965,7 +966,7 @@ export default function App() {
                 type="button"
                 onClick={handleSignOut}
                 title="Logout Student Profile"
-                className="p-2 border border-slate-200 text-slate-455 hover:text-red-555 hover:border-red-200 rounded-xl transition cursor-pointer"
+                className="p-1.5 sm:p-2 border border-slate-200 text-slate-455 hover:text-red-555 hover:border-red-200 rounded-xl transition cursor-pointer"
               >
                 <LogOut size={14} />
               </button>
