@@ -717,7 +717,7 @@ export default function App() {
   // If logged in as an administrator, route straight to the specialized standalone Admin Panel Core
   if (currentUser && currentUser.role === 'admin') {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col justify-between font-sans">
+      <div className="min-h-screen bg-slate-50 flex flex-col justify-between font-sans overflow-x-hidden w-full max-w-full">
         <header className="sticky top-0 z-20 bg-white border-b border-slate-205 backdrop-blur-md bg-white/95">
           <div className="max-w-full mx-auto px-4 sm:px-8 lg:px-12">
             <div className="flex h-16 items-center justify-between gap-4">
@@ -778,7 +778,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans flex flex-col justify-between">
+    <div className="min-h-screen bg-slate-50 font-sans flex flex-col justify-between overflow-x-hidden w-full max-w-full">
       
       {isPaymentModalOpen && (
         <PaymentModal 

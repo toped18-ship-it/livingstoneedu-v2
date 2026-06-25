@@ -6,6 +6,14 @@
   --font-display: "Space Grotesk", sans-serif;
 }
 
+html, body, #root {
+  max-width: 100%;
+  overflow-x: hidden;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
 @layer utilities {
   .animate-fade-in {
     animation: fadeIn 0.2s ease-out forwards;
