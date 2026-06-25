@@ -1,0 +1,20 @@
+# API routing for PHP backend on Shared Hosting (cPanel / InfinityFree)
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  
+  # Protect the db.json database from direct HTTP access
+  <Files "db.json">
+    <IfModule mod_authz_core.c>
+      Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+      Order Allow,Deny
+      Deny from all
+    </IfModule>
+  </Files>
+
+  # Route all requests that are not physical files/directories under /api/ to index.php
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^(.*)$ index.php [QSA,L]
+</IfModule>

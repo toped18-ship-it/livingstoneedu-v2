@@ -1,0 +1,14 @@
+# Root htaccess for React SPA Deployment on Shared Hosting (cPanel / InfinityFree)
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  
+  # Exclude /api directory from SPA rewrite rules
+  RewriteCond %{REQUEST_URI} ^/api/ [NC]
+  RewriteRule ^ - [L]
+
+  # Route all non-file/non-dir paths to index.html for client-side routing
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . index.html [L]
+</IfModule>
