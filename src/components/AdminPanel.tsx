@@ -3305,7 +3305,7 @@ ${generatedNoteAdmin.homeworkAssignment || ''}
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-extrabold uppercase text-slate-400 text-left block">Number of initial questions</label>
                       <input type="number" value={cbtQCount} onChange={(e) => setCbtQCount(Number(e.target.value))} className="w-full px-3 py-2 border rounded-xl bg-white" required />
@@ -3386,7 +3386,7 @@ ${generatedNoteAdmin.homeworkAssignment || ''}
                           <p className="text-[10px] text-slate-450 font-bold uppercase tracking-wide mt-1">{ex.subject}</p>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2 pt-1 text-[11px] font-bold text-slate-600">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 text-[11px] font-bold text-slate-600">
                           <div>⏱️ Duration: <span className="font-mono text-slate-900">{ex.duration} Mins</span></div>
                           <div>📋 Questions: <span className="font-mono text-indigo-705">{(cbtQuestionsRecord[ex.id] || []).length || ex.questions} MCQs</span></div>
                         </div>
@@ -3646,7 +3646,7 @@ ${generatedNoteAdmin.homeworkAssignment || ''}
                   </div>
 
                   <form onSubmit={handleSaveConfig} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="text-[10px] font-black uppercase text-black block tracking-wider">Subscription Price / Term</label>
                         <input
@@ -3696,7 +3696,7 @@ ${generatedNoteAdmin.homeworkAssignment || ''}
                         🏦 Bank Transfer Settlement Parameters
                       </p>
                       
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1">
                           <label className="text-[10px] font-black uppercase text-black block tracking-wider">Bank Name</label>
                           <input
@@ -3758,7 +3758,7 @@ ${generatedNoteAdmin.homeworkAssignment || ''}
                   </p>
 
                   {/* Payment Modal Preview Box (Neo-Brutalist Invoice Format) */}
-                  <div className="bg-white rounded-2xl border-[4px] border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] overflow-hidden max-w-sm mx-auto flex flex-col">
+                  <div className="bg-white rounded-2xl border-[4px] border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] overflow-hidden w-full max-w-sm mx-auto flex flex-col">
                     <div className="bg-[#2563EB] p-4 text-white text-center border-b-[4px] border-black">
                       <span className="text-[9px] font-black tracking-widest block uppercase text-yellow-300">SECURE EDUCATION CHECKOUT</span>
                       <h5 className="text-sm font-black uppercase mt-1">{brandName || 'SCHOOLPORTAL'} PREMIUM TERM</h5>
@@ -4374,7 +4374,7 @@ ${generatedNoteAdmin.homeworkAssignment || ''}
                       </select>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                       <div>
                         <label className="block text-[10px] font-extrabold uppercase text-slate-400 mb-1">Term Start Date</label>
                         <input 
@@ -4645,7 +4645,7 @@ ${generatedNoteAdmin.homeworkAssignment || ''}
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-[10px] font-extrabold uppercase text-slate-400 mb-1">Target Audience</label>
                         <select className="w-full px-3 py-2 border rounded-xl text-xs font-semibold bg-white outline-none">
@@ -5332,7 +5332,7 @@ ${generatedNoteAdmin.homeworkAssignment || ''}
                             </p>
                           </div>
 
-                          <div className="grid grid-cols-4 gap-2 pt-2.5 border-t border-white/15 text-[9px] font-bold text-slate-300">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2.5 border-t border-white/15 text-[9px] font-bold text-slate-300">
                             <div>
                               <p className="text-slate-400 uppercase text-[7px]">Class</p>
                               <p className="font-extrabold text-white">{generatedNoteAdmin.classLevel || selectedClassAdmin}</p>

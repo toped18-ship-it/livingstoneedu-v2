@@ -16,7 +16,7 @@ import { AdminPanel } from './components/AdminPanel';
 import { SplashLoadingScreen } from './components/SplashLoadingScreen';
 import { PWAInstallBanner } from './components/PWAInstallBanner';
 import { syncUserProfile, syncLessonProgress } from './lib/firebaseSync';
-import { GraduationCap, LogOut, Home, BookOpen, HelpCircle, MessageSquare, ShieldCheck, Heart, Trophy, Award, Zap, Sparkles, Mail } from 'lucide-react';
+import { GraduationCap, LogOut, Home, BookOpen, HelpCircle, MessageSquare, ShieldCheck, Heart, Trophy, Award, Zap, Sparkles, Mail, Sun, Moon } from 'lucide-react';
 import { seedRtdbIfEmpty, rtdbSubscribe, rtdbSet, rtdbGet, NODES } from './lib/rtdbService';
 import { auth } from './lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
@@ -34,6 +34,33 @@ export default function App() {
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [isSimulatedOffline, setIsSimulatedOffline] = useState<boolean>(false);
   const effectiveIsOnline = isOnline && !isSimulatedOffline;
+
+  const [curriculums, setCurriculums] = useState<any[]>(() => {
+    const raw = localStorage.getItem('system_curriculums');
+    return raw ? JSON.parse(raw) : [];
+  });
+  const [cbtExams, setCbtExams] = useState<any[]>(() => {
+    const raw = localStorage.getItem('system_cbt');
+    return raw ? JSON.parse(raw) : [];
+  });
+  const [cbtQuestionsRecord, setCbtQuestionsRecord] = useState<Record<string, any>>(() => {
+    const raw = localStorage.getItem('system_cbt_questions');
+    return raw ? JSON.parse(raw) : {};
+  });
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    return localStorage.getItem('isDarkMode') === 'true';
+  });
+
+  // Toggle HTML dark class
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('isDarkMode', 'true');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('isDarkMode', 'false');
+    }
+  }, [isDarkMode]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -146,6 +173,79 @@ export default function App() {
       unsubBranding();
     };
   }, []);
+
+  // 1b. Real-time subscriptions for curriculum, cbt, questions, and user profile sync
+  useEffect(() => {
+    if (!currentUser) return;
+
+    // 1. Subscribe to Curriculum
+    const unsubCurr = rtdbSubscribe(NODES.CURRICULUM, (data) => {
+      if (data) {
+        const flattenNestedCurriculum = (node: any): any[] => {
+          if (!node || typeof node !== 'object') return [];
+          const values = Object.values(node);
+          if (values.length > 0) {
+            const sample: any = values[0];
+            if (sample && typeof sample === 'object' && (sample.class || sample.topic)) {
+              return values.filter(item => item && typeof item === 'object');
+            }
+          }
+          const list: any[] = [];
+          const traverse = (obj: any) => {
+            if (!obj || typeof obj !== 'object') return;
+            if (obj.topic !== undefined || obj.objectives !== undefined || obj.details !== undefined) {
+              list.push(obj);
+              return;
+            }
+            for (const key in obj) {
+              if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                traverse(obj[key]);
+              }
+            }
+          };
+          traverse(node);
+          return list;
+        };
+
+        const arr = flattenNestedCurriculum(data);
+        setCurriculums(arr);
+        window.localStorage.setItem('system_curriculums', JSON.stringify(arr));
+      }
+    });
+
+    // 2. Subscribe to CBT Exams List
+    const unsubCbt = rtdbSubscribe(NODES.CBT, (data) => {
+      if (data) {
+        const arr = Array.isArray(data) ? data : Object.values(data);
+        setCbtExams(arr);
+        window.localStorage.setItem('system_cbt', JSON.stringify(arr));
+      }
+    });
+
+    // 3. Subscribe to CBT Questions Record
+    const unsubQuestions = rtdbSubscribe('cbt_questions', (data) => {
+      if (data) {
+        setCbtQuestionsRecord(data);
+        window.localStorage.setItem('system_cbt_questions', JSON.stringify(data));
+      }
+    });
+
+    // 4. Subscribe to live user updates to get pro / role / name / class level changes instantly
+    const userId = currentUser.email.replace(/[.@]/g, '_');
+    const unsubUser = rtdbSubscribe(`${NODES.USERS}/${userId}`, (data) => {
+      if (data) {
+        setCurrentUser(data);
+        window.localStorage.setItem('hub_active_user', JSON.stringify(data));
+      }
+    });
+
+    return () => {
+      unsubCurr();
+      unsubCbt();
+      unsubQuestions();
+      unsubUser();
+    };
+  }, [currentUser?.email]);
 
   // 2. Firebase Auth state listener and database seeding
   useEffect(() => {
@@ -526,6 +626,14 @@ export default function App() {
                 </div>
                 <button
                   type="button"
+                  onClick={() => setIsDarkMode(!isDarkMode)}
+                  title="Toggle Theme"
+                  className="p-2 border border-slate-200 text-slate-455 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer flex items-center justify-center font-bold"
+                >
+                  {isDarkMode ? <Sun size={16} className="text-amber-500 fill-amber-300 animate-pulse" /> : <Moon size={16} />}
+                </button>
+                <button
+                  type="button"
                   onClick={handleSignOut}
                   title="Logout Teacher Portal"
                   className="p-2 border border-slate-200 text-slate-455 hover:text-red-655 hover:border-red-200 rounded-xl transition cursor-pointer font-bold"
@@ -595,6 +703,14 @@ export default function App() {
                 <div className="w-8.5 h-8.5 rounded-full bg-slate-50 border border-slate-200 text-base flex items-center justify-center">
                   🛡️
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setIsDarkMode(!isDarkMode)}
+                  title="Toggle Theme"
+                  className="p-2 border border-slate-200 text-slate-455 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer flex items-center justify-center font-bold"
+                >
+                  {isDarkMode ? <Sun size={16} className="text-amber-500 fill-amber-300 animate-pulse" /> : <Moon size={16} />}
+                </button>
                 <button
                   type="button"
                   onClick={handleSignOut}
@@ -799,6 +915,16 @@ export default function App() {
                 <GraduationCap size={15} className="stroke-[2.5]" />
               </div>
 
+              {/* Theme toggle button */}
+              <button
+                type="button"
+                onClick={() => setIsDarkMode(!isDarkMode)}
+                title="Toggle Theme"
+                className="p-2 border border-slate-200 text-slate-455 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer flex items-center justify-center font-bold"
+              >
+                {isDarkMode ? <Sun size={14} className="text-amber-500 fill-amber-300 animate-pulse" /> : <Moon size={14} />}
+              </button>
+
               {/* Sign out key icon */}
               <button
                 type="button"
@@ -815,7 +941,7 @@ export default function App() {
       </header>
 
       {/* Mobile Tab Floating Rail Toolbar */}
-      <div className="md:hidden sticky top-16 z-30 bg-white/95 backdrop-blur-md border-b border-slate-100 p-2 flex gap-1 justify-around shadow-xs">
+      <div className="md:hidden sticky top-16 z-30 bg-white/95 backdrop-blur-md border-b border-slate-100 p-2 flex gap-1 justify-around shadow-xs overflow-x-auto scrollbar-none">
         <button
           type="button"
           onClick={() => setActiveTab('home')}
@@ -938,6 +1064,7 @@ export default function App() {
                 onCustomizeSubjects={() => setIsCustomizingSubjects(true)}
                 selectedSubjectId={selectedSubjectId}
                 setSelectedSubjectId={setSelectedSubjectId}
+                curriculums={curriculums}
               />
             )}
 
@@ -950,6 +1077,9 @@ export default function App() {
                 onPaymentTrigger={() => setIsPaymentModalOpen(true)}
                 demoUsageCount={demoUsageCount}
                 onIncrementDemoUsage={handleIncrementDemoUsage}
+                curriculums={curriculums}
+                cbtExams={cbtExams}
+                cbtQuestionsRecord={cbtQuestionsRecord}
               />
             )}
 

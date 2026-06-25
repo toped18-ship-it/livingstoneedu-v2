@@ -20,6 +20,7 @@ interface LearningHubProps {
   onCustomizeSubjects?: () => void;
   selectedSubjectId?: string;
   setSelectedSubjectId?: (id: string) => void;
+  curriculums?: any[];
 }
 
 export function LearningHub({ 
@@ -32,7 +33,8 @@ export function LearningHub({
   onIncrementDemoUsage,
   onCustomizeSubjects,
   selectedSubjectId: propsSelectedSubjectId,
-  setSelectedSubjectId: propsSetSelectedSubjectId
+  setSelectedSubjectId: propsSetSelectedSubjectId,
+  curriculums = []
 }: LearningHubProps) {
   // Speech synthesis states
   const [currentlySpeaking, setCurrentlySpeaking] = useState<string | null>(null);
@@ -139,11 +141,76 @@ export function LearningHub({
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [aiError, setAiError] = useState('');
 
-  // Retrieve current active lesson content using generator
+  // Retrieve current active lesson content using generator or real-time admin sync
   const lesson: LessonContent = useMemo(() => {
     if (!selectedSubject) return { title: '', objectives: [], body: [], keyPoints: [], quiz: [] };
+
+    // Check if there is an override in real-time curriculums from RTDB
+    const termStr = selectedTerm === 1 ? '1st Term' : selectedTerm === 2 ? '2nd Term' : '3rd Term';
+    const rtItem = (curriculums || []).find((c) => {
+      const matchClass = c.class === user.classLevel;
+      const matchSubject = c.subject?.toLowerCase() === selectedSubject.name?.toLowerCase() || c.subject?.toLowerCase() === selectedSubject.id?.toLowerCase();
+      const matchTerm = c.term === termStr;
+      const matchWeek = Number(c.week) === selectedWeek;
+      return matchClass && matchSubject && matchTerm && matchWeek;
+    });
+
+    if (rtItem) {
+      const title = rtItem.topic || rtItem.title || `Week ${selectedWeek} Topic`;
+      
+      let body: string[] = [];
+      if (Array.isArray(rtItem.body)) {
+        body = rtItem.body;
+      } else if (typeof rtItem.details === 'string') {
+        body = rtItem.details.split('\n\n').map((p: any) => String(p).trim()).filter(Boolean);
+      } else if (typeof rtItem.body === 'string') {
+        body = rtItem.body.split('\n\n').map((p: any) => String(p).trim()).filter(Boolean);
+      } else {
+        body = [rtItem.details || 'No details provided yet.'];
+      }
+
+      let objectives: string[] = [];
+      if (Array.isArray(rtItem.objectives)) {
+        objectives = rtItem.objectives;
+      } else if (typeof rtItem.objectives === 'string') {
+        objectives = rtItem.objectives.split('\n').map((o: any) => String(o).replace(/^[*-]\s*/, '').trim()).filter(Boolean);
+      } else {
+        objectives = [`Understand the core concepts of ${title}`];
+      }
+
+      let keyPoints: string[] = [];
+      if (Array.isArray(rtItem.keyPoints)) {
+        keyPoints = rtItem.keyPoints;
+      } else if (typeof rtItem.keyPoints === 'string') {
+        keyPoints = rtItem.keyPoints.split('\n').map((kp: any) => String(kp).replace(/^[*-]\s*/, '').trim()).filter(Boolean);
+      } else {
+        keyPoints = [
+          `Active learning of ${title}`,
+          `Review definitions, formulas, and examples.`
+        ];
+      }
+
+      let quiz: any[] = [];
+      if (Array.isArray(rtItem.quiz)) {
+        quiz = rtItem.quiz;
+      } else if (rtItem.questions && Array.isArray(rtItem.questions)) {
+        quiz = rtItem.questions;
+      } else {
+        const staticLesson = getLessonContent(user.classLevel, selectedSubject.id, selectedTerm, selectedWeek);
+        quiz = staticLesson?.quiz || [];
+      }
+
+      return {
+        title,
+        objectives,
+        body,
+        keyPoints,
+        quiz
+      };
+    }
+
     return getLessonContent(user.classLevel, selectedSubject.id, selectedTerm, selectedWeek);
-  }, [user.classLevel, selectedSubject, selectedTerm, selectedWeek]);
+  }, [user.classLevel, selectedSubject, selectedTerm, selectedWeek, curriculums]);
 
   // Is this specific combination of (Subject, Term, Week) marked as completed?
   const currentProgress = useMemo(() => {
