@@ -62,11 +62,11 @@ export function PaymentModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in font-sans">
-      <div className="bg-white rounded-3xl overflow-hidden shadow-2xl max-w-md w-full border border-slate-100 flex flex-col transform transition-all animate-scale-in">
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in font-sans overflow-y-auto">
+      <div className="bg-white rounded-3xl overflow-hidden shadow-2xl max-w-md w-full border border-slate-100 flex flex-col max-h-[calc(100dvh-2rem)] sm:max-h-[90vh] transform transition-all animate-scale-in">
         
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-700 to-indigo-800 p-6 text-white text-center relative">
+        <div className="bg-gradient-to-r from-blue-700 to-indigo-800 p-6 text-white text-center relative shrink-0">
           <button 
             onClick={onClose}
             className="absolute top-4 right-4 text-white/80 hover:text-white p-1 hover:bg-white/10 rounded-full transition cursor-pointer"
@@ -81,7 +81,7 @@ export function PaymentModal({
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-5 flex-1">
+        <div className="p-6 space-y-5 flex-1 overflow-y-auto">
           
           {/* Package details */}
           <div className="bg-blue-50/60 rounded-2xl border border-blue-105 p-4 space-y-2">
