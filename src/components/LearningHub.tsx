@@ -21,6 +21,7 @@ interface LearningHubProps {
   selectedSubjectId?: string;
   setSelectedSubjectId?: (id: string) => void;
   curriculums?: any[];
+  proPrice?: string;
 }
 
 export function LearningHub({ 
@@ -34,7 +35,8 @@ export function LearningHub({
   onCustomizeSubjects,
   selectedSubjectId: propsSelectedSubjectId,
   setSelectedSubjectId: propsSetSelectedSubjectId,
-  curriculums = []
+  curriculums = [],
+  proPrice = '₦5,000'
 }: LearningHubProps) {
   // Speech synthesis states
   const [currentlySpeaking, setCurrentlySpeaking] = useState<string | null>(null);
@@ -686,7 +688,7 @@ export function LearningHub({
                       onClick={onPaymentTrigger}
                       className="px-8 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:brightness-110 text-white font-black text-xs sm:text-sm rounded-xl shadow-md cursor-pointer transition active:scale-97"
                     >
-                      Subscribe to Pro (₦5,000 / term)
+                      Subscribe to Pro ({proPrice} / term)
                     </button>
                     <a
                       href="https://wa.me/message/AJ4NILOGBTTMJ1"

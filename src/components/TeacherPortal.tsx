@@ -14,6 +14,7 @@ interface TeacherPortalProps {
   onNavigateToHome: () => void;
   isPro: boolean;
   onPaymentTrigger: () => void;
+  proPrice?: string;
 }
 
 // Initial Nigerian mock names for instant classroom bootstrapping
@@ -24,7 +25,7 @@ const DEMO_STUDENT_NAMES = [
   { name: 'Ngozi Adebayo', email: 'ngozi.adebayo@school.ng' }
 ];
 
-export function TeacherPortal({ user, onNavigateToHome, isPro, onPaymentTrigger }: TeacherPortalProps) {
+export function TeacherPortal({ user, onNavigateToHome, isPro, onPaymentTrigger, proPrice = '₦5,000' }: TeacherPortalProps) {
   const [activeSubTab, setActiveSubTab] = useState<'roster' | 'attendance' | 'exam-maker' | 'grader' | 'reports' | 'lesson-notes' | 'curriculum-generator'>('roster');
   
   // Roster Class Level State
@@ -796,7 +797,7 @@ ${generatedNote.homeworkAssignment || ''}
               className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1 shadow-md shadow-amber-500/10 cursor-pointer text-center"
             >
               <Sparkles size={11} className="shrink-0" />
-              <span>Upgrade to Pro (₦5,000)</span>
+              <span>Upgrade to Pro ({proPrice})</span>
             </button>
           )}
         </div>

@@ -209,7 +209,7 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
   // Interactive configurations
   const [brandName, setBrandName] = useState(currentConfig.brandName || 'LIVINGSTONEEDU');
   const [appSubtitle, setAppSubtitle] = useState(currentConfig.appSubtitle || 'Learning Portal');
-  const [proPrice, setProPrice] = useState('₦10,000');
+  const [proPrice, setProPrice] = useState(currentConfig.proPrice || '₦5,000');
   const [supportGroupUrl, setSupportGroupUrl] = useState(currentConfig.supportGroupUrl || 'https://wa.me/message/AJ4NILOGBTTMJ1');
   const [contactName, setContactName] = useState(currentConfig.contactName || 'Livingtch Brand Agency');
   const [paystackLink, setPaystackLink] = useState((currentConfig as any).paystackLink || 'https://paystack.com/pay/livingstone-pro-access');
@@ -219,6 +219,19 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
   const [bankAccountName, setBankAccountName] = useState('temitope oluwaseun fatoye');
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState('');
+
+  // Sync state values with currentConfig changes in real-time
+  useEffect(() => {
+    if (currentConfig) {
+      if (currentConfig.brandName) setBrandName(currentConfig.brandName);
+      if (currentConfig.appSubtitle) setAppSubtitle(currentConfig.appSubtitle);
+      if (currentConfig.proPrice) setProPrice(currentConfig.proPrice);
+      if (currentConfig.supportGroupUrl) setSupportGroupUrl(currentConfig.supportGroupUrl);
+      if (currentConfig.contactName) setContactName(currentConfig.contactName);
+      if ((currentConfig as any).paystackLink) setPaystackLink((currentConfig as any).paystackLink);
+      if ((currentConfig as any).flutterwaveLink) setFlutterwaveLink((currentConfig as any).flutterwaveLink);
+    }
+  }, [currentConfig]);
 
   // Toasts Feedback
   const [toastMessage, setToastMessage] = useState<string>('');

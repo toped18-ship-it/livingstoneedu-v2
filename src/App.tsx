@@ -25,7 +25,16 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isSplashLoading, setIsSplashLoading] = useState(true);
   const [progressList, setProgressList] = useState<LessonProgress[]>([]);
-  const [activeTab, setActiveTab] = useState<'home' | 'hub' | 'quizzes' | 'progress' | 'faq' | 'contact' | 'admin'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'hub' | 'quizzes' | 'progress' | 'faq' | 'contact' | 'admin'>(() => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname.replace(/^\//, '').replace(/\/$/, '');
+      const validTabs = ['home', 'hub', 'quizzes', 'progress', 'faq', 'contact', 'admin'];
+      if (validTabs.includes(path)) {
+        return path as any;
+      }
+    }
+    return 'home';
+  });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isCustomizingSubjects, setIsCustomizingSubjects] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -61,6 +70,31 @@ export default function App() {
       localStorage.setItem('isDarkMode', 'false');
     }
   }, [isDarkMode]);
+
+  // Synchronize activeTab with URL pathname
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const targetPath = `/${activeTab}`;
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState(null, '', targetPath);
+    }
+  }, [activeTab]);
+
+  // Listen for browser navigation (back/forward button)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handlePopState = () => {
+      const path = window.location.pathname.replace(/^\//, '').replace(/\/$/, '');
+      const validTabs = ['home', 'hub', 'quizzes', 'progress', 'faq', 'contact', 'admin'];
+      if (validTabs.includes(path)) {
+        setActiveTab(path as any);
+      } else if (path === '') {
+        setActiveTab('home');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -651,6 +685,7 @@ export default function App() {
             onNavigateToHome={handleSignOut}
             isPro={!!currentUser.isPro}
             onPaymentTrigger={() => setIsPaymentModalOpen(true)}
+            proPrice={appConfig.proPrice}
           />
         </main>
 
@@ -1065,6 +1100,7 @@ export default function App() {
                 selectedSubjectId={selectedSubjectId}
                 setSelectedSubjectId={setSelectedSubjectId}
                 curriculums={curriculums}
+                proPrice={appConfig.proPrice}
               />
             )}
 
@@ -1080,6 +1116,7 @@ export default function App() {
                 curriculums={curriculums}
                 cbtExams={cbtExams}
                 cbtQuestionsRecord={cbtQuestionsRecord}
+                proPrice={appConfig.proPrice}
               />
             )}
 

@@ -20,6 +20,7 @@ interface InteractiveQuizzesProps {
   curriculums?: any[];
   cbtExams?: any[];
   cbtQuestionsRecord?: Record<string, any>;
+  proPrice?: string;
 }
 
 export function InteractiveQuizzes({ 
@@ -32,7 +33,8 @@ export function InteractiveQuizzes({
   onIncrementDemoUsage,
   curriculums = [],
   cbtExams = [],
-  cbtQuestionsRecord = {}
+  cbtQuestionsRecord = {},
+  proPrice = '₦5,000'
 }: InteractiveQuizzesProps) {
   // Local Toast notifications
   const [toastMessage, setToastMessage] = useState('');
@@ -52,6 +54,7 @@ export function InteractiveQuizzes({
   const [cbtQuestions, setCbtQuestions] = useState<any[]>([]);
   const [cbtTimeRemaining, setCbtTimeRemaining] = useState<number>(0);
   const [cbtTabSwitches, setCbtTabSwitches] = useState<number>(0);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   // CBT Countdown Timer and Anti-Cheating tab blur detection
   useEffect(() => {
@@ -189,7 +192,6 @@ export function InteractiveQuizzes({
   const [selectedWeek, setSelectedWeek] = useState<WeekNumber>(1);
 
   // Quiz Play States
-  const [isPlaying, setIsPlaying] = useState(false);
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [hasAnswered, setHasAnswered] = useState(false);
@@ -589,7 +591,7 @@ export function InteractiveQuizzes({
                       onClick={onPaymentTrigger}
                       className="px-8 py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:brightness-110 text-white font-black text-xs sm:text-sm rounded-xl shadow-md cursor-pointer transition active:scale-97 animate-pulse"
                     >
-                      Subscribe to Pro (₦5,000 / term)
+                      Subscribe to Pro ({proPrice} / term)
                     </button>
                     <a
                       href="https://wa.me/message/AJ4NILOGBTTMJ1"
