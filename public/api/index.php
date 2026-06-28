@@ -1,7 +1,7 @@
 <?php
 /**
  * LIVINGSTONEEDU Shared Hosting API Gateway Controller (PHP)
- * Designed for deployment on cPanel, InfinityFree, and any standard PHP hosting environments.
+ * Designed for deployment on cPanel, FeclesHost, and any standard PHP hosting environments.
  * Implements equivalent features of the Express.js server: config management, inquiries, logs,
  * Gmail notification helpers, and Google Gemini API integration.
  */

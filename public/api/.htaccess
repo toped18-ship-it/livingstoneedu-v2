@@ -1,4 +1,4 @@
-# API routing for PHP backend on Shared Hosting (cPanel / InfinityFree)
+# API routing for PHP backend on Shared Hosting (cPanel / FeclesHost)
 <IfModule mod_rewrite.c>
   RewriteEngine On
   
