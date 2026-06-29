@@ -1,4 +1,4 @@
-name: Deploy to InfinityFree
+name: Deploy to LivingTech
 
 on:
   push:
@@ -28,8 +28,9 @@ jobs:
       - name: Sync Files via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
-          server: ftpupload.net
+          server: ${{ secrets.FTP_SERVER || 'ftp.livingtech.name.ng' }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./dist/
-          server-dir: /livingstoneedu.great-site.net/htdocs/
+          server-dir: ${{ secrets.FTP_SERVER_DIR || 'public_html/' }}
+
