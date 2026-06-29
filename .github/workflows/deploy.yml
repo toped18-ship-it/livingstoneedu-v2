@@ -1,4 +1,4 @@
-name: Deploy to InfinityFree
+name: Deploy to fecleshost.com.ng
 
 on:
   push:
