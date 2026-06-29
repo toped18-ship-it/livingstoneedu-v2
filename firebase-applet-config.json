@@ -3,8 +3,8 @@
   "appId": "1:609898867985:web:6974d45a1b7669ef6430b0",
   "apiKey": "AIzaSyDqIITag-j4mPPGPYgawx927RTwLSfjmdU",
   "authDomain": "livingstoneedu-17aad.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-nigerianschoolle-d512183a-a5c5-45e2-918d-b11ec09ffac3",
   "storageBucket": "livingstoneedu-17aad.firebasestorage.app",
   "messagingSenderId": "609898867985",
-  "measurementId": "",
-  "databaseURL": "https://livingstoneedu-17aad-default-rtdb.firebaseio.com"
+  "measurementId": ""
 }

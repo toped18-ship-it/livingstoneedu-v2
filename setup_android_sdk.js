@@ -61,9 +61,9 @@ yesProcess.on("close", (code) => {
   console.log(`License agreement process closed with code ${code}`);
   
   // 5. Install SDK Platforms, Build-Tools, Platform-Tools
-  console.log("Installing platforms;android-36, build-tools;34.0.0, and platform-tools...");
+  console.log("Installing platforms;android-35, build-tools;35.0.0, and platform-tools...");
   try {
-    execSync(`${sdkmanagerPath} --sdk_root=${sdkDir} \"platforms;android-36\" \"build-tools;34.0.0\" \"platform-tools\"`, { stdio: "inherit" });
+    execSync(`${sdkmanagerPath} --sdk_root=${sdkDir} "platforms;android-35" "build-tools;35.0.0" "platform-tools"`, { stdio: "inherit" });
     console.log("SDK installation complete inside persistent workspace!");
   } catch (err) {
     console.error("Error during SDK packages installation:", err);

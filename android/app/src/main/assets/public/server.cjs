@@ -346,7 +346,7 @@ Livingstone Educational Academy Team`;
     const db = getDB();
     res.json(db.config);
   });
-  app.post("/api/admin/config", (req, res) => {
+  app.post("/api/admin/config", async (req, res) => {
     const {
       brandName,
       appSubtitle,
@@ -389,6 +389,15 @@ Livingstone Educational Academy Team`;
       bankAccountName: bankAccountName !== void 0 ? bankAccountName : db.config.bankAccountName || "LIVINGSTONEEDU PREMIUM PORTAL"
     };
     saveDB(db);
+    if (firebaseAdminApp) {
+      try {
+        const dbRef = (0, import_database.getDatabase)(firebaseAdminApp).ref("school_settings");
+        await dbRef.set(db.config);
+        console.log("[RTDB Config Sync] Successfully synchronized school settings with Firebase Realtime Database.");
+      } catch (rtdbErr) {
+        console.error("[RTDB Config Sync Error] Failed to synchronize settings:", rtdbErr.message || rtdbErr);
+      }
+    }
     res.json({ success: true, config: db.config });
   });
   app.get("/api/admin/activities", (req, res) => {

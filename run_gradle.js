@@ -24,7 +24,7 @@ try {
     cwd: "./android",
     env: { 
       ...process.env, 
-      JAVA_HOME: "/usr/lib/jvm/java-21-openjdk-amd64",
+      JAVA_HOME: "/tmp/jdk21",
       ANDROID_HOME: "/app/applet/android-sdk"
     },
     detached: true,

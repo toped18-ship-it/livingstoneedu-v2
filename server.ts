@@ -176,6 +176,17 @@ async function startServer() {
         firebaseAdminApp = getAdminApp();
       }
       console.log(`[Firebase Admin Successfully Instantiated via modular SDK] Client email: ${serviceAccount.client_email} and databaseURL: ${dbUrl}`);
+
+      // Asynchronously verify credential viability to gracefully fall back to standalone mode if revoked
+      firebaseAdminApp.options.credential.getAccessToken()
+        .then(() => {
+          console.log("[Firebase Admin] Service Account credentials successfully verified with Google OAuth endpoint.");
+        })
+        .catch((authErr: any) => {
+          console.warn("[Firebase Admin Warning] Service account credentials could not be verified (likely key is revoked or stale):", authErr.message || authErr);
+          console.warn("[Firebase Admin] Reverting backend to standalone/simulated database mode to guarantee stability.");
+          firebaseAdminApp = null;
+        });
     } else {
       console.warn("[Firebase Admin] No service account key found at firebase-service-account.json. Standalone database mode is active.");
     }

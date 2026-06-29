@@ -8,7 +8,7 @@ fs.writeSync(out, "=== APK Build Started at " + new Date().toISOString() + " ===
 
 try {
   const child = spawn("npx", ["cap", "build", "android", "--androidreleasetype", "APK"], {
-    env: { ...process.env, JAVA_HOME: "/usr/lib/jvm/java-17-openjdk-amd64" },
+    env: { ...process.env, JAVA_HOME: "/tmp/jdk21" },
     detached: true,
     stdio: ["ignore", out, out]
   });

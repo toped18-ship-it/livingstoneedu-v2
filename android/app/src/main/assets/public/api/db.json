@@ -1,0 +1,77 @@
+{
+  "config": {
+    "brandName": "LIVINGSTONEEDU",
+    "appSubtitle": "Learning Portal",
+    "proPrice": "₦5,000",
+    "supportGroupUrl": "https://wa.me/message/AJ4NILOGBTTMJ1",
+    "contactName": "Livingtch Brand Agency",
+    "logoIcon": "GraduationCap",
+    "logoColor": "blue",
+    "logoText": "LIVINGSTONE",
+    "activeGateway": "Paystack",
+    "isPaymentLive": false,
+    "paystackPublicKey": "pk_test_paystack_a1b2c3d4e5f6",
+    "flutterwavePublicKey": "FLWPUBK_TEST-a1b2c3d4e5",
+    "stripePublicKey": "pk_test_stripe_12345",
+    "paystackLink": "https://paystack.com/pay/livingstone-pro-access",
+    "flutterwaveLink": "https://flutterwave.com/pay/sxagj005oznw"
+  },
+  "activities": [
+    {
+      "id": "act_signup_1781170655776_682",
+      "userName": "Temitope Oluwaseun Daniels",
+      "userEmail": "destinywayinternationalgroupof@gmail.com",
+      "activityType": "Registration",
+      "subject": "Academic Portal",
+      "detail": "Teacher registration completed. Email: destinywayinternationalgroupof@gmail.com.",
+      "timestamp": "2026-06-11T09:37:35.776Z"
+    },
+    {
+      "id": "act_1780918609052_609",
+      "userName": "Aminat Bello",
+      "userEmail": "aminat@gmail.com",
+      "activityType": "Submit Inquiry",
+      "subject": "Curriculum Question",
+      "detail": "Submitted academic inquiry on theme: \"Curriculum Question\"",
+      "timestamp": "2026-06-08T11:36:49.052Z"
+    },
+    {
+      "id": "act_1",
+      "userName": "Mrs. Funke Alao",
+      "userEmail": "funke@livingstone.ng",
+      "activityType": "Login",
+      "subject": "General",
+      "detail": "Teacher Funke Alao logged in to primary dashboard",
+      "timestamp": "2026-06-08T10:10:13.860Z"
+    },
+    {
+      "id": "act_2",
+      "userName": "Mrs. Funke Alao",
+      "userEmail": "funke@livingstone.ng",
+      "activityType": "Lesson Open",
+      "subject": "Mathematics",
+      "detail": "Viewed lesson Week 1 Mathematics: Whole Numbers",
+      "timestamp": "2026-06-08T10:10:13.860Z"
+    }
+  ],
+  "inquiries": [
+    {
+      "id": "inq_1780918609049",
+      "name": "Aminat Bello",
+      "email": "aminat@gmail.com",
+      "subject": "Curriculum Question",
+      "message": "Help with my home work",
+      "timestamp": "2026-06-08T11:36:49.049Z",
+      "replyStatus": "Replied"
+    },
+    {
+      "id": "inq_1592",
+      "name": "Olumide Benson",
+      "email": "benson@gmail.com",
+      "subject": "JSS 2 Syllabus Question",
+      "message": "Hello, please can we print out the complete worksheets for offline classes in Ibadan?",
+      "timestamp": "2026-06-08T10:10:13.860Z",
+      "replyStatus": "Pending"
+    }
+  ]
+}
