@@ -14,7 +14,6 @@ import { ClassSelector } from './components/ClassSelector';
 import { TeacherPortal } from './components/TeacherPortal';
 import { PaymentModal } from './components/PaymentModal';
 import { AdminPanel } from './components/AdminPanel';
-import { GoogleClassroomHub } from './components/GoogleClassroomHub';
 import { SplashLoadingScreen } from './components/SplashLoadingScreen';
 import { PWAInstallBanner } from './components/PWAInstallBanner';
 import { syncUserProfile, syncLessonProgress } from './lib/firebaseSync';
@@ -27,10 +26,10 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isSplashLoading, setIsSplashLoading] = useState(true);
   const [progressList, setProgressList] = useState<LessonProgress[]>([]);
-  const [activeTab, setActiveTab] = useState<'home' | 'hub' | 'quizzes' | 'progress' | 'classroom' | 'faq' | 'contact' | 'admin'>(() => {
+  const [activeTab, setActiveTab] = useState<'home' | 'hub' | 'quizzes' | 'progress' | 'faq' | 'contact' | 'admin'>(() => {
     if (typeof window !== 'undefined') {
       const path = window.location.pathname.replace(/^\//, '').replace(/\/$/, '');
-      const validTabs = ['home', 'hub', 'quizzes', 'progress', 'classroom', 'faq', 'contact', 'admin'];
+      const validTabs = ['home', 'hub', 'quizzes', 'progress', 'faq', 'contact', 'admin'];
       if (validTabs.includes(path)) {
         return path as any;
       }
@@ -61,11 +60,6 @@ export default function App() {
         return {
           title: "Academic Performance Progress | LIVINGSTONEEDU",
           description: "View your termly certificate badges, streak achievements, and completed curriculum analytics."
-        };
-      case 'classroom':
-        return {
-          title: "Google Classroom Integrator Hub | LIVINGSTONEEDU",
-          description: "Import coursework profiles, sync roster enrollment databases, and update automated score gradebooks."
         };
       case 'faq':
         return {
@@ -1083,18 +1077,6 @@ export default function App() {
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab('classroom')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                  activeTab === 'classroom' 
-                    ? 'bg-white text-blue-700 shadow-sm border border-slate-200/50' 
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <GraduationCap size={13} className={activeTab === 'classroom' ? 'text-emerald-600 fill-emerald-300' : ''} />
-                <span>Google Classroom</span>
-              </button>
-              <button
-                type="button"
                 onClick={() => setActiveTab('faq')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                   activeTab === 'faq' 
@@ -1278,16 +1260,6 @@ export default function App() {
         </button>
         <button
           type="button"
-          onClick={() => setActiveTab('classroom')}
-          className={`flex flex-col items-center py-1.5 px-1 rounded-lg text-[10px] font-bold tracking-tight transition duration-200 cursor-pointer ${
-            activeTab === 'classroom' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600'
-          }`}
-        >
-          <GraduationCap size={14} className={`stroke-[2.5] ${activeTab === 'classroom' ? 'text-emerald-600 fill-emerald-300' : ''}`} />
-          <span>Classroom</span>
-        </button>
-        <button
-          type="button"
           onClick={() => setActiveTab('faq')}
           className={`flex flex-col items-center py-1.5 px-1 rounded-lg text-[10px] font-bold tracking-tight transition duration-200 cursor-pointer ${
             activeTab === 'faq' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600'
@@ -1398,13 +1370,6 @@ export default function App() {
                 />
               )}
             </div>
-
-            {activeTab === 'classroom' && currentUser && (
-              <GoogleClassroomHub 
-                user={currentUser} 
-                curriculums={curriculums} 
-              />
-            )}
 
             {activeTab === 'faq' && (
               <FaqSection />

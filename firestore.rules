@@ -55,9 +55,10 @@ service cloud.firestore {
              data.avatarSeed is string && data.avatarSeed.size() <= 128 &&
              data.joinDate is string &&
              (data.role == 'student' || data.role == 'teacher' || data.role == 'admin') &&
-             (!data.keys().hasAll(['classLevel']) || data.classLevel is string) &&
-             (!data.keys().hasAll(['schoolName']) || data.schoolName is string) &&
-             (!data.keys().hasAll(['isPro']) || data.isPro is bool);
+             (!data.keys().hasAll(['classLevel']) || data.classLevel is string || data.classLevel == null) &&
+             (!data.keys().hasAll(['schoolName']) || data.schoolName is string || data.schoolName == null) &&
+             (!data.keys().hasAll(['selectedSubjectIds']) || data.selectedSubjectIds is list || data.selectedSubjectIds == null) &&
+             (!data.keys().hasAll(['isPro']) || data.isPro is bool || data.isPro == null);
     }
 
     function isValidLessonProgress(data) {
@@ -67,7 +68,7 @@ service cloud.firestore {
              data.termNum is number && data.termNum >= 1 && data.termNum <= 3 &&
              data.weekNum is number && data.weekNum >= 1 && data.weekNum <= 12 &&
              data.completed is bool &&
-             (!data.keys().hasAll(['score']) || data.score is number) &&
+             (!data.keys().hasAll(['score']) || data.score is number || data.score == null) &&
              data.lastAccessed is string;
     }
 

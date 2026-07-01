@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { rtdbSubscribe, rtdbSet, rtdbGet, NODES, seedRtdbIfEmpty } from '../lib/rtdbService';
 import { GmailHub } from './GmailHub';
-import { GoogleClassroomHub } from './GoogleClassroomHub';
 import { 
   getSubjectsForClass, 
   getWeeklyTopicTitle, 
@@ -192,7 +191,7 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
   }, [currentUser]);
 
   // Main UI Tab Router
-  const [activeAdminTab, setActiveAdminTab] = useState<'dashboard' | 'users' | 'curriculum' | 'cbt' | 'payments' | 'results' | 'branding' | 'inquiries' | 'activities' | 'gmail' | 'session' | 'attendance' | 'comms' | 'fees' | 'settings' | 'moderation' | 'db' | 'ai-notes' | 'classroom'>('payments');
+  const [activeAdminTab, setActiveAdminTab] = useState<'dashboard' | 'users' | 'curriculum' | 'cbt' | 'payments' | 'results' | 'branding' | 'inquiries' | 'activities' | 'gmail' | 'session' | 'attendance' | 'comms' | 'fees' | 'settings' | 'moderation' | 'db' | 'ai-notes'>('payments');
 
   // AI Note Generator states
   const [selectedClassAdmin, setSelectedClassAdmin] = useState<string>('SS 1');
@@ -1968,24 +1967,6 @@ ${generatedNoteAdmin.homeworkAssignment || ''}
               </span>
               <span className="text-[9px] font-bold px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded-md">
                 AI
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveAdminTab('classroom')}
-              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
-                activeAdminTab === 'classroom'
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
-                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <BookOpen size={13} className="stroke-[2.5]" />
-                <span>Google Classroom Hub</span>
-              </span>
-              <span className="text-[9px] font-bold px-1.5 py-0.5 bg-green-100 text-green-750 rounded-md">
-                LMS
               </span>
             </button>
           </div>
@@ -5572,16 +5553,6 @@ ${generatedNoteAdmin.homeworkAssignment || ''}
 
               </div>
 
-            </div>
-          )}
-
-          {activeAdminTab === 'classroom' && (
-            <div className="space-y-6 animate-fade-in text-slate-800 font-sans">
-              <div className="border-b pb-3">
-                <h3 className="font-extrabold text-lg text-slate-900">Google Classroom Integration Hub</h3>
-                <p className="text-xs text-slate-500">Sync rosters, push curriculum milestones, and manage Google Classroom materials seamlessly.</p>
-              </div>
-              <GoogleClassroomHub user={currentUser} curriculums={curriculums} />
             </div>
           )}
 
