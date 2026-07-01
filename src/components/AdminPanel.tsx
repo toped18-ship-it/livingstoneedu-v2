@@ -47,7 +47,8 @@ import {
   Eye,
   Database,
   BrainCircuit,
-  Loader2
+  Loader2,
+  Sparkles
 } from 'lucide-react';
 
 interface InquiryItem {
@@ -878,6 +879,39 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
       if (result.success) {
         setGeneratedNoteAdmin(result.lessonNote);
         setLessonSubTabAdmin('blueprint');
+
+        // Automatically publish/save to the database so that both student and teacher portals update immediately
+        const cleanClass = selectedClassAdmin.trim().replace(/[.#$[\]/]/g, '_');
+        const cleanSubj = selectedSubjectAdmin.trim().replace(/[.#$[\]/]/g, '_');
+        const termNum = selectedTermAdmin === '1st Term' ? 1 : selectedTermAdmin === '2nd Term' ? 2 : 3;
+        const weekNum = selectedWeekAdmin;
+        const keyId = `curr_${cleanClass}_${cleanSubj}_t${termNum}_W${weekNum}`.replace(/\s+/g, '_');
+
+        const curriculumItem = {
+          id: keyId,
+          class: selectedClassAdmin,
+          subject: selectedSubjectAdmin,
+          term: selectedTermAdmin,
+          week: selectedWeekAdmin,
+          topic: result.lessonNote.topic || result.lessonNote.title || `Week ${selectedWeekAdmin} Topic`,
+          objectives: result.lessonNote.objectives || [],
+          keyVocabulary: result.lessonNote.keyVocabulary || [],
+          teachingMaterials: result.lessonNote.teachingMaterials || [],
+          introduction: result.lessonNote.introduction || '',
+          teacherExplanationSteps: result.lessonNote.teacherExplanationSteps || [],
+          detailedLessonNote: result.lessonNote.detailedLessonNote || '',
+          studentActivities: result.lessonNote.studentActivities || [],
+          classExercises: result.lessonNote.classExercises || [],
+          homeworkAssignment: result.lessonNote.homeworkAssignment || '',
+          quiz: result.lessonNote.quizQuestions || [],
+          theoryQuestions: result.lessonNote.theoryQuestions || [],
+          subjectSpecificFocus: result.lessonNote.subjectSpecificFocus || null,
+          details: result.lessonNote.detailedLessonNote || (result.lessonNote.objectives || []).join('\n'),
+          status: 'Published'
+        };
+
+        await rtdbSet(`${NODES.CURRICULUM}/${keyId}`, curriculumItem);
+        showToast(`Success! Explain with LIVINGTECH AI has successfully updated lesson notes for ${selectedClassAdmin}, ${selectedSubjectAdmin}, Week ${selectedWeekAdmin}`, 'success');
         
         // Log updated academic activity on backend
         await adminFetch('/api/admin/log-activity', {
@@ -888,7 +922,7 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
             userEmail: currentUser?.email || "admin@livingstone.edu",
             activityType: 'Admin AI Lesson Note',
             subject: selectedSubjectAdmin,
-            detail: `Admin synthesized NERDC Lesson Note for ${selectedClassAdmin}, Week ${selectedWeekAdmin} (${selectedTermAdmin})`
+            detail: `Admin synthesized and published NERDC Lesson Note for ${selectedClassAdmin}, Week ${selectedWeekAdmin} (${selectedTermAdmin})`
           })
         });
       } else {
@@ -5190,17 +5224,17 @@ ${generatedNoteAdmin.homeworkAssignment || ''}
                       type="button"
                       onClick={handleGenerateLessonNoteAdmin}
                       disabled={isGeneratingNoteAdmin}
-                      className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-705 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition"
+                      className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-705 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition shadow-md shadow-indigo-600/15"
                     >
                       {isGeneratingNoteAdmin ? (
                         <>
                           <Loader2 size={13} className="animate-spin text-white" />
-                          <span>Generating Lesson Guides...</span>
+                          <span>Explaining with LIVINGTECH AI...</span>
                         </>
                       ) : (
                         <>
-                          <BrainCircuit size={13} />
-                          <span>Compile Lesson Plan Guide</span>
+                          <Sparkles size={13} className="text-amber-300 animate-pulse fill-amber-300" />
+                          <span>Explain with LIVINGTECH AI</span>
                         </>
                       )}
                     </button>
