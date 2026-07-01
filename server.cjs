@@ -491,7 +491,7 @@ Make sure the questions:
 4. "correctIndex" is a zero-indexed integer referencing the correct option index (e.g. 0 for A, 1 for B, 2 for C, 3 for D).
 5. All elements are formatted in plain, valid JSON without Markdown blocks.`;
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -585,7 +585,7 @@ Format the output as a clean, plain JSON object with the following schema:
   "aiWeaknesses": array of strings (areas of curriculum they need to read about)
 }`;
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -696,7 +696,7 @@ Strictly use Nigerian context and terminology (such as using local examples, nam
         required: ["weeks"]
       };
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         contents: [systemPrompt, userPrompt],
         config: {
           responseMimeType: "application/json",
@@ -912,7 +912,7 @@ Include a quiz with exactly 5 multiple choice questions and 3 detailed theory qu
         };
       }
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         contents: [systemPrompt, userPrompt],
         config: {
           responseMimeType: "application/json",
