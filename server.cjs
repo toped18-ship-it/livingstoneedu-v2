@@ -491,7 +491,7 @@ Make sure the questions:
 4. "correctIndex" is a zero-indexed integer referencing the correct option index (e.g. 0 for A, 1 for B, 2 for C, 3 for D).
 5. All elements are formatted in plain, valid JSON without Markdown blocks.`;
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.5-flash",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -545,7 +545,7 @@ Make sure the questions:
           ],
           correctIndex: i * 2 % 4,
           // Pseudo random but repeatable correct index
-          explanation: `This is an automatic fallback explanation for ${subject} ${classLevel} because the external AI key was not declared or responded with a timeout. The correct standard option is verified.`
+          explanation: `This is an automatic fallback explanation for ${subject} ${classLevel} because the external AI key was not declared or responded with a timeout. The correct standard option aligns with NERDC standards.`
         });
       }
       res.json({ success: true, questions: fallbackQuestions, isFallback: true });
@@ -585,7 +585,7 @@ Format the output as a clean, plain JSON object with the following schema:
   "aiWeaknesses": array of strings (areas of curriculum they need to read about)
 }`;
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.5-flash",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -658,7 +658,7 @@ Format the output as a clean, plain JSON object with the following schema:
       }
       const systemPrompt = `You are an expert curriculum design specialist, Nigerian NERDC educational consultant, and syllabus director.
 Your job is to generate a comprehensive, highly structured 12-week Academic Curriculum for the specified Student Class, Subject, and Term.
-The curriculum must align strictly with the official Nigerian NERDC (National Educational Research and Development Council) syllabus guidelines, including appropriate difficulty levels for the target age group, culturally relevant context, and term-appropriate pedagogical goals.
+The curriculum must align strictly with the official Nigerian NERDC (National Educational Research and Development Council) syllabus guidelines, including appropriate difficulty levels for the target class level.
 
 For the requested Class, Subject, and Term, you MUST generate exactly 12 weeks of curriculum content.
 Each week MUST contain:
@@ -668,7 +668,7 @@ Each week MUST contain:
 4. keywords: An array of 3 to 5 vital academic keywords or terms central to that week's topic.
 
 Strictly use Nigerian context and terminology (such as using local examples, naming conventions, and educational terms). Output the result as a raw JSON object matching the requested schema.`;
-      const userPrompt = `Generate a full 12-week educational curriculum for Class of Students: "${classLevel}", Subject Matter: "${subject}", Academic Term: "${term}". Ensure extremely professional, high-fidelity alignment with standard Nigerian educational requirements.`;
+      const userPrompt = `Generate a full 12-week educational curriculum for Class of Students: "${classLevel}", Subject Matter: "${subject}", Academic Term: "${term}". Ensure extremely professional alignment to current NERDC standards.`;
       const responseSchema = {
         type: import_genai.Type.OBJECT,
         properties: {
@@ -696,7 +696,7 @@ Strictly use Nigerian context and terminology (such as using local examples, nam
         required: ["weeks"]
       };
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.5-flash",
         contents: [systemPrompt, userPrompt],
         config: {
           responseMimeType: "application/json",
@@ -732,7 +732,7 @@ Strictly use Nigerian context and terminology (such as using local examples, nam
         throw new Error("GEMINI_API_KEY is not configured");
       }
       let systemPrompt = `You are an expert curriculum planner, NERDC educational planner, lesson-note writer, and academic supervisor in Nigeria.
-Your job is to generate COMPLETE, UPDATED, DETAILED, and PROFESSIONALLY STRUCTURED lesson notes conforming strictly to the latest Nigerian NERDC curriculum guidelines, WAEC/NECO standards, and BECE criteria.
+Your job is to generate COMPLETE, UPDATED, DETAILED, and PROFESSIONALLY STRUCTURED lesson notes conforming strictly to the latest Nigerian NERDC curriculum guidelines, WAEC/NECO standards, and BECE expectations.
 
 CRITICAL M&E COMPLIANCE REQUIREMENT:
 - DO NOT generate generic educational content.
@@ -749,7 +749,7 @@ Context parameters:
 
 Instructions on Quality and Tone:
 1. Every section must be fully written out. Do NOT use brief placeholders (e.g. "etc.", "Introduce topic..."). Give detailed, printable lesson notes.
-2. Ensure rigorous national educational context: Use Nigerian local names (Amina, Chidi, Tunde, Musa, Ngozi), Nigerian cities/markets (Kano, Lagos, Onitsha, Mile 12, Balogun), Nigerian currency (Naira and Kobo), and local examples (cassava farming, palm oil production, local manufacturing, NEPA/DisCo grids).
+2. Ensure rigorous national educational context: Use Nigerian local names (Amina, Chidi, Tunde, Musa, Ngozi), Nigerian cities/markets (Kano, Lagos, Onitsha, Mile 12, Balogun), Nigerian currency (Naira), and West African references.
 3. Align to specific fields depending on the subject type:
    - English: Comprehension text, grammar terms, sentence structures.
    - Mathematics: Logical step-by-step mathematical calculations, equations, and alternative solving tricks.
@@ -760,7 +760,7 @@ Instructions on Quality and Tone:
       let responseSchema = {};
       if (isEndOfTerm) {
         userPrompt = `Generate a comprehensive End-of-Term Revision Syllabus and Assessment package for ${classLevel} - ${subject} for ${term} Term.
-Include complete revision highlights, 15 high-quality objective multiple-choice questions, 5 comprehensive theory discussion questions with detailed marking keys, a practical project assessment rubric, and expert examination tips.`;
+Include complete revision highlights, 15 high-quality objective multiple-choice questions, 5 comprehensive theory discussion questions with detailed marking keys, a practical project assessment rubric, and a complete answer key with evaluation insights.`;
         responseSchema = {
           type: import_genai.Type.OBJECT,
           properties: {
@@ -912,7 +912,7 @@ Include a quiz with exactly 5 multiple choice questions and 3 detailed theory qu
         };
       }
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.5-flash",
         contents: [systemPrompt, userPrompt],
         config: {
           responseMimeType: "application/json",
@@ -948,7 +948,7 @@ Include a quiz with exactly 5 multiple choice questions and 3 detailed theory qu
 In accordance with national educational standards established by the **Nigerian Educational Research and Development Council (NERDC)**, this week's focus is on exploring *${finalTopic}*.
 
 #### 1. Core Principles
-Education is crucial for local socio-economic transformation. For instance, studying ${subject} equips students with basic problem-solving abilities. In cities like Onitsha, Lagos, and Kano, micro-entrepreneurs and students apply these tenets daily to navigate local trade, science, and community development.
+Education is crucial for local socio-economic transformation. For instance, studying ${subject} equips students with basic problem-solving abilities. In cities like Onitsha, Lagos, and Kano, micro and macro economic principles are observed daily.
 
 Let's explore these major factors:
 *   **Scientific and Analytical Methods**: Approaching problems step by step allows for robust results.
@@ -956,7 +956,7 @@ Let's explore these major factors:
 *   **Ethical and Moral Standards**: Education guides youth towards patriotic nation-building.
 
 #### 2. Case Study & Local Applications
-Consider a trade shop at Balogun Market in Lagos State. A local trader needs to catalog goods efficiently. Applying the concepts outlined under this week's ${subject} curriculum enhances bookkeeping and customer service!`,
+Consider a trade shop at Balogun Market in Lagos State. A local trader needs to catalog goods efficiently. Applying the concepts outlined under this week's ${subject} curriculum enhances bookkeeping and inventory management.`,
         studentActivities: [
           "Take notes on the major definitions written on the board.",
           "Participate in group discussions about local examples of this lesson in their hometowns.",
@@ -966,7 +966,7 @@ Consider a trade shop at Balogun Market in Lagos State. A local trader needs to 
           `Briefly describe how ${subject} helps a local school admin manage student rosters.`,
           `Write down three local materials that can be scavenged in Nigeria representing components of ${subject}.`
         ],
-        homeworkAssignment: `Conduct research at home. Interview parents or local elders to identify how this week's lesson on ${subject} is directly observed in standard local works (like farming, banking, or trade). Write a 1-page report.`,
+        homeworkAssignment: `Conduct research at home. Interview parents or local elders to identify how this week's lesson on ${subject} is directly observed in standard local works (like farming, trading, or healthcare).`,
         quizQuestions: [
           {
             question: `Which corporate regulatory council oversees curriculum standards in Nigerian school portals?`,
@@ -984,13 +984,13 @@ Consider a trade shop at Balogun Market in Lagos State. A local trader needs to 
         theoryQuestions: [
           {
             question: `Identify and discuss two reasons why Nigerian curriculum planning integrates local trade centers (like Balogun or Kurmi Markets) as case studies.`,
-            modelAnswer: `1. Enhanced Relevance: Using familiar marketplaces helps students connect abstract theories to immediate reality. 2. Practical Application: Students can immediately see theoretical trade and arithmetic rules being executed in live markets.`,
+            modelAnswer: `1. Enhanced Relevance: Using familiar marketplaces helps students connect abstract theories to immediate reality. 2. Practical Application: Students can immediately see connections.`,
             markingSchemeName: `Award 5 marks for each reason (Total 10 marks).`
           }
         ],
         subjectSpecificFocus: {
           title: "Patriotic Civic Realization & Local Safeguards",
-          content: `In general classrooms across Oyo, Kaduna, Enugu and Delta states, standard focus should always highlight safety. All materials must be guarded carefully and toxic substances avoided entirely.`,
+          content: `In general classrooms across Oyo, Kaduna, Enugu and Delta states, standard focus should always highlight safety. All materials must be guarded carefully.`,
           safeguardsOrMoralLesson: "Take continuous pride in honest, patriotic academic development."
         }
       };
