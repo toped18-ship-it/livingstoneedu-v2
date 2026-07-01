@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { rtdbSubscribe, rtdbSet, rtdbGet, NODES, seedRtdbIfEmpty } from '../lib/rtdbService';
 import { GmailHub } from './GmailHub';
+import { GoogleClassroomHub } from './GoogleClassroomHub';
 import { 
   getSubjectsForClass, 
   getWeeklyTopicTitle, 
@@ -191,7 +192,7 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
   }, [currentUser]);
 
   // Main UI Tab Router
-  const [activeAdminTab, setActiveAdminTab] = useState<'dashboard' | 'users' | 'curriculum' | 'cbt' | 'payments' | 'results' | 'branding' | 'inquiries' | 'activities' | 'gmail' | 'session' | 'attendance' | 'comms' | 'fees' | 'settings' | 'moderation' | 'db' | 'ai-notes'>('payments');
+  const [activeAdminTab, setActiveAdminTab] = useState<'dashboard' | 'users' | 'curriculum' | 'cbt' | 'payments' | 'results' | 'branding' | 'inquiries' | 'activities' | 'gmail' | 'session' | 'attendance' | 'comms' | 'fees' | 'settings' | 'moderation' | 'db' | 'ai-notes' | 'classroom'>('payments');
 
   // AI Note Generator states
   const [selectedClassAdmin, setSelectedClassAdmin] = useState<string>('SS 1');
@@ -200,6 +201,7 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
   const [selectedWeekAdmin, setSelectedWeekAdmin] = useState<number>(1);
   const [isEndOfTermAdmin, setIsEndOfTermAdmin] = useState<boolean>(false);
   const [isGeneratingNoteAdmin, setIsGeneratingNoteAdmin] = useState<boolean>(false);
+  const [isPublishingNoteAdmin, setIsPublishingNoteAdmin] = useState<boolean>(false);
   const [generatedNoteAdmin, setGeneratedNoteAdmin] = useState<any | null>(null);
   const [noteErrorAdmin, setNoteErrorAdmin] = useState<string>('');
   const [lessonSubTabAdmin, setLessonSubTabAdmin] = useState<'blueprint' | 'narrative' | 'activities' | 'assessment'>('blueprint');
@@ -897,6 +899,64 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
       setNoteErrorAdmin(err.message || 'Connection failed compiling lesson note.');
     } finally {
       setIsGeneratingNoteAdmin(false);
+    }
+  };
+
+  const handlePublishNoteAdmin = async () => {
+    if (!generatedNoteAdmin) {
+      showToast('No compiled lesson note available to publish.', 'error');
+      return;
+    }
+    setIsPublishingNoteAdmin(true);
+    try {
+      const cleanClass = selectedClassAdmin.trim().replace(/[.#$[\]/]/g, '_');
+      const cleanSubj = selectedSubjectAdmin.trim().replace(/[.#$[\]/]/g, '_');
+      const termNum = selectedTermAdmin === '1st Term' ? 1 : selectedTermAdmin === '2nd Term' ? 2 : 3;
+      const weekNum = selectedWeekAdmin;
+      const keyId = `curr_${cleanClass}_${cleanSubj}_t${termNum}_W${weekNum}`.replace(/\s+/g, '_');
+
+      const curriculumItem = {
+        id: keyId,
+        class: selectedClassAdmin,
+        subject: selectedSubjectAdmin,
+        term: selectedTermAdmin,
+        week: selectedWeekAdmin,
+        topic: generatedNoteAdmin.topic || generatedNoteAdmin.title || `Week ${selectedWeekAdmin} Topic`,
+        objectives: generatedNoteAdmin.objectives || [],
+        keyVocabulary: generatedNoteAdmin.keyVocabulary || [],
+        teachingMaterials: generatedNoteAdmin.teachingMaterials || [],
+        introduction: generatedNoteAdmin.introduction || '',
+        teacherExplanationSteps: generatedNoteAdmin.teacherExplanationSteps || [],
+        detailedLessonNote: generatedNoteAdmin.detailedLessonNote || '',
+        studentActivities: generatedNoteAdmin.studentActivities || [],
+        classExercises: generatedNoteAdmin.classExercises || [],
+        homeworkAssignment: generatedNoteAdmin.homeworkAssignment || '',
+        quiz: generatedNoteAdmin.quizQuestions || [],
+        theoryQuestions: generatedNoteAdmin.theoryQuestions || [],
+        subjectSpecificFocus: generatedNoteAdmin.subjectSpecificFocus || null,
+        details: generatedNoteAdmin.detailedLessonNote || (generatedNoteAdmin.objectives || []).join('\n'),
+        status: 'Published'
+      };
+
+      await rtdbSet(`${NODES.CURRICULUM}/${keyId}`, curriculumItem);
+      showToast(`Success! Lesson Note published to Learning Hub for ${selectedClassAdmin}, ${selectedSubjectAdmin}, Week ${selectedWeekAdmin}`, 'success');
+      
+      // Log updated academic activity on backend
+      await adminFetch('/api/admin/log-activity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userName: currentUser?.fullName || "System Admin",
+          userEmail: currentUser?.email || "admin@livingstone.edu",
+          activityType: 'Admin Publish Note',
+          subject: selectedSubjectAdmin,
+          detail: `Admin published AI Lesson Note to Learning Hub for ${selectedClassAdmin}, Week ${selectedWeekAdmin} (${selectedTermAdmin})`
+        })
+      });
+    } catch (err: any) {
+      showToast(err.message || 'Failed to publish lesson note to Learning Hub.', 'error');
+    } finally {
+      setIsPublishingNoteAdmin(false);
     }
   };
 
@@ -1908,6 +1968,24 @@ ${generatedNoteAdmin.homeworkAssignment || ''}
               </span>
               <span className="text-[9px] font-bold px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded-md">
                 AI
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveAdminTab('classroom')}
+              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
+                activeAdminTab === 'classroom'
+                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
+                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <BookOpen size={13} className="stroke-[2.5]" />
+                <span>Google Classroom Hub</span>
+              </span>
+              <span className="text-[9px] font-bold px-1.5 py-0.5 bg-green-100 text-green-750 rounded-md">
+                LMS
               </span>
             </button>
           </div>
@@ -3611,47 +3689,10 @@ ${generatedNoteAdmin.homeworkAssignment || ''}
                 </div>
               </div>
 
-              {/* Simulation Hub Box */}
-              <div className="bg-white p-6 rounded-2xl border-[3px] border-black shadow-[5px_5px_0px_0px_rgba(0,0,0,1)] space-y-4">
-                <div>
-                  <h4 className="text-xs font-black uppercase text-black flex items-center gap-2 bg-cyan-300 px-3 py-1.5 rounded-lg border border-black shadow-[2px_2px_0px_rgba(0,0,0,1)] inline-block">
-                    <Smartphone size={14} className="stroke-[2.5]" />
-                    <span>NIGERIAN TRANSACTIONS SIMULATION BAY</span>
-                  </h4>
-                  <p className="text-[11px] text-slate-800 font-extrabold mt-2">
-                    Instantly simulate incoming cloud registration receipts to test web-hooks & database status propagation without live currency.
-                  </p>
-                </div>
-
-                <div className="flex gap-3 flex-wrap text-xs font-black">
-                  <button
-                    type="button"
-                    onClick={() => handleSimulatePaymentTrigger('Paystack')}
-                    className="px-5 py-3 bg-emerald-400 hover:bg-emerald-500 text-black border-[3px] border-black rounded-xl shadow-[4px_4px_0px_rgba(0,0,0,1)] transition-all active:translate-x-[2px] active:translate-y-[2px] active:shadow-[2px_2px_0px_rgba(0,0,0,1)] cursor-pointer flex items-center gap-2"
-                  >
-                    <span>⚡ SIMULATE PAYSTACK ₦10,000 SUCCESS</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSimulatePaymentTrigger('Flutterwave')}
-                    className="px-5 py-3 bg-blue-400 hover:bg-blue-500 text-black border-[3px] border-black rounded-xl shadow-[4px_4px_0px_rgba(0,0,0,1)] transition-all active:translate-x-[2px] active:translate-y-[2px] active:shadow-[2px_2px_0px_rgba(0,0,0,1)] cursor-pointer flex items-center gap-2"
-                  >
-                    <span>⚡ SIMULATE FLUTTERWAVE ₦10,000 SUCCESS</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSimulatePaymentTrigger('Stripe')}
-                    className="px-5 py-3 bg-[#e0f2fe] hover:bg-[#bae6fd] text-black border-[3px] border-black rounded-xl shadow-[4px_4px_0px_rgba(0,0,0,1)] transition-all active:translate-x-[2px] active:translate-y-[2px] active:shadow-[2px_2px_0px_rgba(0,0,0,1)] cursor-pointer flex items-center gap-2"
-                  >
-                    <span>⚡ SIMULATE STRIPE $15 SUCCESS</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Subscription & Payment Link Configuration Hub - TWO COLUMN WORKSPACE */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pb-4">
+              {/* Subscription & Payment Link Configuration Hub - CENTERED WORKSPACE */}
+              <div className="max-w-3xl mx-auto pb-4">
                 
-                {/* Left Column (Subscription & Gateway Configuration) */}
+                {/* Subscription & Gateway Configuration */}
                 <div className="bg-white p-6 rounded-2xl border-[3px] border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] space-y-6">
                   <div className="flex items-center gap-2 border-b-2 border-black pb-3 bg-yellow-105 p-2 rounded-lg border border-black shadow-[2px_2px_0px_black] bg-amber-200">
                     <span className="p-1.5 bg-black text-white rounded text-xs font-black">⚙️</span>
@@ -3754,93 +3795,6 @@ ${generatedNoteAdmin.homeworkAssignment || ''}
                       </button>
                     </div>
                   </form>
-                </div>
-
-                {/* Right Column (Live Checkout Page Preview Container mimics a standalone invoice card) */}
-                <div className="bg-white p-6 rounded-2xl border-[3px] border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] space-y-6">
-                  <div className="flex justify-between items-center border-b-2 border-black pb-3 bg-cyan-100 p-2 rounded-lg border border-black shadow-[2px_2px_0px_black]">
-                    <div className="flex items-center gap-1.5">
-                      <span className="p-1 bg-black text-white rounded text-xs">📱</span>
-                      <h4 className="text-xs font-black uppercase tracking-wider text-black">Live Checkout Page Preview</h4>
-                    </div>
-                    <span className="text-[9px] font-black text-white bg-black px-2 py-1 rounded border border-black uppercase shadow-[1.5px_1.5px_0px_black]">Parent Viewport</span>
-                  </div>
-
-                  <p className="text-[11px] text-slate-800 font-black leading-relaxed">
-                    This structural container simulates the live responsive invoice layout that parents interact with when unlocking student terms.
-                  </p>
-
-                  {/* Payment Modal Preview Box (Neo-Brutalist Invoice Format) */}
-                  <div className="bg-white rounded-2xl border-[4px] border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] overflow-hidden w-full max-w-sm mx-auto flex flex-col">
-                    <div className="bg-[#2563EB] p-4 text-white text-center border-b-[4px] border-black">
-                      <span className="text-[9px] font-black tracking-widest block uppercase text-yellow-300">SECURE EDUCATION CHECKOUT</span>
-                      <h5 className="text-sm font-black uppercase mt-1">{brandName || 'SCHOOLPORTAL'} PREMIUM TERM</h5>
-                    </div>
-                    
-                    <div className="p-5 space-y-4">
-                      <div className="bg-yellow-300 rounded-xl p-4 border-[3px] border-black shadow-[3px_3px_0px_rgba(0,0,0,1)] flex justify-between items-center">
-                        <div>
-                          <p className="text-[10px] font-black uppercase text-black tracking-wider">PREMIER CLASSROOM PLAN</p>
-                          <p className="text-[9px] text-black/70 font-bold mt-0.5">UNLIMITED ACCESS LICENSE</p>
-                        </div>
-                        <span className="text-2xl font-black text-black select-all bg-white px-2.5 py-1 border-2 border-black rounded shadow-[2px_2px_0px_black]">{proPrice || "₦10,000"}</span>
-                      </div>
-
-                      {/* Payment connection display */}
-                      <div className="space-y-3">
-                        <span className="text-[10px] font-black uppercase text-black tracking-wider block bg-black text-white px-2 py-0.5 w-fit rounded">
-                          🔌 Secure Gateway Portals:
-                        </span>
-                        
-                        <div className="space-y-2">
-                          {paystackLink ? (
-                            <a
-                              href={paystackLink}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="p-3 bg-emerald-300 text-black text-xs font-black rounded-xl border-[2px] border-black flex justify-between items-center hover:bg-emerald-400 cursor-pointer shadow-[3px_3px_0px_rgba(0,0,0,1)] hover:translate-y-[-1px]"
-                            >
-                              <span>⚡ Paystack Payment link</span>
-                              <span className="text-[8px] bg-white border border-black px-1 py-0.5 rounded font-bold uppercase truncate max-w-[135px]">{paystackLink}</span>
-                            </a>
-                          ) : (
-                            <div className="p-3 bg-slate-150 text-slate-550 text-xs rounded-xl border-2 border-dashed border-slate-300 text-center font-bold">
-                              Paystack direct channel unconfigured
-                            </div>
-                          )}
-
-                          {flutterwaveLink ? (
-                            <a
-                              href={flutterwaveLink}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="p-3 bg-blue-300 text-black text-xs font-black rounded-xl border-[2px] border-black flex justify-between items-center hover:bg-blue-400 cursor-pointer shadow-[3px_3px_0px_rgba(0,0,0,1)] hover:translate-y-[-1px]"
-                            >
-                              <span>⚡ Flutterwave Payment link</span>
-                              <span className="text-[8px] bg-white border border-black px-1 py-0.5 rounded font-bold uppercase truncate max-w-[135px]">{flutterwaveLink}</span>
-                            </a>
-                          ) : (
-                            <div className="p-3 bg-slate-150 text-slate-550 text-xs rounded-xl border-2 border-dashed border-slate-300 text-center font-bold">
-                              Flutterwave direct channel unconfigured
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Bank transfer display mock */}
-                        <div className="border-t-2 border-black pt-3 space-y-2">
-                          <span className="text-[10px] font-black uppercase text-black tracking-wider block bg-black text-white px-2 py-0.5 w-fit rounded">
-                            🏛️ Direct Settlement Account:
-                          </span>
-                          
-                          <div className="p-4 bg-orange-150 rounded-xl border-[3px] border-black shadow-[4px_4px_0px_black] flex flex-col items-center space-y-1 bg-orange-100">
-                            <span className="text-[10px] font-black text-black uppercase tracking-wider bg-white border border-black px-2 py-0.5 rounded">{bankName}</span>
-                            <span className="text-lg font-black text-[#2563EB] font-mono select-all tracking-tight bg-white border-[2px] border-black px-3 py-1 rounded shadow-[2.5px_2.5px_0px_rgba(0,0,0,1)]">{bankAccountNumber}</span>
-                            <span className="text-[10px] font-black text-black uppercase tracking-wide pt-1 text-center">{bankAccountName}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
                 </div>
 
               </div>
@@ -5316,6 +5270,22 @@ ${generatedNoteAdmin.homeworkAssignment || ''}
                             <Download size={11} />
                             Copy Raw Text
                           </button>
+                          <button
+                            onClick={handlePublishNoteAdmin}
+                            disabled={isPublishingNoteAdmin}
+                            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-lg text-[10px] flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
+                          >
+                            {isPublishingNoteAdmin ? (
+                              <>
+                                <Loader2 size={11} className="animate-spin text-white" />
+                                <span>Publishing...</span>
+                              </>
+                            ) : (
+                              <>
+                                <span>🚀 Publish to Learning Hub</span>
+                              </>
+                            )}
+                          </button>
                         </div>
                         <span className="text-[9px] text-slate-450 italic font-medium">
                           ✓ Standard Pedagogy Compiled
@@ -5602,6 +5572,16 @@ ${generatedNoteAdmin.homeworkAssignment || ''}
 
               </div>
 
+            </div>
+          )}
+
+          {activeAdminTab === 'classroom' && (
+            <div className="space-y-6 animate-fade-in text-slate-800 font-sans">
+              <div className="border-b pb-3">
+                <h3 className="font-extrabold text-lg text-slate-900">Google Classroom Integration Hub</h3>
+                <p className="text-xs text-slate-500">Sync rosters, push curriculum milestones, and manage Google Classroom materials seamlessly.</p>
+              </div>
+              <GoogleClassroomHub user={currentUser} curriculums={curriculums} />
             </div>
           )}
 

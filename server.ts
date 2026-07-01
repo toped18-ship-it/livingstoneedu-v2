@@ -615,7 +615,7 @@ Make sure the questions:
 5. All elements are formatted in plain, valid JSON without Markdown blocks.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.5-flash',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -720,7 +720,7 @@ Format the output as a clean, plain JSON object with the following schema:
 }`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.5-flash',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -846,7 +846,7 @@ Strictly use Nigerian context and terminology (such as using local examples, nam
       };
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.5-flash',
         contents: [systemPrompt, userPrompt],
         config: {
           responseMimeType: 'application/json',
@@ -1051,7 +1051,7 @@ Include a quiz with exactly 5 multiple choice questions and 3 detailed theory qu
       }
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.5-flash',
+        model: 'gemini-2.5-flash',
         contents: [systemPrompt, userPrompt],
         config: {
           responseMimeType: 'application/json',

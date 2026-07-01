@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { ClassLevel, User, LessonProgress, TermNumber, WeekNumber } from './types';
 import { AuthScreen } from './components/AuthScreen';
 import { HomeDashboard } from './components/HomeDashboard';
@@ -13,6 +14,7 @@ import { ClassSelector } from './components/ClassSelector';
 import { TeacherPortal } from './components/TeacherPortal';
 import { PaymentModal } from './components/PaymentModal';
 import { AdminPanel } from './components/AdminPanel';
+import { GoogleClassroomHub } from './components/GoogleClassroomHub';
 import { SplashLoadingScreen } from './components/SplashLoadingScreen';
 import { PWAInstallBanner } from './components/PWAInstallBanner';
 import { syncUserProfile, syncLessonProgress } from './lib/firebaseSync';
@@ -25,16 +27,83 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isSplashLoading, setIsSplashLoading] = useState(true);
   const [progressList, setProgressList] = useState<LessonProgress[]>([]);
-  const [activeTab, setActiveTab] = useState<'home' | 'hub' | 'quizzes' | 'progress' | 'faq' | 'contact' | 'admin'>(() => {
+  const [activeTab, setActiveTab] = useState<'home' | 'hub' | 'quizzes' | 'progress' | 'classroom' | 'faq' | 'contact' | 'admin'>(() => {
     if (typeof window !== 'undefined') {
       const path = window.location.pathname.replace(/^\//, '').replace(/\/$/, '');
-      const validTabs = ['home', 'hub', 'quizzes', 'progress', 'faq', 'contact', 'admin'];
+      const validTabs = ['home', 'hub', 'quizzes', 'progress', 'classroom', 'faq', 'contact', 'admin'];
       if (validTabs.includes(path)) {
         return path as any;
       }
     }
     return 'home';
   });
+
+  const helmetData = useMemo(() => {
+    if (!currentUser) {
+      return {
+        title: "LIVINGSTONEEDU - West-African National Curriculum Learning Portal",
+        description: "Interactive educational lesson notes, CBT mocks, continuous assessment registries, and parent-tutor communication tools fully aligned with official NERDC syllabus standards."
+      };
+    }
+    
+    switch (activeTab) {
+      case 'hub':
+        return {
+          title: "NERDC Lessons Hub | LIVINGSTONEEDU",
+          description: "Master termly subjects and weekly syllabus lessons with custom interactive guides."
+        };
+      case 'quizzes':
+        return {
+          title: "Computer-Based Tests (CBT) | LIVINGSTONEEDU",
+          description: "Evaluate your subject mastery with customized mock exams and instant step-by-step scoring feedback."
+        };
+      case 'progress':
+        return {
+          title: "Academic Performance Progress | LIVINGSTONEEDU",
+          description: "View your termly certificate badges, streak achievements, and completed curriculum analytics."
+        };
+      case 'classroom':
+        return {
+          title: "Google Classroom Integrator Hub | LIVINGSTONEEDU",
+          description: "Import coursework profiles, sync roster enrollment databases, and update automated score gradebooks."
+        };
+      case 'faq':
+        return {
+          title: "Support FAQ Help Desk | LIVINGSTONEEDU",
+          description: "Find instant answers regarding offline access, subscription plans, and secure portal configurations."
+        };
+      case 'contact':
+        return {
+          title: "Get In Touch | LIVINGSTONEEDU Support",
+          description: "Connect with administrators, send curriculum development feedback, or report technical assistance requests."
+        };
+      case 'admin':
+        return {
+          title: "Administrative Console Hub | LIVINGSTONEEDU",
+          description: "Configure paystack/flutterwave gateway gateways, manage school branding metadata, and inspect automated log history tables."
+        };
+      case 'home':
+      default:
+        return {
+          title: "Dashboard | LIVINGSTONEEDU Learning Portal",
+          description: "Access school session announcements, personal curriculum progress track lists, attendance registers, and academic metrics in real-time."
+        };
+    }
+  }, [currentUser, activeTab]);
+
+  const renderHelmet = () => (
+    <Helmet>
+      <title>{helmetData.title}</title>
+      <meta name="description" content={helmetData.description} />
+      <meta property="og:title" content={helmetData.title} />
+      <meta property="og:description" content={helmetData.description} />
+      <meta property="og:type" content="website" />
+      <meta name="twitter:card" content="summary_large_image" />
+      <meta name="twitter:title" content={helmetData.title} />
+      <meta name="twitter:description" content={helmetData.description} />
+    </Helmet>
+  );
+
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isCustomizingSubjects, setIsCustomizingSubjects] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -396,8 +465,10 @@ export default function App() {
         const cleanEmail = firebaseUser.email.toLowerCase();
         const id = cleanEmail.replace(/[.@]/g, '_');
         
-        // Seed database with default structure if empty (safely once authenticated)
-        seedRtdbIfEmpty();
+        // Seed database asynchronously in the background after a short delay so it doesn't compete with loading the user profile
+        setTimeout(() => {
+          seedRtdbIfEmpty();
+        }, 1200);
 
         // Grab full loaded user profile from RTDB
         let userProfile = await rtdbGet(`${NODES.USERS}/${id}`);
@@ -715,24 +786,33 @@ export default function App() {
   // 6. If initial splash loading state is active, render the premium Splash Screen with blue background
   if (isSplashLoading) {
     return (
-      <SplashLoadingScreen 
-        brandName={appConfig.brandName}
-        appSubtitle={appConfig.appSubtitle}
-        logoIcon={appConfig.logoIcon}
-        logoText={appConfig.logoText}
-      />
+      <>
+        {renderHelmet()}
+        <SplashLoadingScreen 
+          brandName={appConfig.brandName}
+          appSubtitle={appConfig.appSubtitle}
+          logoIcon={appConfig.logoIcon}
+          logoText={appConfig.logoText}
+        />
+      </>
     );
   }
 
   // 7. If no active user profile is found, render Signup / Signin page
   if (!currentUser) {
-    return <AuthScreen onAuthComplete={handleAuthComplete} />;
+    return (
+      <>
+        {renderHelmet()}
+        <AuthScreen onAuthComplete={handleAuthComplete} />
+      </>
+    );
   }
 
   // Step 1: If user has not selected their academic class level yet, prompt them to choose it first!
   if (currentUser && !currentUser.classLevel && currentUser.role === 'student') {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
+        {renderHelmet()}
         <div className="sm:mx-auto sm:w-full sm:max-w-md text-center space-y-3 mb-6 animate-fade-in font-sans">
           <div className="inline-flex p-3 bg-blue-600 rounded-2xl shadow-md text-white animate-bounce">
             <GraduationCap size={28} />
@@ -753,6 +833,7 @@ export default function App() {
   if (currentUser && !currentUser.selectedSubjectIds && currentUser.role === 'student') {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
+        {renderHelmet()}
         <div className="sm:mx-auto sm:w-full sm:max-w-md text-center space-y-3 mb-6 animate-fade-in font-sans">
           <div className="inline-flex p-3 bg-blue-600 rounded-2xl shadow-md text-white animate-bounce">
             <GraduationCap size={28} />
@@ -774,6 +855,7 @@ export default function App() {
   if (currentUser && currentUser.role === 'teacher') {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col justify-between font-sans">
+        {renderHelmet()}
         <header className="sticky top-0 z-20 bg-white border-b border-slate-205 backdrop-blur-md bg-white/95">
           <div className="max-w-full mx-auto px-4 sm:px-8 lg:px-12">
             <div className="flex h-16 items-center justify-between gap-4">
@@ -854,6 +936,7 @@ export default function App() {
   if (currentUser && currentUser.role === 'admin') {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col justify-between font-sans overflow-x-hidden w-full max-w-full">
+        {renderHelmet()}
         <header className="sticky top-0 z-20 bg-white border-b border-slate-205 backdrop-blur-md bg-white/95">
           <div className="max-w-full mx-auto px-4 sm:px-8 lg:px-12">
             <div className="flex h-16 items-center justify-between gap-4">
@@ -915,6 +998,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans flex flex-col justify-between overflow-x-hidden w-full max-w-full">
+      {renderHelmet()}
       
       {isPaymentModalOpen && (
         <PaymentModal 
@@ -996,6 +1080,18 @@ export default function App() {
               >
                 <Award size={13} className={activeTab === 'progress' ? 'text-indigo-600 fill-indigo-300' : ''} />
                 <span>My Progress & Leaderboard</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('classroom')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                  activeTab === 'classroom' 
+                    ? 'bg-white text-blue-700 shadow-sm border border-slate-200/50' 
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <GraduationCap size={13} className={activeTab === 'classroom' ? 'text-emerald-600 fill-emerald-300' : ''} />
+                <span>Google Classroom</span>
               </button>
               <button
                 type="button"
@@ -1182,6 +1278,16 @@ export default function App() {
         </button>
         <button
           type="button"
+          onClick={() => setActiveTab('classroom')}
+          className={`flex flex-col items-center py-1.5 px-1 rounded-lg text-[10px] font-bold tracking-tight transition duration-200 cursor-pointer ${
+            activeTab === 'classroom' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600'
+          }`}
+        >
+          <GraduationCap size={14} className={`stroke-[2.5] ${activeTab === 'classroom' ? 'text-emerald-600 fill-emerald-300' : ''}`} />
+          <span>Classroom</span>
+        </button>
+        <button
+          type="button"
           onClick={() => setActiveTab('faq')}
           className={`flex flex-col items-center py-1.5 px-1 rounded-lg text-[10px] font-bold tracking-tight transition duration-200 cursor-pointer ${
             activeTab === 'faq' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600'
@@ -1292,6 +1398,13 @@ export default function App() {
                 />
               )}
             </div>
+
+            {activeTab === 'classroom' && currentUser && (
+              <GoogleClassroomHub 
+                user={currentUser} 
+                curriculums={curriculums} 
+              />
+            )}
 
             {activeTab === 'faq' && (
               <FaqSection />

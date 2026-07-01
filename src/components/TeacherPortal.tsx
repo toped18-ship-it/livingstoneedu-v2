@@ -26,7 +26,7 @@ const DEMO_STUDENT_NAMES = [
 ];
 
 export function TeacherPortal({ user, onNavigateToHome, isPro, onPaymentTrigger, proPrice = '₦5,000' }: TeacherPortalProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'roster' | 'attendance' | 'exam-maker' | 'grader' | 'reports' | 'lesson-notes' | 'curriculum-generator'>('roster');
+  const [activeSubTab, setActiveSubTab] = useState<'roster' | 'attendance' | 'exam-maker' | 'grader' | 'reports' | 'curriculum-generator'>('roster');
   
   // Roster Class Level State
   const [classLevel, setClassLevel] = useState<ClassLevel>('SS 1');
@@ -849,15 +849,6 @@ ${generatedNote.homeworkAssignment || ''}
         >
           <Printer size={14} />
           Report Card Section
-        </button>
-        <button
-          onClick={() => setActiveSubTab('lesson-notes')}
-          className={`px-4 py-2 text-xs font-bold rounded-xl transition flex items-center gap-2 cursor-pointer ${
-            activeSubTab === 'lesson-notes' ? 'bg-white text-slate-900 shadow-xs border border-indigo-200 bg-indigo-50/10' : 'text-indigo-650 hover:bg-indigo-50 bg-indigo-50/20 border border-indigo-200/30'
-          }`}
-        >
-          <BookOpen size={14} className="text-indigo-600 animate-pulse" />
-          NERDC Lesson Note Writer
         </button>
         <button
           onClick={() => setActiveSubTab('curriculum-generator')}
@@ -1771,8 +1762,8 @@ ${generatedNote.homeworkAssignment || ''}
         </div>
       )}
 
-      {/* 6. NERDC LESSON NOTES GENERATOR */}
-      {activeSubTab === 'lesson-notes' && (
+      {/* 6. NERDC LESSON NOTES GENERATOR - Disallowed in teacher view (Admin only) */}
+      {false && (
         <div className="space-y-6">
           {/* Main Container Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

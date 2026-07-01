@@ -132,7 +132,14 @@ export const rtdbSubscribe = (nodePath: string, callback: (data: any) => void): 
 };
 
 // Seeding standard high-fidelity data into the 17 nodes if they don't exist
+let wasSeededChecked = false;
+
 export const seedRtdbIfEmpty = async () => {
+  if (wasSeededChecked) {
+    console.log('[RTDB Seed] Seeding check already performed in this session. Skipping to optimize performance.');
+    return;
+  }
+  wasSeededChecked = true;
   try {
     console.log('[RTDB Seed] Check if database requires seeding...');
     

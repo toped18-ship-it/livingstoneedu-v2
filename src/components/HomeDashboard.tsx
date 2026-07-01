@@ -2,7 +2,7 @@ import React from 'react';
 import { ClassLevel, User, LessonProgress } from '../types';
 import { getSubjectsForClass } from '../data/curriculum';
 import { requestNotificationPermission } from '../lib/pushNotifications';
-import { Award, BookOpen, Clock, CheckCircle, GraduationCap, Flame, Star, Trophy, Users, Bell } from 'lucide-react';
+import { Award, BookOpen, Clock, CheckCircle, GraduationCap, Flame, Star, Trophy, Users, Bell, ShieldCheck, Lock, Shield, Mail, Check, X, ExternalLink } from 'lucide-react';
 
 interface HomeDashboardProps {
   user: User;
@@ -39,6 +39,8 @@ export function HomeDashboard({ user, progressList, onNavigateToHub, onClassChan
   const [pushSubscribed, setPushSubscribed] = React.useState(false);
   const [subscribing, setSubscribing] = React.useState(false);
   const [subError, setSubError] = React.useState('');
+  const [showPrivacy, setShowPrivacy] = React.useState(false);
+  const [showTerms, setShowTerms] = React.useState(false);
 
   const handleSubscribePush = async () => {
     setSubscribing(true);
@@ -329,6 +331,152 @@ export function HomeDashboard({ user, progressList, onNavigateToHub, onClassChan
         </div>
 
       </div>
+
+      {/* Portal Policies & Security Center */}
+      <div className="bg-slate-50 dark:bg-slate-900 rounded-3xl p-6 sm:p-8 border border-slate-200 dark:border-slate-800 space-y-6 mt-8 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-2xl">
+              <ShieldCheck size={26} className="stroke-[2.5]" />
+            </div>
+            <div className="text-left">
+              <h3 className="font-extrabold text-slate-800 dark:text-white tracking-tight text-base sm:text-lg">
+                Privacy, Security & Agreement Policy Centre
+              </h3>
+              <p className="text-xs text-slate-455 dark:text-slate-400 mt-0.5">
+                We safeguard student records, CA reports, and administrative credentials under strict industry-standard security protocols.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <button
+              onClick={() => setShowPrivacy(true)}
+              className="px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-700 transition cursor-pointer flex items-center gap-1"
+            >
+              <Shield size={13} />
+              <span>Privacy Policy</span>
+            </button>
+            <button
+              onClick={() => setShowTerms(true)}
+              className="px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold border border-slate-200 dark:border-slate-700 transition cursor-pointer flex items-center gap-1"
+            >
+              <Lock size={13} />
+              <span>Terms of Service</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Full Screen Privacy Policy Overlay Modal */}
+      {showPrivacy && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border-2 border-black rounded-3xl max-w-2xl w-full max-h-[85vh] overflow-y-auto shadow-2xl relative p-6 sm:p-8 space-y-6 text-left">
+            <button 
+              onClick={() => setShowPrivacy(false)}
+              className="absolute right-4 top-4 p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded-full cursor-pointer transition text-slate-700 dark:text-slate-200"
+            >
+              <X size={18} />
+            </button>
+            
+            <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-4">
+              <Shield className="text-blue-600" size={24} />
+              <h2 className="text-xl font-extrabold text-slate-800 dark:text-white">Privacy Policy</h2>
+            </div>
+
+            <div className="space-y-4 text-xs text-slate-650 dark:text-slate-350 leading-relaxed font-medium">
+              <p className="text-[10px] uppercase font-black tracking-widest text-slate-400">Effective Date: June 29, 2026</p>
+              
+              <p className="dark:text-slate-300">
+                At <strong>LIVINGSTONEEDU</strong>, we prioritize the protection and security of our user's data. This Privacy Policy outlines how we collect, use, process, and protect your information when you interact with our educational platform.
+              </p>
+
+              <h4 className="font-extrabold text-slate-800 dark:text-white text-sm uppercase tracking-wide">1. Information We Collect</h4>
+              <p className="dark:text-slate-300">
+                When you register or log in, we collect and process:
+              </p>
+              <ul className="list-disc pl-5 space-y-1 dark:text-slate-300">
+                <li><strong>Account Details:</strong> User email, password hash, role (student/teacher), and display name to create, map, and authenticate accounts.</li>
+                <li><strong>Educational Information:</strong> Student records, homework submissions, test results, attendance logs, and school fees ledger entries created directly in our portal.</li>
+              </ul>
+
+              <h4 className="font-extrabold text-slate-800 dark:text-white text-sm uppercase tracking-wide">2. How We Use Collected Information</h4>
+              <p className="dark:text-slate-300">
+                All data collected is used strictly for core educational purposes:
+              </p>
+              <ul className="list-disc pl-5 space-y-1 dark:text-slate-300">
+                <li>Creating secure custom student profiles mapped to specific primary or secondary classes.</li>
+                <li>Syncing grades, assignments, announcements, and rosters.</li>
+                <li>Displaying pupil results to verified parent/student dashboards.</li>
+              </ul>
+
+              <h4 className="font-extrabold text-slate-800 dark:text-white text-sm uppercase tracking-wide">3. Data Deletion and Retention</h4>
+              <p className="dark:text-slate-300">
+                Your data is stored for as long as your account is active. If you wish to delete your profile and request full record erasure, you can do so by contacting support@livingstoneedu.com.
+              </p>
+            </div>
+
+            <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex justify-end">
+              <button
+                onClick={() => setShowPrivacy(false)}
+                className="px-5 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 cursor-pointer"
+              >
+                Close Policy
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Full Screen Terms of Service Overlay Modal */}
+      {showTerms && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border-2 border-black rounded-3xl max-w-2xl w-full max-h-[85vh] overflow-y-auto shadow-2xl relative p-6 sm:p-8 space-y-6 text-left">
+            <button 
+              onClick={() => setShowTerms(false)}
+              className="absolute right-4 top-4 p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded-full cursor-pointer transition text-slate-700 dark:text-slate-200"
+            >
+              <X size={18} />
+            </button>
+            
+            <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-4">
+              <Lock className="text-indigo-650" size={24} />
+              <h2 className="text-xl font-extrabold text-slate-800 dark:text-white">Terms of Service</h2>
+            </div>
+
+            <div className="space-y-4 text-xs text-slate-650 dark:text-slate-350 leading-relaxed font-medium">
+              <p className="text-[10px] uppercase font-black tracking-widest text-slate-400">Effective Date: June 29, 2026</p>
+              
+              <p className="dark:text-slate-300">
+                By accessing or using the <strong>LIVINGSTONEEDU</strong> learning portal, you agree to comply with and be bound by these Terms of Service.
+              </p>
+
+              <h4 className="font-extrabold text-slate-800 dark:text-white text-sm uppercase tracking-wide">1. Description of Service</h4>
+              <p className="dark:text-slate-300">
+                LIVINGSTONEEDU provides curriculum subjects, lesson notes, and testing materials aligned with national academic frameworks.
+              </p>
+
+              <h4 className="font-extrabold text-slate-800 dark:text-white text-sm uppercase tracking-wide">2. Compliance and Account Conduct</h4>
+              <p className="dark:text-slate-300">
+                Users must use the classroom portal responsibly. Distributing spam, illegal curriculum notes, or abusing standard messaging triggers is strictly forbidden and will result in immediate service termination.
+              </p>
+
+              <h4 className="font-extrabold text-slate-800 dark:text-white text-sm uppercase tracking-wide">3. Limitation of Liability</h4>
+              <p className="dark:text-slate-300">
+                LIVINGSTONEEDU provides materials on an "as-is" basis and is not liable for data delivery disruptions resulting from third-party system latency.
+              </p>
+            </div>
+
+            <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex justify-end">
+              <button
+                onClick={() => setShowTerms(false)}
+                className="px-5 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 cursor-pointer"
+              >
+                Accept & Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

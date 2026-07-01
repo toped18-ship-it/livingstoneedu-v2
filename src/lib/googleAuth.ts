@@ -2,11 +2,21 @@ import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User } from 'f
 import { auth } from './firebase';
 
 const provider = new GoogleAuthProvider();
-// Add required Gmail and user info scopes
+// Add required Gmail, user info, and Google Classroom scopes
 provider.addScope('https://www.googleapis.com/auth/gmail.modify');
 provider.addScope('https://www.googleapis.com/auth/gmail.send');
 provider.addScope('https://www.googleapis.com/auth/userinfo.profile');
 provider.addScope('https://www.googleapis.com/auth/userinfo.email');
+
+// Classroom Scopes
+provider.addScope('https://www.googleapis.com/auth/classroom.courses');
+provider.addScope('https://www.googleapis.com/auth/classroom.announcements');
+provider.addScope('https://www.googleapis.com/auth/classroom.coursework.me');
+provider.addScope('https://www.googleapis.com/auth/classroom.coursework.students');
+provider.addScope('https://www.googleapis.com/auth/classroom.rosters');
+provider.addScope('https://www.googleapis.com/auth/classroom.student-submissions.me.readonly');
+provider.addScope('https://www.googleapis.com/auth/classroom.student-submissions.students.readonly');
+provider.addScope('https://www.googleapis.com/auth/classroom.topics');
 
 // Flag to indicate if we are in the middle of a sign-in flow.
 let isSigningIn = false;
