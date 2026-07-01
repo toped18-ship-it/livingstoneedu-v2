@@ -573,7 +573,7 @@ export default function App() {
   }, []);
 
   // 2. Event: Student logs in or creates profile
-  const handleAuthComplete = (profileData: { fullName: string; email: string; classLevel?: ClassLevel; avatarSeed: string; selectedSubjectIds?: string[]; role?: 'student' | 'teacher' | 'admin'; s...any }) => {
+  const handleAuthComplete = (profileData: { fullName: string; email: string; classLevel?: ClassLevel; avatarSeed: string; selectedSubjectIds?: string[]; role?: 'student' | 'teacher' | 'admin'; isPro?: boolean }) => {
     const isTeacher = profileData.role === 'teacher';
     const isAdmin = profileData.role === 'admin';
 
