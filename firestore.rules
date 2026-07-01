@@ -49,7 +49,7 @@ service cloud.firestore {
     // --- ENTITY VALIDATION HELPERS ---
 
     function isValidUser(data) {
-      return data.id is string && (data.id == request.auth.uid || isLocalId(data.id)) &&
+      return data.id is string && ((request.auth != null && data.id == request.auth.uid) || isLocalId(data.id)) &&
              data.fullName is string && data.fullName.size() >= 2 && data.fullName.size() <= 128 &&
              data.email is string && data.email.size() <= 150 &&
              data.avatarSeed is string && data.avatarSeed.size() <= 128 &&
@@ -62,7 +62,7 @@ service cloud.firestore {
     }
 
     function isValidLessonProgress(data) {
-      return data.userId is string && (data.userId == request.auth.uid || isLocalId(data.userId)) &&
+      return data.userId is string && ((request.auth != null && data.userId == request.auth.uid) || isLocalId(data.userId)) &&
              data.classLevel is string && data.classLevel.size() <= 64 &&
              data.subjectId is string && data.subjectId.size() <= 64 &&
              data.termNum is number && data.termNum >= 1 && data.termNum <= 3 &&
@@ -84,7 +84,7 @@ service cloud.firestore {
     }
 
     function isValidTeacherSetup(data) {
-      return data.teacherId is string && (data.teacherId == request.auth.uid || isLocalId(data.teacherId)) &&
+      return data.teacherId is string && ((request.auth != null && data.teacherId == request.auth.uid) || isLocalId(data.teacherId)) &&
              data.classLevel is string && data.classLevel.size() <= 64 &&
              data.students is list && data.students.size() <= 150;
     }

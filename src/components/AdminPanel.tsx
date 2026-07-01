@@ -5145,7 +5145,7 @@ ${generatedNoteAdmin.homeworkAssignment || ''}
                           setSelectedClassAdmin(e.target.value);
                           const subjs = getSubjectsForClass(e.target.value);
                           if (subjs && subjs.length > 0) {
-                            setSelectedSubjectAdmin(subjs[0]);
+                            setSelectedSubjectAdmin(subjs[0].name);
                           }
                         }}
                         className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-xs font-semibold"
@@ -5165,7 +5165,7 @@ ${generatedNoteAdmin.homeworkAssignment || ''}
                         className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-white text-xs font-semibold"
                       >
                         {(getSubjectsForClass(selectedClassAdmin) || []).map((sub) => (
-                          <option key={sub} value={sub}>{sub}</option>
+                          <option key={sub.id} value={sub.name}>{sub.name}</option>
                         ))}
                       </select>
                     </div>

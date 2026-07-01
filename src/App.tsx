@@ -16,7 +16,6 @@ import { PaymentModal } from './components/PaymentModal';
 import { AdminPanel } from './components/AdminPanel';
 import { SplashLoadingScreen } from './components/SplashLoadingScreen';
 import { PWAInstallBanner } from './components/PWAInstallBanner';
-import { InstallPrompt } from './components/InstallPrompt';
 import { syncUserProfile, syncLessonProgress } from './lib/firebaseSync';
 import { GraduationCap, LogOut, Home, BookOpen, HelpCircle, MessageSquare, ShieldCheck, Heart, Trophy, Award, Zap, Sparkles, Mail, Sun, Moon, Clock, X } from 'lucide-react';
 import { seedRtdbIfEmpty, rtdbSubscribe, rtdbSet, rtdbGet, NODES } from './lib/rtdbService';
@@ -99,8 +98,6 @@ export default function App() {
     </Helmet>
   );
 
-  // ... Rest of the component logic remains the same ...
-  
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isCustomizingSubjects, setIsCustomizingSubjects] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -573,7 +570,7 @@ export default function App() {
   }, []);
 
   // 2. Event: Student logs in or creates profile
-  const handleAuthComplete = (profileData: { fullName: string; email: string; classLevel?: ClassLevel; avatarSeed: string; selectedSubjectIds?: string[]; role?: 'student' | 'teacher' | 'admin'; isPro?: boolean }) => {
+  const handleAuthComplete = (profileData: { fullName: string; email: string; classLevel?: ClassLevel; avatarSeed: string; selectedSubjectIds?: string[]; role?: 'student' | 'teacher' | 'admin'; schoolName?: string; isPro?: boolean }) => {
     const isTeacher = profileData.role === 'teacher';
     const isAdmin = profileData.role === 'admin';
 
@@ -848,13 +845,730 @@ export default function App() {
     );
   }
 
-  // Rest of component remains the same...
+  // If logged in as a teacher, route straight to the specialized Teacher Admin Portal
+  if (currentUser && currentUser.role === 'teacher') {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col justify-between font-sans">
+        {renderHelmet()}
+        <header className="sticky top-0 z-20 bg-white border-b border-slate-205 backdrop-blur-md bg-white/95">
+          <div className="max-w-full mx-auto px-4 sm:px-8 lg:px-12">
+            <div className="flex h-16 items-center justify-between gap-4">
+              <div className="flex items-center gap-2.5">
+                <div className={`p-2 ${logoBgColorClass} rounded-xl shadow-sm text-white`}>
+                  {renderDynamicLogo(22)}
+                </div>
+                <div>
+                  <h1 className="text-sm font-black font-display text-slate-900 tracking-tight leading-none">{appConfig.brandName.toUpperCase()}</h1>
+                  <p className={`text-[10px] font-bold ${logoTextColClass} tracking-wider uppercase mt-0.5`}>Staff Control Center</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="hidden sm:flex flex-col text-right text-xs">
+                  <span className="font-extrabold text-slate-850 truncate max-w-40">{currentUser.fullName}</span>
+                  <span className="text-[10px] text-slate-400 font-bold font-sans">Class Administrator</span>
+                </div>
+                <div className="w-8.5 h-8.5 rounded-full bg-slate-50 border border-slate-200 text-base flex items-center justify-center">
+                  👩‍🏫
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsDarkMode(!isDarkMode)}
+                  title="Toggle Theme"
+                  className="p-2 border border-slate-200 text-slate-455 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer flex items-center justify-center font-bold"
+                >
+                  {isDarkMode ? <Sun size={16} className="text-amber-500 fill-amber-300 animate-pulse" /> : <Moon size={16} />}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  title="Logout Teacher Portal"
+                  className="p-2 border border-slate-200 text-slate-455 hover:text-red-655 hover:border-red-200 rounded-xl transition cursor-pointer font-bold"
+                >
+                  <LogOut size={16} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-grow max-w-full w-full mx-auto px-4 sm:px-8 lg:px-12 py-8 md:px-0 sm:px-0">
+          <TeacherPortal 
+            user={currentUser} 
+            onNavigateToHome={handleSignOut}
+            isPro={!!currentUser.isPro}
+            onPaymentTrigger={() => setIsPaymentModalOpen(true)}
+            proPrice={appConfig.proPrice}
+          />
+        </main>
+
+        <footer className="bg-white border-t border-slate-150 py-8 text-center text-slate-500 text-xs">
+          <div className="max-w-full mx-auto px-4 sm:px-8 lg:px-12 flex justify-between items-center text-slate-400">
+            <p>&copy; 2026 {appConfig.brandName.toUpperCase()}. Secure Teacher administration.</p>
+            <p className="font-bold text-slate-600">Staff Portal Active</p>
+          </div>
+        </footer>
+
+        {isPaymentModalOpen && (
+          <PaymentModal 
+            user={currentUser}
+            onPaymentSuccess={handlePaymentSuccess}
+            onClose={() => setIsPaymentModalOpen(false)}
+            brandName={appConfig.brandName}
+            proPrice={appConfig.proPrice}
+            paystackLink={(appConfig as any).paystackLink}
+            flutterwaveLink={(appConfig as any).flutterwaveLink}
+            bankName={(appConfig as any).bankName}
+            bankAccountNumber={(appConfig as any).bankAccountNumber}
+            bankAccountName={(appConfig as any).bankAccountName}
+          />
+        )}
+      </div>
+    );
+  }
+
+  // If logged in as an administrator, route straight to the specialized standalone Admin Panel Core
+  if (currentUser && currentUser.role === 'admin') {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col justify-between font-sans overflow-x-hidden w-full max-w-full">
+        {renderHelmet()}
+        <header className="sticky top-0 z-20 bg-white border-b border-slate-205 backdrop-blur-md bg-white/95">
+          <div className="max-w-full mx-auto px-4 sm:px-8 lg:px-12">
+            <div className="flex h-16 items-center justify-between gap-4">
+              <div className="flex items-center gap-2.5 bg-transparent">
+                <div className="p-2 bg-gradient-to-tr from-blue-600 to-indigo-650 rounded-xl shadow-sm text-white">
+                  {renderDynamicLogo(18)}
+                </div>
+                <div>
+                  <h1 className="text-sm font-black text-slate-900 tracking-tight leading-none">{appConfig.brandName.toUpperCase()}</h1>
+                  <p className="text-[10px] font-bold text-slate-400 tracking-wider uppercase mt-1 leading-none font-sans">Administration Command Console</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="hidden sm:flex flex-col text-right text-xs">
+                  <span className="font-extrabold text-slate-850 truncate max-w-40">{currentUser.fullName}</span>
+                  <span className="text-[10px] text-slate-450 font-bold font-sans">System Administrator</span>
+                </div>
+                <div className="w-8.5 h-8.5 rounded-full bg-slate-50 border border-slate-200 text-base flex items-center justify-center">
+                  🛡️
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsDarkMode(!isDarkMode)}
+                  title="Toggle Theme"
+                  className="p-2 border border-slate-200 text-slate-455 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer flex items-center justify-center font-bold"
+                >
+                  {isDarkMode ? <Sun size={16} className="text-amber-500 fill-amber-300 animate-pulse" /> : <Moon size={16} />}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  title="Logout Administrative Console"
+                  className="p-2 border border-slate-200 text-slate-455 hover:text-red-655 hover:border-red-200 rounded-xl transition cursor-pointer font-bold"
+                >
+                  <LogOut size={16} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-grow max-w-full w-full mx-auto px-4 sm:px-8 lg:px-12 py-8 md:px-0 sm:px-0">
+          <AdminPanel 
+            currentConfig={appConfig}
+            onConfigChange={(newConfig) => setAppConfig(newConfig)}
+            currentUser={currentUser}
+          />
+        </main>
+
+        <footer className="bg-white border-t border-slate-150 py-8 text-center text-slate-500 text-xs">
+          <div className="max-w-full mx-auto px-4 sm:px-8 lg:px-12 flex justify-between items-center text-slate-400">
+            <p>&copy; 2026 {appConfig.brandName.toUpperCase()}. Core App Administration Dashboard.</p>
+            <p className="font-bold text-slate-600">Operational Security Mode Active</p>
+          </div>
+        </footer>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans flex flex-col justify-between overflow-x-hidden w-full max-w-full">
       {renderHelmet()}
-      <InstallPrompt />
-      <PWAInstallBanner />
+      
+      {isPaymentModalOpen && (
+        <PaymentModal 
+          user={currentUser}
+          onPaymentSuccess={handlePaymentSuccess}
+          onClose={() => setIsPaymentModalOpen(false)}
+          brandName={appConfig.brandName}
+          proPrice={appConfig.proPrice}
+          paystackLink={(appConfig as any).paystackLink}
+          flutterwaveLink={(appConfig as any).flutterwaveLink}
+          bankName={(appConfig as any).bankName}
+          bankAccountNumber={(appConfig as any).bankAccountNumber}
+          bankAccountName={(appConfig as any).bankAccountName}
+        />
+      )}
+      
+      {/* 2. Page Navigation Bar Header */}
+      <header className="sticky top-0 z-20 bg-white border-b border-slate-205 backdrop-blur-md bg-white/95">
+        <div className="max-w-full mx-auto px-4 sm:px-8 lg:px-12">
+          <div className="flex h-16 items-center justify-between gap-4">
+            
+            {/* Logo / Brand Header */}
+            <div className="flex items-center gap-1.5 sm:gap-2.5 bg-transparent shrink-0">
+              <div className="p-1.5 sm:p-2 bg-gradient-to-tr from-blue-600 to-indigo-650 rounded-xl shadow-xs text-white">
+                {renderDynamicLogo(16)}
+              </div>
+              <div>
+                <h1 className="text-xs sm:text-sm font-extrabold tracking-wider font-sans text-slate-900 uppercase leading-none">{appConfig.brandName}</h1>
+                <p className="text-[8px] sm:text-[9px] font-bold text-slate-400 tracking-widest uppercase mt-0.5 sm:mt-1 leading-none">{appConfig.appSubtitle}</p>
+              </div>
+            </div>
+
+            {/* Desktop Navigation Links Selector */}
+            <nav className="hidden md:flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setActiveTab('home')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                  activeTab === 'home' 
+                    ? 'bg-white text-blue-700 shadow-sm border border-slate-200/50' 
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Home size={13} />
+                <span>Home Dashboard</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('hub')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                  activeTab === 'hub' 
+                    ? 'bg-white text-blue-700 shadow-sm border border-slate-200/50' 
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <BookOpen size={13} />
+                <span>Learning Hub</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('quizzes')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                  activeTab === 'quizzes' 
+                    ? 'bg-white text-blue-700 shadow-sm border border-slate-200/50' 
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Trophy size={13} className={activeTab === 'quizzes' ? 'text-amber-500 fill-amber-300' : ''} />
+                <span>Syllabus Quizzes</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('progress')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                  activeTab === 'progress' 
+                    ? 'bg-white text-blue-700 shadow-sm border border-slate-200/50' 
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Award size={13} className={activeTab === 'progress' ? 'text-indigo-600 fill-indigo-300' : ''} />
+                <span>My Progress & Leaderboard</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('faq')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                  activeTab === 'faq' 
+                    ? 'bg-white text-blue-700 shadow-sm border border-slate-200/50' 
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <HelpCircle size={13} />
+                <span>FAQs Accordion</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('contact')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                  activeTab === 'contact' 
+                    ? 'bg-white text-blue-700 shadow-sm border border-slate-200/50' 
+                    : 'text-slate-655 hover:text-slate-900'
+                }`}
+              >
+                <MessageSquare size={13} />
+                <span>Help & Contacts</span>
+              </button>
+              {currentUser?.role === 'admin' && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('admin')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                    activeTab === 'admin' 
+                      ? 'bg-white text-blue-700 shadow-sm border border-slate-200/50 font-black' 
+                      : 'text-slate-655 hover:text-slate-900 bg-slate-50 hover:bg-slate-100/60'
+                  }`}
+                >
+                  <ShieldCheck size={13} className={activeTab === 'admin' ? 'text-blue-700' : 'text-blue-650'} />
+                  <span>Admin Panel</span>
+                </button>
+              )}
+            </nav>
+
+            {/* User Profile Summary trigger */}
+            <div className="flex items-center gap-1.5 sm:gap-3">
+              {/* Network Connectivity status with simulated toggling capability */}
+              {!effectiveIsOnline ? (
+                <div 
+                  onClick={() => setIsSimulatedOffline(false)}
+                  className="flex items-center gap-1 px-1.5 py-1 bg-red-50 text-red-700 rounded-lg border border-red-200 text-[10px] font-extrabold uppercase tracking-wider animate-pulse hover:bg-red-100 transition cursor-pointer" 
+                  title="Offline Mode: Progress is cached locally and will sync once you reconnect to the internet. Click to reconnect!"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping"></span>
+                  <span className="hidden sm:inline">Offline Caching</span>
+                </div>
+              ) : (
+                <div 
+                  onClick={() => setIsSimulatedOffline(true)}
+                  className="flex items-center gap-1 px-1.5 py-1 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-155 text-[10px] font-extrabold uppercase tracking-wider hover:bg-emerald-100/60 transition cursor-pointer" 
+                  title="All systems synchronized. Click to simulate Offline mode!"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                  <span className="hidden sm:inline">Connected</span>
+                </div>
+              )}
+
+              {/* Countdown Timer Badge */}
+              {currentUser && currentUser.role === 'student' && !currentUser.isPro && trialTimeRemaining !== null && (
+                <div 
+                  className={`flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-xl border font-sans text-xs font-black uppercase tracking-wider shadow-sm select-none animate-pulse ${
+                    trialTimeRemaining <= 60 
+                      ? 'bg-red-50 text-red-600 border-red-200' 
+                      : trialTimeRemaining <= 300 
+                        ? 'bg-amber-50 text-amber-600 border-amber-200' 
+                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  }`}
+                  title="Free Learning Time Remaining today"
+                >
+                  <Clock size={11} className={`${
+                    trialTimeRemaining <= 60 
+                      ? 'text-red-500' 
+                      : trialTimeRemaining <= 300 
+                        ? 'text-amber-500' 
+                        : 'text-emerald-500'
+                  }`} />
+                  <span className="text-[9px] hidden md:inline text-slate-500 font-bold uppercase tracking-tight">Free Time:</span>
+                  <span className="font-mono text-[11px] tracking-tight font-extrabold">
+                    {Math.floor(trialTimeRemaining / 60)}:{(trialTimeRemaining % 60).toString().padStart(2, '0')}
+                  </span>
+                </div>
+              )}
+
+              {currentUser?.isPro ? (
+                <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-750 rounded-lg border border-amber-200 text-[10px] font-black uppercase tracking-wider">
+                  <Sparkles size={11} className="fill-amber-400 text-amber-550" />
+                  <span>Pro Active</span>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsPaymentModalOpen(true)}
+                  className="flex items-center gap-1 p-1.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:brightness-110 transition shadow-sm cursor-pointer sm:px-3 sm:py-1 sm:gap-1.5"
+                  title={`Go Pro (${appConfig.proPrice})`}
+                >
+                  <Zap size={11} className="fill-white" />
+                  <span className="hidden sm:inline">Go Pro ({appConfig.proPrice})</span>
+                </button>
+              )}
+
+              <div className="hidden sm:flex flex-col text-right">
+                <span className="text-xs font-extrabold text-slate-850 truncate max-w-40">{currentUser.fullName}</span>
+                <span className="text-[10px] text-slate-400 font-semibold">{currentUser.classLevel} &bull; <span className="text-amber-600 font-black">⚡ {totalXpoints} XP</span></span>
+              </div>
+
+              {/* Status avatar icon */}
+              <div className="hidden sm:flex w-8.5 h-8.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100 items-center justify-center">
+                <GraduationCap size={15} className="stroke-[2.5]" />
+              </div>
+
+              {/* Theme toggle button */}
+              <button
+                type="button"
+                onClick={() => setIsDarkMode(!isDarkMode)}
+                title="Toggle Theme"
+                className="p-1.5 sm:p-2 border border-slate-200 text-slate-455 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer flex items-center justify-center font-bold"
+              >
+                {isDarkMode ? <Sun size={14} className="text-amber-500 fill-amber-300 animate-pulse" /> : <Moon size={14} />}
+              </button>
+
+              {/* Sign out key icon */}
+              <button
+                type="button"
+                onClick={handleSignOut}
+                title="Logout Student Profile"
+                className="p-1.5 sm:p-2 border border-slate-200 text-slate-455 hover:text-red-555 hover:border-red-200 rounded-xl transition cursor-pointer"
+              >
+                <LogOut size={14} />
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </header>
+
+      {/* Mobile Tab Floating Rail Toolbar */}
+      <div className="md:hidden sticky top-16 z-30 bg-white/95 backdrop-blur-md border-b border-slate-100 p-2 flex gap-1 justify-around shadow-xs overflow-x-auto scrollbar-none">
+        <button
+          type="button"
+          onClick={() => setActiveTab('home')}
+          className={`flex flex-col items-center py-1.5 px-1 rounded-lg text-[10px] font-bold tracking-tight transition duration-200 cursor-pointer ${
+            activeTab === 'home' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600'
+          }`}
+        >
+          <Home size={14} className="stroke-[2.5]" />
+          <span>Home</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('hub')}
+          className={`flex flex-col items-center py-1.5 px-1 rounded-lg text-[10px] font-bold tracking-tight transition duration-200 cursor-pointer ${
+            activeTab === 'hub' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600'
+          }`}
+        >
+          <BookOpen size={14} className="stroke-[2.5]" />
+          <span>Hub</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('quizzes')}
+          className={`flex flex-col items-center py-1.5 px-1 rounded-lg text-[10px] font-bold tracking-tight transition duration-200 cursor-pointer ${
+            activeTab === 'quizzes' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600'
+          }`}
+        >
+          <Trophy size={14} className={`stroke-[2.5] ${activeTab === 'quizzes' ? 'text-amber-500 fill-amber-300' : ''}`} />
+          <span>Quiz</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('progress')}
+          className={`flex flex-col items-center py-1.5 px-1 rounded-lg text-[10px] font-bold tracking-tight transition duration-200 cursor-pointer ${
+            activeTab === 'progress' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600'
+          }`}
+        >
+          <Award size={14} className={`stroke-[2.5] ${activeTab === 'progress' ? 'text-blue-600 fill-blue-300' : ''}`} />
+          <span>Stats</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('faq')}
+          className={`flex flex-col items-center py-1.5 px-1 rounded-lg text-[10px] font-bold tracking-tight transition duration-200 cursor-pointer ${
+            activeTab === 'faq' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600'
+          }`}
+        >
+          <HelpCircle size={14} className="stroke-[2.5]" />
+          <span>FAQ</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('contact')}
+          className={`flex flex-col items-center py-1.5 px-1 rounded-lg text-[10px] font-bold tracking-tight transition duration-200 cursor-pointer ${
+            activeTab === 'contact' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600'
+          }`}
+        >
+          <MessageSquare size={14} className="stroke-[2.5]" />
+          <span>Help</span>
+        </button>
+        {currentUser?.role === 'admin' && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('admin')}
+            className={`flex flex-col items-center py-1.5 px-1 rounded-lg text-[10px] font-bold tracking-tight transition duration-200 cursor-pointer ${
+              activeTab === 'admin' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-600'
+            }`}
+          >
+            <ShieldCheck size={14} className={`stroke-[2.5] ${activeTab === 'admin' ? 'text-blue-650' : 'text-slate-500'}`} />
+            <span>Admin</span>
+          </button>
+        )}
+      </div>
+
+      {/* 3. Main content body sections with responsive boundaries */}
+      <main className="flex-grow max-w-full w-full mx-auto px-4 sm:px-8 lg:px-12 py-8">
+        {isRefreshing ? (
+          <div className="h-64 flex flex-col items-center justify-center space-y-2">
+            <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+            <p className="text-xs text-slate-500 font-medium">Re-tuning curriculum mapping...</p>
+          </div>
+        ) : isCustomizingSubjects ? (
+          <div className="max-w-2xl mx-auto py-4 animate-fade-in">
+            <SubjectSelector 
+              user={currentUser}
+              onSave={(ids) => {
+                handleSaveSubjectSelection(ids);
+                setIsCustomizingSubjects(false);
+              }}
+              onCancel={() => setIsCustomizingSubjects(false)}
+              isSettingsView={true}
+            />
+          </div>
+        ) : (
+          <>
+            {activeTab === 'home' && (
+              <HomeDashboard 
+                user={currentUser} 
+                progressList={progressList} 
+                onNavigateToHub={(subjectId) => {
+                  if (subjectId) {
+                    setSelectedSubjectId(subjectId);
+                  }
+                  setActiveTab('hub');
+                }}
+                onClassChange={handleClassChange}
+                onCustomizeSubjects={() => setIsCustomizingSubjects(true)}
+              />
+            )}
+
+            <div className={['hub', 'quizzes', 'progress'].includes(activeTab) && currentUser && currentUser.role === 'student' && !currentUser.isPro && trialTimeRemaining === 0 ? "filter blur-md pointer-events-none select-none transition-all duration-500" : ""}>
+              {activeTab === 'hub' && (
+                <LearningHub 
+                  user={currentUser} 
+                  progressList={progressList} 
+                  onToggleComplete={handleToggleComplete}
+                  isPro={!!currentUser.isPro}
+                  onPaymentTrigger={() => setIsPaymentModalOpen(true)}
+                  demoUsageCount={demoUsageCount}
+                  onIncrementDemoUsage={handleIncrementDemoUsage}
+                  onCustomizeSubjects={() => setIsCustomizingSubjects(true)}
+                  selectedSubjectId={selectedSubjectId}
+                  setSelectedSubjectId={setSelectedSubjectId}
+                  curriculums={curriculums}
+                  proPrice={appConfig.proPrice}
+                />
+              )}
+
+              {activeTab === 'quizzes' && (
+                <InteractiveQuizzes
+                  user={currentUser}
+                  progressList={progressList}
+                  onToggleComplete={handleToggleComplete}
+                  isPro={!!currentUser.isPro}
+                  onPaymentTrigger={() => setIsPaymentModalOpen(true)}
+                  demoUsageCount={demoUsageCount}
+                  onIncrementDemoUsage={handleIncrementDemoUsage}
+                  curriculums={curriculums}
+                  cbtExams={cbtExams}
+                  cbtQuestionsRecord={cbtQuestionsRecord}
+                  proPrice={appConfig.proPrice}
+                />
+              )}
+
+              {activeTab === 'progress' && (
+                <StudentProgressPage
+                  user={currentUser}
+                  progressList={progressList}
+                  onNavigateToQuizzes={() => setActiveTab('quizzes')}
+                />
+              )}
+            </div>
+
+            {activeTab === 'faq' && (
+              <FaqSection />
+            )}
+
+            {activeTab === 'contact' && (
+              <ContactUs 
+                user={currentUser} 
+                brandName={appConfig.brandName}
+                contactName={appConfig.contactName}
+                supportGroupUrl={appConfig.supportGroupUrl}
+              />
+            )}
+
+            {activeTab === 'admin' && (
+              currentUser?.role === 'admin' ? (
+                <AdminPanel 
+                  currentConfig={appConfig}
+                  onConfigChange={(newConfig) => setAppConfig(newConfig)}
+                  currentUser={currentUser}
+                />
+              ) : (
+                <div className="max-w-md mx-auto my-12 p-8 bg-white border border-red-150 rounded-2xl shadow-xl space-y-6 text-center animate-fade-in">
+                  <div className="mx-auto w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center border border-red-200">
+                    <ShieldCheck size={32} className="stroke-[2.5]" />
+                  </div>
+                  <div className="space-y-2">
+                    <h2 className="text-xl font-bold text-slate-800">403 - Forbidden Access Denied</h2>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      You are not authorized to view the administrative terminal. Access to the administration core is strictly restricted to authenticated App Owner and School Administration profiles.
+                    </p>
+                  </div>
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('home')}
+                      className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl shadow-md transition cursor-pointer"
+                    >
+                      Return to Safety Dashboard
+                    </button>
+                  </div>
+                </div>
+              )
+            )}
+          </>
+        )}
+      </main>
+
+      {/* 4. Elegant footer with credits */}
+      <footer className="bg-white border-t border-slate-150 py-8 text-center text-slate-500 space-y-3">
+        <div className="max-w-full mx-auto px-4 sm:px-8 lg:px-12 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
+          
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse" />
+            <span className="font-bold text-slate-700">Federal Government Curriculum Match</span>
+          </div>
+
+          <p className="text-slate-400">
+            &copy; 2026 {appConfig.brandName.toUpperCase()}. Democratizing premium schooling for primary & secondary levels in Nigeria.
+          </p>
+
+          <p className="flex items-center justify-center gap-1 font-bold text-slate-600">
+            <span>Made with</span>
+            <Heart size={12} className="text-red-500 fill-red-500" />
+            <span>for Nigerian Students</span>
+          </p>
+        </div>
+      </footer>
+
       <WhatsAppFloatingButton contactName={appConfig.contactName} supportGroupUrl={appConfig.supportGroupUrl} />
+      <PWAInstallBanner />
+
+      {/* 15-Minute Free Daily Trial Locked Modal */}
+      {currentUser && currentUser.role === 'student' && !currentUser.isPro && trialTimeRemaining === 0 && ['hub', 'quizzes', 'progress'].includes(activeTab) && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/50 rounded-3xl shadow-2xl overflow-hidden p-6 sm:p-8 text-center space-y-6 relative">
+            <div className="absolute top-4 right-4">
+              <button 
+                type="button"
+                onClick={() => setActiveTab('home')}
+                className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+                title="Go to Home Dashboard"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="mx-auto w-20 h-20 bg-gradient-to-tr from-amber-500 to-amber-600 text-white rounded-full flex items-center justify-center shadow-lg shadow-amber-500/20">
+              <span className="text-4xl">🔒</span>
+            </div>
+
+            <div className="space-y-2">
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-850 dark:text-white tracking-tight leading-tight">
+                Free Learning Time Ended
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">
+                You have used your free 15-minute learning session today.
+              </p>
+            </div>
+
+            <div className="bg-amber-50/50 dark:bg-amber-950/20 border border-amber-100/50 dark:border-amber-900/30 rounded-2xl p-5 text-left space-y-3">
+              <p className="text-xs font-bold text-amber-850 dark:text-amber-400 uppercase tracking-wider">
+                Upgrade to Premium to continue enjoying:
+              </p>
+              <ul className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 space-y-2.5 font-semibold">
+                <li className="flex items-start gap-2.5">
+                  <span className="text-emerald-500 text-base font-black shrink-0">✓</span>
+                  <span>Unlimited interactive lesson notes & local downloads</span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <span className="text-emerald-500 text-base font-black shrink-0">✓</span>
+                  <span>Full First, Second and Third Term academic curriculum</span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <span className="text-emerald-500 text-base font-black shrink-0">✓</span>
+                  <span>Complete Week 1–12 lesson outlines & class notes</span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <span className="text-emerald-500 text-base font-black shrink-0">✓</span>
+                  <span>Over 10,050 exam prep questions & comprehensive explanations</span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <span className="text-emerald-500 text-base font-black shrink-0">✓</span>
+                  <span>Direct 1-on-1 AskAfri Chat Tutor assistant (Gemini AI powered)</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPaymentModalOpen(true);
+                }}
+                className="flex-1 py-3 px-6 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:brightness-110 text-white font-extrabold rounded-2xl shadow-lg transition duration-200 cursor-pointer text-xs uppercase tracking-wider"
+              >
+                Upgrade to Premium Now
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const message = `Hello Parent! I finished my free 15 minutes study session on ${appConfig.brandName}. Please help me pay to unlock unlimited full access for my class notes and exams!`;
+                  window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+                }}
+                className="py-3 px-5 border border-slate-200 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-extrabold rounded-2xl transition duration-200 cursor-pointer text-xs uppercase tracking-wider"
+              >
+                Ask Parent to Pay 📱
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('home')}
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-bold underline cursor-pointer"
+            >
+              Go back to Home Dashboard
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Premium Reminders Slide-in Banner Toast */}
+      {premiumReminder && (
+        <div className="fixed bottom-6 right-6 z-[120] max-w-sm w-full bg-slate-900 text-white border border-slate-800 rounded-2xl shadow-2xl p-4 flex gap-3.5 animate-slide-in">
+          <div className="w-10 h-10 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+            <Clock size={20} className="animate-pulse" />
+          </div>
+          <div className="flex-1 space-y-1">
+            <h4 className="text-sm font-black text-amber-400">{premiumReminder.title}</h4>
+            <p className="text-xs text-slate-300 font-medium leading-relaxed">{premiumReminder.body}</p>
+            <div className="flex gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setPremiumReminder(null);
+                  setIsPaymentModalOpen(true);
+                }}
+                className="text-[10px] font-black text-amber-400 uppercase tracking-wider hover:underline"
+              >
+                Upgrade Now
+              </button>
+              <button
+                type="button"
+                onClick={() => setPremiumReminder(null)}
+                className="text-[10px] font-black text-slate-400 uppercase tracking-wider hover:underline"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+          <button 
+            type="button"
+            onClick={() => setPremiumReminder(null)} 
+            className="text-slate-500 hover:text-white shrink-0 self-start"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
