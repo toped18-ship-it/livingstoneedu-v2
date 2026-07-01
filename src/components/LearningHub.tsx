@@ -6,7 +6,7 @@ import { rtdbGet, NODES } from '../lib/rtdbService';
 import { 
   BookOpen, ChevronRight, CheckCircle, Search, HelpCircle, 
   Flame, Award, ArrowLeft, RotateCcw, AlertCircle, Save, Sparkles,
-  Volume2, VolumeX
+  Volume2, VolumeX, Printer, Download, Edit, Check, X
 } from 'lucide-react';
 
 interface LearningHubProps {
@@ -22,6 +22,7 @@ interface LearningHubProps {
   setSelectedSubjectId?: (id: string) => void;
   curriculums?: any[];
   proPrice?: string;
+  trialTimeRemaining?: number | null;
 }
 
 export function LearningHub({ 
@@ -36,7 +37,8 @@ export function LearningHub({
   selectedSubjectId: propsSelectedSubjectId,
   setSelectedSubjectId: propsSetSelectedSubjectId,
   curriculums = [],
-  proPrice = '₦5,000'
+  proPrice = '₦5,000',
+  trialTimeRemaining = null
 }: LearningHubProps) {
   // Speech synthesis states
   const [currentlySpeaking, setCurrentlySpeaking] = useState<string | null>(null);
@@ -143,6 +145,15 @@ export function LearningHub({
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [aiError, setAiError] = useState('');
 
+  // Editing states for custom lesson notes
+  const [isEditingLocal, setIsEditingLocal] = useState(false);
+  const [editTopic, setEditTopic] = useState('');
+  const [editIntroduction, setEditIntroduction] = useState('');
+  const [editDetailedNote, setEditDetailedNote] = useState('');
+  const [editHomework, setEditHomework] = useState('');
+  const [editVocab, setEditVocab] = useState('');
+  const [editMaterials, setEditMaterials] = useState('');
+
   // Automatically sync/load the compiled AI lesson note from the Realtime Database if it was published by the admin
   React.useEffect(() => {
     if (!selectedSubject) {
@@ -161,8 +172,19 @@ export function LearningHub({
     if (rtItem && (rtItem.detailedLessonNote || rtItem.introduction)) {
       setAiLessonNote(rtItem);
     } else {
-      setAiLessonNote(null);
+      const storageKey = `livingstone_custom_lesson_note_${user.id}_${user.classLevel}_${selectedSubject.id}_${selectedTerm}_${selectedWeek}`;
+      const cached = localStorage.getItem(storageKey);
+      if (cached) {
+        try {
+          setAiLessonNote(JSON.parse(cached));
+        } catch {
+          setAiLessonNote(null);
+        }
+      } else {
+        setAiLessonNote(null);
+      }
     }
+    setIsEditingLocal(false);
   }, [selectedSubject, selectedTerm, selectedWeek, curriculums, user.classLevel]);
 
   // Retrieve current active lesson content using generator or real-time admin sync
@@ -427,18 +449,116 @@ export function LearningHub({
       }
 
       const data = await response.json();
+      let generatedNote: any = null;
       if (data && data.success && data.lessonNote && data.lessonNote.topic) {
-        setAiLessonNote(data.lessonNote);
+        generatedNote = data.lessonNote;
       } else if (data && data.topic) {
-        setAiLessonNote(data);
+        generatedNote = data;
       } else {
         throw new Error('Received unexpected syllabus format from AI server.');
+      }
+
+      if (generatedNote) {
+        setAiLessonNote(generatedNote);
+        // Persist generated note to localStorage so user doesn't lose it!
+        const storageKey = `livingstone_custom_lesson_note_${user.id}_${user.classLevel}_${selectedSubject.id}_${selectedTerm}_${selectedWeek}`;
+        localStorage.setItem(storageKey, JSON.stringify(generatedNote));
       }
     } catch (err: any) {
       setAiError(err.message || 'Failed to connect to school AI generator.');
     } finally {
       setIsGeneratingAI(false);
     }
+  };
+
+  const handleStartEditing = () => {
+    if (!aiLessonNote) return;
+    setEditTopic(aiLessonNote.topic || '');
+    setEditIntroduction(aiLessonNote.introduction || '');
+    setEditDetailedNote(aiLessonNote.detailedLessonNote || '');
+    setEditHomework(aiLessonNote.homeworkAssignment || '');
+    setEditVocab((aiLessonNote.keyVocabulary || []).join(', '));
+    setEditMaterials((aiLessonNote.teachingMaterials || []).join(', '));
+    setIsEditingLocal(true);
+  };
+
+  const handleSaveEdits = () => {
+    if (!aiLessonNote) return;
+    const updatedNote = {
+      ...aiLessonNote,
+      topic: editTopic,
+      introduction: editIntroduction,
+      detailedLessonNote: editDetailedNote,
+      homeworkAssignment: editHomework,
+      keyVocabulary: editVocab.split(',').map(s => s.trim()).filter(Boolean),
+      teachingMaterials: editMaterials.split(',').map(s => s.trim()).filter(Boolean)
+    };
+    setAiLessonNote(updatedNote);
+    
+    // Save to localStorage
+    const storageKey = `livingstone_custom_lesson_note_${user.id}_${user.classLevel}_${selectedSubject.id}_${selectedTerm}_${selectedWeek}`;
+    localStorage.setItem(storageKey, JSON.stringify(updatedNote));
+    setIsEditingLocal(false);
+  };
+
+  const handleCancelEditing = () => {
+    setIsEditingLocal(false);
+  };
+
+  const handleExportToWord = () => {
+    if (!aiLessonNote) return;
+    const title = `${user.classLevel || 'Class'}_${selectedSubject?.name || 'Subject'}_Week_${selectedWeek}_Lesson_Note`;
+    
+    const contentHtml = `
+      <h1>${selectedSubject?.name} - ${user.classLevel}</h1>
+      <h2>Term ${selectedTerm}, Week ${selectedWeek} Lesson Note</h2>
+      <h3>Topic: ${aiLessonNote.topic || lesson.title}</h3>
+      <p><strong>Duration:</strong> ${aiLessonNote.duration || '40 Minutes'}</p>
+      
+      <h3>Learning Objectives</h3>
+      <ul>
+        ${(aiLessonNote.objectives || lesson.objectives || []).map((obj: string) => `<li>${obj}</li>`).join('')}
+      </ul>
+      
+      <h3>Key Vocabulary Terms</h3>
+      <ul>
+        ${(aiLessonNote.keyVocabulary || []).map((word: string) => `<li>${word}</li>`).join('')}
+      </ul>
+      
+      <h3>Teaching / Reference Materials</h3>
+      <ul>
+        ${(aiLessonNote.teachingMaterials || []).map((mat: string) => `<li>${mat}</li>`).join('')}
+      </ul>
+      
+      <h3>Introduction</h3>
+      <p>${aiLessonNote.introduction || ''}</p>
+      
+      <h3>Comprehensive Lesson Text</h3>
+      <div style="white-space: pre-wrap;">${aiLessonNote.detailedLessonNote || ''}</div>
+      
+      <h3>Classroom Exercises</h3>
+      <ul>
+        ${(aiLessonNote.classExercises || []).map((ex: string) => `<li>${ex}</li>`).join('')}
+      </ul>
+      
+      <h3>Weekly Assignment</h3>
+      <p>${aiLessonNote.homeworkAssignment || ''}</p>
+    `;
+    
+    const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' " +
+          "xmlns:w='urn:schemas-microsoft-com:office:office:word' " +
+          "xmlns='http://www.w3.org/TR/REC-html40'>" +
+          "<head><title>Lesson Note</title><style>body { font-family: Arial, sans-serif; line-height: 1.5; }</style></head><body>";
+    const footer = "</body></html>";
+    const sourceHTML = header + contentHtml + footer;
+    
+    const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML);
+    const fileDownload = document.createElement("a");
+    document.body.appendChild(fileDownload);
+    fileDownload.href = source;
+    fileDownload.download = `${title.replace(/\s+/g, '_')}.doc`;
+    fileDownload.click();
+    document.body.removeChild(fileDownload);
   };
 
   // Navigate directly to a search result
@@ -546,7 +666,8 @@ export function LearningHub({
               {subjects.map((subj) => {
                 const isSelected = selectedSubject?.id === subj.id;
                 const isPremiumSubj = subj.id !== 'mathematics' && subj.id !== 'english';
-                const showLockIcon = !isPro && isPremiumSubj;
+                const hasTrialTime = trialTimeRemaining !== null && trialTimeRemaining > 0;
+                const showLockIcon = !isPro && isPremiumSubj && !hasTrialTime;
                 return (
                   <button
                     key={subj.id}
@@ -661,7 +782,8 @@ export function LearningHub({
           {selectedSubject && (() => {
             const isPremiumSubject = selectedSubject.id !== 'mathematics' && selectedSubject.id !== 'english';
             const isTrialExceeded = demoUsageCount >= 15;
-            const isLocked = !isPro && (isPremiumSubject || isTrialExceeded);
+            const hasTrialTime = trialTimeRemaining !== null && trialTimeRemaining > 0;
+            const isLocked = !isPro && !hasTrialTime && (isPremiumSubject || isTrialExceeded);
 
             if (isLocked) {
               return (
@@ -805,18 +927,30 @@ export function LearningHub({
               )}
 
               {/* Lesson Notes Body */}
-              {aiLessonNote ? (
+              {isGeneratingAI ? (
+                <div className="p-10 bg-indigo-50/50 border border-indigo-100 rounded-3xl flex flex-col items-center justify-center text-center space-y-4 animate-pulse">
+                  <div className="h-14 w-14 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center animate-spin">
+                    <Sparkles size={28} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <h4 className="text-sm font-black text-slate-900 tracking-tight">AI is generating a detailed NERDC-aligned study note...</h4>
+                    <p className="text-xs text-slate-500 max-w-sm">
+                      We are assembling structured lesson outlines, vocabulary keywords, student classroom exercises, diagnostic quizzes, and exam tips. This may take 10-15 seconds.
+                    </p>
+                  </div>
+                </div>
+              ) : aiLessonNote ? (
                 <div className="bg-slate-50 border border-slate-150 p-5 rounded-2xl space-y-6 animate-fade-in relative">
-                  <div className="flex flex-wrap items-center justify-between border-b border-slate-200 pb-3 gap-2">
-                    <div className="flex items-center gap-2">
+                  <div className="flex flex-col xl:flex-row xl:items-center justify-between border-b border-slate-200 pb-3 gap-3">
+                     <div className="flex items-center gap-2">
                       <Sparkles size={15} className="text-indigo-600 fill-indigo-300" />
                       <h3 className="font-extrabold text-[10px] uppercase tracking-widest text-[#1e1b4b]">Livingstone AI Smart Lesson Note</h3>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
                         onClick={() => handleSpeak(`${aiLessonNote.introduction || ''}. ${aiLessonNote.detailedLessonNote || ''}`)}
-                        className={`text-xs font-bold transition flex items-center gap-1 cursor-pointer py-1 px-2.5 rounded-lg border ${
+                        className={`text-[11px] font-bold transition flex items-center gap-1 cursor-pointer py-1 px-2.5 rounded-lg border ${
                           currentlySpeaking === `${aiLessonNote.introduction || ''}. ${aiLessonNote.detailedLessonNote || ''}`
                             ? 'bg-indigo-50 border-indigo-200 text-indigo-700 animate-pulse font-extrabold'
                             : 'bg-white border-slate-200 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50/20'
@@ -834,13 +968,43 @@ export function LearningHub({
                           </>
                         )}
                       </button>
+
+                      <button
+                        type="button"
+                        onClick={handleGenerateAISyllabus}
+                        className="bg-white border border-indigo-200 hover:bg-indigo-50 text-indigo-700 text-[11px] font-extrabold py-1 px-2.5 rounded-lg flex items-center gap-1 transition cursor-pointer"
+                        title="Regenerate with AI"
+                      >
+                        <RotateCcw size={12} />
+                        <span>Regenerate</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => window.print()}
+                        className="bg-white border border-slate-200 hover:bg-indigo-50/20 text-slate-600 hover:text-indigo-600 text-[11px] font-bold py-1 px-2.5 rounded-lg flex items-center gap-1 transition cursor-pointer"
+                        title="Print / PDF Export"
+                      >
+                        <Printer size={12} />
+                        <span>Print</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleExportToWord}
+                        className="bg-white border border-slate-200 hover:bg-indigo-50/20 text-slate-600 hover:text-indigo-600 text-[11px] font-bold py-1 px-2.5 rounded-lg flex items-center gap-1 transition cursor-pointer"
+                        title="Word Export"
+                      >
+                        <Download size={12} />
+                        <span>Word</span>
+                      </button>
                       
                       <button
                         type="button"
                         onClick={() => setAiLessonNote(null)}
-                        className="text-xs text-indigo-600 hover:text-indigo-800 font-bold tracking-tight cursor-pointer"
+                        className="text-xs text-indigo-600 hover:text-indigo-800 font-bold tracking-tight cursor-pointer ml-1"
                       >
-                        Reset and show brief notes
+                        Reset
                       </button>
                     </div>
                   </div>
@@ -891,7 +1055,7 @@ export function LearningHub({
                   <div className="space-y-3.5">
                     <h4 className="text-xs font-extrabold text-[#1e1b4b] uppercase tracking-wider">Comprehensive Lesson Text</h4>
                     <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-3">
-                      <p className="text-xs font-extrabold text-indigo-905 italic">
+                      <p className="text-xs font-extrabold text-indigo-905 italic text-slate-800">
                         Introduction: {aiLessonNote.introduction}
                       </p>
                       <div className="text-xs sm:text-sm text-slate-705 leading-relaxed whitespace-pre-wrap font-sans text-slate-700">
@@ -938,27 +1102,50 @@ export function LearningHub({
                   </div>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {lesson.body.map((para, pIdx) => {
-                    const isSpeaking = currentlySpeaking === para;
-                    return (
-                      <div key={pIdx} className="flex gap-3 group items-start p-1 hover:bg-slate-50/50 rounded-lg transition">
-                        <p className="text-xs sm:text-sm text-slate-650 leading-relaxed text-slate-700 flex-1">
-                          {para}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => handleSpeak(para)}
-                          className={`p-1.5 rounded-lg border border-slate-100 hover:bg-slate-100 transition opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-0 cursor-pointer ${
-                            isSpeaking ? 'opacity-100 bg-blue-50 border-blue-200 text-blue-650' : 'text-slate-400 hover:text-blue-600'
-                          }`}
-                          title="Read paragraph aloud"
-                        >
-                          {isSpeaking ? <VolumeX size={13} className="animate-pulse" /> : <Volume2 size={13} />}
-                        </button>
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    {lesson.body.map((para, pIdx) => {
+                      const isSpeaking = currentlySpeaking === para;
+                      return (
+                        <div key={pIdx} className="flex gap-3 group items-start p-1 hover:bg-slate-50/50 rounded-lg transition">
+                          <p className="text-xs sm:text-sm text-slate-650 leading-relaxed text-slate-700 flex-1">
+                            {para}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => handleSpeak(para)}
+                            className={`p-1.5 rounded-lg border border-slate-100 hover:bg-slate-100 transition opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-0 cursor-pointer ${
+                              isSpeaking ? 'opacity-100 bg-blue-50 border-blue-200 text-blue-650' : 'text-slate-400 hover:text-blue-600'
+                            }`}
+                            title="Read paragraph aloud"
+                          >
+                            {isSpeaking ? <VolumeX size={13} className="animate-pulse" /> : <Volume2 size={13} />}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* AI Generation Suggestion Panel */}
+                  <div className="p-6 bg-gradient-to-r from-indigo-500/5 to-purple-500/5 border border-indigo-150/60 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-1.5">
+                        <Sparkles size={16} className="text-indigo-600" />
+                        <h4 className="text-xs font-extrabold text-[#1e1b4b] uppercase tracking-wider">Unleash Livingstone AI Study Assistant</h4>
                       </div>
-                    );
-                  })}
+                      <p className="text-xs text-slate-500 max-w-lg leading-relaxed">
+                        Need a fully comprehensive study note with structured academic explanations, key vocabulary terms, teaching materials, classroom exercises, and instant interactive CBT quizzes?
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleGenerateAISyllabus}
+                      className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-md shadow-indigo-100 cursor-pointer transition flex items-center gap-1.5 select-none shrink-0"
+                    >
+                      <Sparkles size={14} />
+                      <span>Generate Detailed Lesson Note</span>
+                    </button>
+                  </div>
                 </div>
               )}
 

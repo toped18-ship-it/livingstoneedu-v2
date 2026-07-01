@@ -132,11 +132,11 @@ export default function App() {
     if (currentUser && currentUser.role === 'student' && !currentUser.isPro) {
       const todayDate = new Date().toISOString().split('T')[0];
       if (currentUser.lastTrialAccessDate !== todayDate) {
-        setTrialTimeRemaining(900);
+        setTrialTimeRemaining(1200);
       } else if (currentUser.trialSecondsRemaining !== undefined) {
-        setTrialTimeRemaining(currentUser.trialSecondsRemaining);
+        setTrialTimeRemaining(Math.min(currentUser.trialSecondsRemaining, 1200));
       } else {
-        setTrialTimeRemaining(900);
+        setTrialTimeRemaining(1200);
       }
     } else {
       setTrialTimeRemaining(null);
@@ -471,7 +471,7 @@ export default function App() {
         if (userProfile) {
           if (userProfile.role === 'student' && !userProfile.isPro) {
             if (userProfile.lastTrialAccessDate !== todayDate) {
-              userProfile.trialSecondsRemaining = 900;
+              userProfile.trialSecondsRemaining = 1200;
               userProfile.lastTrialAccessDate = todayDate;
               await rtdbSet(`${NODES.USERS}/${id}`, userProfile).catch(() => {});
             }
@@ -489,7 +489,7 @@ export default function App() {
             selectedSubjectIds: cleanEmail === 'toped18@gmail.com' ? ['physics'] : ['mathematics', 'english'],
             role: cleanEmail === 'toped18@gmail.com' ? 'admin' : 'student',
             joinDate: new Date().toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }),
-            trialSecondsRemaining: cleanEmail === 'toped18@gmail.com' ? undefined : 900,
+            trialSecondsRemaining: cleanEmail === 'toped18@gmail.com' ? undefined : 1200,
             lastTrialAccessDate: cleanEmail === 'toped18@gmail.com' ? undefined : todayDate
           };
           setCurrentUser(fallbackProfile);
@@ -504,7 +504,7 @@ export default function App() {
           if (parsed && parsed.role === 'student' && !parsed.isPro) {
             const todayDate = new Date().toISOString().split('T')[0];
             if (parsed.lastTrialAccessDate !== todayDate) {
-              parsed.trialSecondsRemaining = 900;
+              parsed.trialSecondsRemaining = 1200;
               parsed.lastTrialAccessDate = todayDate;
               localStorage.setItem('hub_active_user', JSON.stringify(parsed));
             }
@@ -1138,31 +1138,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* Countdown Timer Badge */}
-              {currentUser && currentUser.role === 'student' && !currentUser.isPro && trialTimeRemaining !== null && (
-                <div 
-                  className={`flex items-center gap-1.5 px-2.5 py-1 bg-white rounded-xl border font-sans text-xs font-black uppercase tracking-wider shadow-sm select-none animate-pulse ${
-                    trialTimeRemaining <= 60 
-                      ? 'bg-red-50 text-red-600 border-red-200' 
-                      : trialTimeRemaining <= 300 
-                        ? 'bg-amber-50 text-amber-600 border-amber-200' 
-                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                  }`}
-                  title="Free Learning Time Remaining today"
-                >
-                  <Clock size={11} className={`${
-                    trialTimeRemaining <= 60 
-                      ? 'text-red-500' 
-                      : trialTimeRemaining <= 300 
-                        ? 'text-amber-500' 
-                        : 'text-emerald-500'
-                  }`} />
-                  <span className="text-[9px] hidden md:inline text-slate-500 font-bold uppercase tracking-tight">Free Time:</span>
-                  <span className="font-mono text-[11px] tracking-tight font-extrabold">
-                    {Math.floor(trialTimeRemaining / 60)}:{(trialTimeRemaining % 60).toString().padStart(2, '0')}
-                  </span>
-                </div>
-              )}
+              {/* Countdown Timer Badge (Made invisible/hidden) */}
 
               {currentUser?.isPro ? (
                 <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-750 rounded-lg border border-amber-200 text-[10px] font-black uppercase tracking-wider">
@@ -1343,6 +1319,7 @@ export default function App() {
                   setSelectedSubjectId={setSelectedSubjectId}
                   curriculums={curriculums}
                   proPrice={appConfig.proPrice}
+                  trialTimeRemaining={trialTimeRemaining}
                 />
               )}
 
@@ -1442,10 +1419,10 @@ export default function App() {
       <WhatsAppFloatingButton contactName={appConfig.contactName} supportGroupUrl={appConfig.supportGroupUrl} />
       <PWAInstallBanner />
 
-      {/* 15-Minute Free Daily Trial Locked Modal */}
+      {/* 20-Minute Free Daily Trial Locked Modal */}
       {currentUser && currentUser.role === 'student' && !currentUser.isPro && trialTimeRemaining === 0 && ['hub', 'quizzes', 'progress'].includes(activeTab) && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-fade-in">
-          <div className="w-full max-w-lg bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/50 rounded-3xl shadow-2xl overflow-hidden p-6 sm:p-8 text-center space-y-6 relative">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-fade-in overflow-y-auto">
+          <div className="w-full max-w-lg bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900/50 rounded-3xl shadow-2xl p-6 sm:p-8 text-center space-y-6 relative max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
             <div className="absolute top-4 right-4">
               <button 
                 type="button"
@@ -1466,7 +1443,7 @@ export default function App() {
                 Free Learning Time Ended
               </h2>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">
-                You have used your free 15-minute learning session today.
+                You have used your free 20-minute learning session today.
               </p>
             </div>
 
@@ -1504,14 +1481,14 @@ export default function App() {
                 onClick={() => {
                   setIsPaymentModalOpen(true);
                 }}
-                className="flex-1 py-3 px-6 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:brightness-110 text-white font-extrabold rounded-2xl shadow-lg transition duration-200 cursor-pointer text-xs uppercase tracking-wider"
+                className="flex-1 py-3 px-6 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:brightness-110 text-white font-extrabold rounded-2xl shadow-lg transition duration-200 cursor-pointer text-xs uppercase tracking-wider animate-pulse"
               >
                 Upgrade to Premium Now
               </button>
               <button
                 type="button"
                 onClick={() => {
-                  const message = `Hello Parent! I finished my free 15 minutes study session on ${appConfig.brandName}. Please help me pay to unlock unlimited full access for my class notes and exams!`;
+                  const message = `Hello Parent! I finished my free 20 minutes study session on ${appConfig.brandName}. Please help me pay to unlock unlimited full access for my class notes and exams!`;
                   window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
                 }}
                 className="py-3 px-5 border border-slate-200 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-extrabold rounded-2xl transition duration-200 cursor-pointer text-xs uppercase tracking-wider"

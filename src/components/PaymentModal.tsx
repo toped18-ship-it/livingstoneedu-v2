@@ -81,7 +81,7 @@ export function PaymentModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in font-sans overflow-y-auto">
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-[200] animate-fade-in font-sans overflow-y-auto">
       <div className="bg-white rounded-3xl overflow-hidden shadow-2xl max-w-md w-full border border-slate-100 flex flex-col max-h-[calc(100dvh-2rem)] sm:max-h-[90vh] transform transition-all animate-scale-in">
         
         {/* Header */}
