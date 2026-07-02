@@ -28,8 +28,10 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Inject Build ID into Service Worker
-        run: sed -i "s/BUILD_ID/${{ github.sha }}/g" public/sw.js
+      - name: Inject Build ID into Service Worker and App Entry
+        run: |
+          sed -i "s/BUILD_ID/${{ github.sha }}/g" public/sw.js
+          sed -i "s/BUILD_ID/${{ github.sha }}/g" src/main.tsx
 
       - name: Build Application
         run: npx vite build
