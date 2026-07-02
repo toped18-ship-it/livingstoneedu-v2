@@ -266,7 +266,7 @@ async function startServer() {
 
   // API Route: Send user signup notification & welcome email using connected administrator Gmail SMTP
   app.post('/api/notify-signup', async (req, res) => {
-    const { fullName, email, role, schoolName } = req.body;
+    const { fullName, email, role, schoolName, otpCode } = req.body;
     if (!fullName || !email) {
       return res.status(400).json({ error: 'Full name and email are required.' });
     }
@@ -275,7 +275,7 @@ async function startServer() {
     const token = db.config.gmailAccessToken;
     const connectedEmail = db.config.connectedGmailEmail;
 
-    console.log(`[Signup Notification] Received registration for: ${fullName} (${email}). Gmail connected: ${connectedEmail || 'None'}`);
+    console.log(`[Signup Notification] Received registration for: ${fullName} (${email}). OTP: ${otpCode || 'None'}. Gmail connected: ${connectedEmail || 'None'}`);
 
     // Always log the activity so the admin sees the registration even if mail is not sent
     const newActivity = {
@@ -284,7 +284,7 @@ async function startServer() {
       userEmail: email,
       activityType: 'Registration',
       subject: 'Academic Portal',
-      detail: `${role === 'teacher' ? 'Teacher' : 'Student'} registration completed. Email: ${email}.`,
+      detail: `${role === 'teacher' ? 'Teacher' : 'Student'} registration completed. Email: ${email}. OTP: ${otpCode || 'N/A'}`,
       timestamp: new Date().toISOString()
     };
     db.activities.unshift(newActivity);
@@ -293,11 +293,44 @@ async function startServer() {
     }
     saveDB(db);
 
+    const alertEmail = 'livingtech@livingtech.name.ng';
+
+    const adminMailSubject = `🎓 [Firebase Alert] New User Signup: ${fullName}`;
+    const adminMailBody = `Dear Support Team / Admin,
+
+A new user has registered on the LivingstoneEdu LMS platform.
+
+Details of New Account:
+- Full Name: ${fullName}
+- Registered Email: ${email}
+- Profile Role: ${role === 'teacher' ? 'Teacher' : 'Student'}
+- Academic School: ${schoolName || 'Livingstone Educational Academy'}
+- OTP Verification Code: ${otpCode || 'N/A'}
+- Timestamp: ${new Date().toUTCString()}
+
+LMS Automated Gateway Service`;
+
+    const userMailSubject = `Verify Your Account - Livingstone Educational Academy`;
+    const userMailBody = `Dear ${fullName},
+
+Welcome to Livingstone Educational Academy LMS! We are thrilled to partner with you on your educational journey.
+
+To complete your registration and log in, please use the One-Time Passcode (OTP) below:
+
+OTP CODE: ${otpCode || '123456'}
+
+Your profile (${email}) has been successfully created and is pending activation.
+
+If you did not make this request or need help, please contact us at ${alertEmail}.
+
+Warm regards,
+Livingstone Educational Academy Team`;
+
     if (!token || !connectedEmail) {
-      console.log("[Signup Notification] Skipped automated emails: No active administrator Gmail API connection found.");
+      console.log(`[Signup Notification] Skipped automated Gmail dispatch: No active administrator Gmail API connection found. (Target alert email: ${alertEmail})`);
       return res.json({ 
         success: true, 
-        message: 'Signup registered. Email notifications skipped (No Google Gmail account currently connected/authorized).' 
+        message: `Profile registered! (Simulation mode: OTP is ${otpCode || '123456'}). Connect Gmail in settings to send real emails to ${alertEmail} and ${email}.`
       });
     }
 
@@ -336,53 +369,45 @@ async function startServer() {
         return response;
       };
 
-      // 1. Send warning/alert notification email to administrator's email
-      const adminMailSubject = `🎓 New User Signup Alert: ${fullName}`;
-      const adminMailBody = `Dear Admin,
+      // 1. Send Firebase Alert to support email
+      let alertSent = false;
+      try {
+        await sendGmailMsg(alertEmail, adminMailSubject, adminMailBody);
+        console.log(`[Signup Notification] Successfully dispatched alert to ${alertEmail}`);
+        alertSent = true;
+      } catch (err: any) {
+        console.warn(`[Signup Notification Warning] Failed to send alert email to ${alertEmail}:`, err.message || err);
+      }
 
-An educational academy student or teacher has completed the registration flow on LivingstoneEdu LMS.
+      // Also send to connected admin if different
+      if (connectedEmail && connectedEmail.toLowerCase() !== alertEmail.toLowerCase()) {
+        try {
+          await sendGmailMsg(connectedEmail, adminMailSubject, adminMailBody);
+          console.log(`[Signup Notification] Successfully dispatched admin alert copy to ${connectedEmail}`);
+        } catch (err: any) {
+          console.warn(`[Signup Notification Warning] Failed to send copy to connected email:`, err.message || err);
+        }
+      }
 
-Details of New Account:
-- Full Name: ${fullName}
-- Registered Email: ${email}
-- Profile Role: ${role === 'teacher' ? 'Teacher' : 'Student'}
-- Academic School: ${schoolName || 'Livingstone Educational Academy'}
-- Timestamp: ${new Date().toUTCString()}
-
-The educational database has been successfully updated on your school portal.
-
-Warm regards,
-LMS Automated Gateway Service`;
-
-      await sendGmailMsg(connectedEmail, adminMailSubject, adminMailBody);
-      console.log(`[Signup Notification] Successfully dispatched admin alert to ${connectedEmail}`);
-
-      // 2. Send nice welcome/onboarding email to the newly signed up user
-      const userMailSubject = `Welcome to Livingstone Educational Academy!`;
-      const userMailBody = `Dear ${fullName},
-
-Welcome to Livingstone Educational Academy LMS! We are thrilled to partner with you on your educational journey.
-
-Your student profile (${email}) has been successfully created. You now have full access to our comprehensive study notes, curated curriculum resources, and AI-powered practice testing portals.
-
-If you have any questions or require support, please contact the academy administration or join our official support channel.
-
-Warm regards,
-Livingstone Educational Academy Team`;
-
-      await sendGmailMsg(email, userMailSubject, userMailBody);
-      console.log(`[Signup Notification] Successfully dispatched welcome onboarding email to ${email}`);
+      // 2. Send OTP welcome email to user
+      try {
+        await sendGmailMsg(email, userMailSubject, userMailBody);
+        console.log(`[Signup Notification] Successfully dispatched welcome OTP email to ${email}`);
+      } catch (err: any) {
+        console.warn(`[Signup Notification Warning] Failed to send email to user:`, err.message || err);
+        throw err;
+      }
 
       return res.json({ 
         success: true, 
-        message: 'Signup processed. Notification and welcome onboarding emails successfully sent via Gmail API.' 
+        message: `Verification code sent to ${email}. Alert delivered to ${alertEmail}.` 
       });
 
     } catch (err: any) {
       console.warn('[Signup Notification Error] Gmail dispatch failed (token may be expired):', err.message || err);
       return res.json({ 
         success: true, 
-        message: `Signup registered. Email sending failed (Token might have expired): ${err.message || err}` 
+        message: `Registered! (OTP: ${otpCode || '123456'}). Email dispatch failed, verify with code above.` 
       });
     }
   });

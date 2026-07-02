@@ -41,6 +41,25 @@ export const NODES = {
   ACADEMIC_SESSIONS: 'academic_sessions',
 };
 
+// Helper to recursively remove undefined properties before writing to RTDB
+const removeUndefined = (obj: any): any => {
+  if (obj === null || obj === undefined) return null;
+  if (Array.isArray(obj)) {
+    return obj.map(item => removeUndefined(item));
+  }
+  if (typeof obj === 'object') {
+    const cleaned: any = {};
+    Object.keys(obj).forEach(key => {
+      const val = obj[key];
+      if (val !== undefined) {
+        cleaned[key] = removeUndefined(val);
+      }
+    });
+    return cleaned;
+  }
+  return obj;
+};
+
 // Generic Realtime Database API Helpers
 export const rtdbGet = async (nodePath: string): Promise<any> => {
   try {
@@ -60,7 +79,8 @@ export const rtdbGet = async (nodePath: string): Promise<any> => {
 export const rtdbSet = async (nodePath: string, data: any): Promise<void> => {
   try {
     const dbRef = ref(rtdb, nodePath);
-    await set(dbRef, data);
+    const cleanedData = removeUndefined(data);
+    await set(dbRef, cleanedData);
   } catch (error) {
     if (String(error).includes('Permission denied') || String(error).includes('permission_denied')) {
       console.warn(`[RTDB Set Permission] Safe bypass for path [${nodePath}].`);
@@ -74,7 +94,8 @@ export const rtdbSet = async (nodePath: string, data: any): Promise<void> => {
 export const rtdbUpdate = async (nodePath: string, data: any): Promise<void> => {
   try {
     const dbRef = ref(rtdb, nodePath);
-    await update(dbRef, data);
+    const cleanedData = removeUndefined(data);
+    await update(dbRef, cleanedData);
   } catch (error) {
     if (String(error).includes('Permission denied') || String(error).includes('permission_denied')) {
       console.warn(`[RTDB Update Permission] Safe bypass for path [${nodePath}].`);
@@ -91,7 +112,8 @@ export const rtdbPush = async (nodePath: string, data: any): Promise<string> => 
     const newRef = push(dbRef);
     const key = newRef.key || '';
     const dataWithId = typeof data === 'object' && data !== null ? { ...data, id: key } : data;
-    await set(newRef, dataWithId);
+    const cleanedData = removeUndefined(dataWithId);
+    await set(newRef, cleanedData);
     return key;
   } catch (error) {
     if (String(error).includes('Permission denied') || String(error).includes('permission_denied')) {
