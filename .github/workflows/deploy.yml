@@ -9,6 +9,8 @@ on:
 
 permissions:
   contents: write # Required for JamesIves/github-pages-deploy-action to write to gh-pages branch
+  pages: write # Required for actions/deploy-pages to deploy directly
+  id-token: write # Required for OIDC connection
 
 jobs:
   web-deploy:
@@ -65,11 +67,23 @@ jobs:
           fi
           echo "All critical static assets are verified and present in dist!"
 
-      - name: Deploy to GitHub Pages
+      - name: Deploy to gh-pages branch (for Deploy from Branch setting)
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          folder: dist # The folder the action should deploy.
-          branch: gh-pages # The branch the action should deploy to.
+          folder: dist
+          branch: gh-pages
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact for direct deployment
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'dist'
+
+      - name: Deploy to GitHub Pages (for GitHub Actions setting)
+        id: deployment
+        uses: actions/deploy-pages@v4
 
 
