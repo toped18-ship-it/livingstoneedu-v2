@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - master
   workflow_dispatch: # Allows manual trigger from GitHub Actions tab
 
 permissions:
@@ -28,14 +29,18 @@ jobs:
         run: npm ci
 
       - name: Build Application
-        run: npm run build
+        run: npx vite build
 
       - name: Create CNAME file for Custom Domain
         run: echo "livingtech.name.ng" > dist/CNAME
 
+      - name: Create 404.html for SPA Routing
+        run: cp dist/index.html dist/404.html
+
       - name: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           folder: dist # The folder the action should deploy.
           branch: gh-pages # The branch the action should deploy to.
 
