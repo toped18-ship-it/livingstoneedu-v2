@@ -39,8 +39,31 @@ jobs:
       - name: Create CNAME file for Custom Domain
         run: echo "livingtech.name.ng" > dist/CNAME
 
+      - name: Create .nojekyll file to bypass Jekyll processing
+        run: touch dist/.nojekyll
+
       - name: Create 404.html for SPA Routing
         run: cp dist/index.html dist/404.html
+
+      - name: Verify dist contents before deployment
+        run: |
+          echo "=== Verifying Build Output Directory (dist) ==="
+          ls -la dist
+          
+          # Assert critical files are present
+          if [ ! -f dist/sw.js ]; then
+            echo "Error: sw.js is missing from the build output!"
+            exit 1
+          fi
+          if [ ! -f dist/manifest.json ]; then
+            echo "Error: manifest.json is missing from the build output!"
+            exit 1
+          fi
+          if [ ! -f dist/logo.jpg ]; then
+            echo "Error: logo.jpg is missing from the build output!"
+            exit 1
+          fi
+          echo "All critical static assets are verified and present in dist!"
 
       - name: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4
