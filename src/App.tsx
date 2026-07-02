@@ -29,6 +29,9 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'home' | 'hub' | 'quizzes' | 'progress' | 'faq' | 'contact' | 'admin'>(() => {
     if (typeof window !== 'undefined') {
       const path = window.location.pathname.replace(/^\//, '').replace(/\/$/, '');
+      if (path === 'homepage' || path === 'index.html' || path === '') {
+        return 'home';
+      }
       const validTabs = ['home', 'hub', 'quizzes', 'progress', 'faq', 'contact', 'admin'];
       if (validTabs.includes(path)) {
         return path as any;
@@ -233,6 +236,10 @@ export default function App() {
   // Synchronize activeTab with URL pathname
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    const currentPath = window.location.pathname.replace(/^\//, '').replace(/\/$/, '');
+    if ((currentPath === 'homepage' || currentPath === '') && activeTab === 'home') {
+      return; // Preserve the /homepage or empty path URL on the homepage dashboard
+    }
     const targetPath = `/${activeTab}`;
     if (window.location.pathname !== targetPath) {
       window.history.pushState(null, '', targetPath);
@@ -244,6 +251,10 @@ export default function App() {
     if (typeof window === 'undefined') return;
     const handlePopState = () => {
       const path = window.location.pathname.replace(/^\//, '').replace(/\/$/, '');
+      if (path === 'homepage' || path === '') {
+        setActiveTab('home');
+        return;
+      }
       const validTabs = ['home', 'hub', 'quizzes', 'progress', 'faq', 'contact', 'admin'];
       if (validTabs.includes(path)) {
         setActiveTab(path as any);
