@@ -621,12 +621,18 @@ Livingstone Educational Academy Team`;
 
   // API Route: Generate Exam Questions using Gemini 3.5 Flash
   app.post('/api/gemini/generate-exam', async (req, res) => {
-    const { subject, classLevel, numQuestions, term, topic } = req.body;
-    const questionsCount = parseInt(numQuestions) || 5;
-
-    console.log(`AI Gen Exam Request: Class=${classLevel}, Subject=${subject}, QCount=${questionsCount}`);
-
     try {
+      const { 
+        subject = "General Study", 
+        classLevel = "Primary 1", 
+        numQuestions = "5", 
+        term = "First Term", 
+        topic = "General Topic" 
+      } = req.body || {};
+      const questionsCount = parseInt(numQuestions) || 5;
+
+      console.log(`AI Gen Exam Request: Class=${classLevel}, Subject=${subject}, QCount=${questionsCount}`);
+
       if (!process.env.GEMINI_API_KEY) {
         throw new Error('GEMINI_API_KEY is not configured');
       }
@@ -711,11 +717,17 @@ Make sure the questions:
 
   // API Route: Check / Grade typed scripts & constructive writing
   app.post('/api/gemini/grade-script', async (req, res) => {
-    const { studentName, subject, classLevel, questions, studentAnswers } = req.body;
-
-    console.log(`AI Grading Request for student: ${studentName}, Class=${classLevel}, Subject=${subject}`);
-
     try {
+      const { 
+        studentName = "Student", 
+        subject = "General Study", 
+        classLevel = "Primary 1", 
+        questions = [], 
+        studentAnswers = [] 
+      } = req.body || {};
+
+      console.log(`AI Grading Request for student: ${studentName}, Class=${classLevel}, Subject=${subject}`);
+
       if (!process.env.GEMINI_API_KEY) {
         throw new Error('GEMINI_API_KEY is not configured');
       }
@@ -822,11 +834,15 @@ Format the output as a clean, plain JSON object with the following schema:
 
   // API Route: Expert NERDC 12-Week Curriculum Generator
   app.post('/api/gemini/generate-curriculum', async (req, res) => {
-    const { classLevel, subject, term } = req.body;
-
-    console.log(`AI Curriculum Generation request: Class=${classLevel}, Subject=${subject}, Term=${term}`);
-
     try {
+      const { 
+        classLevel = "Primary 1", 
+        subject = "General Study", 
+        term = "First Term" 
+      } = req.body || {};
+
+      console.log(`AI Curriculum Generation request: Class=${classLevel}, Subject=${subject}, Term=${term}`);
+
       if (!process.env.GEMINI_API_KEY) {
         throw new Error('GEMINI_API_KEY is not configured');
       }
@@ -911,11 +927,18 @@ Strictly use Nigerian context and terminology (such as using local examples, nam
 
   // API Route: Expert NERDC Curriculum Lesson Note Generator
   app.post('/api/gemini/generate-lesson-note', async (req, res) => {
-    const { classLevel, subject, term, week, focusTopic, isEndOfTerm } = req.body;
-
-    console.log(`AI Lesson Note Generation request: Class=${classLevel}, Subject=${subject}, Term=${term}, Week=${week}`);
-
     try {
+      const { 
+        classLevel = "Primary 1", 
+        subject = "General Study", 
+        term = "First Term", 
+        week = "Week 1", 
+        focusTopic = "General Topic", 
+        isEndOfTerm = false 
+      } = req.body || {};
+
+      console.log(`AI Lesson Note Generation request: Class=${classLevel}, Subject=${subject}, Term=${term}, Week=${week}`);
+
       if (!process.env.GEMINI_API_KEY) {
         throw new Error('GEMINI_API_KEY is not configured');
       }
@@ -930,15 +953,15 @@ Your job is to generate COMPLETE, UPDATED, DETAILED, and PROFESSIONALLY STRUCTUR
 
 CRITICAL M&E COMPLIANCE REQUIREMENT:
 - DO NOT generate generic educational content.
-- Generate lesson notes strictly from the curriculum topic selected of: "${focusTopic || 'General syllabus topic and standards'}".
-- Ensure all sections write specifically about "${focusTopic || 'General syllabus topic and standards'}" and nothing else.
+- Generate lesson notes strictly from the curriculum topic selected of: "${focusTopic}".
+- Ensure all sections write specifically about "${focusTopic}" and nothing else.
 
 Context parameters:
 - Student Class: ${classLevel}
 - Subject: ${subject}
 - Term: ${term}
 - Week: ${week}
-- Specific Focus: ${focusTopic || 'General syllabus topic and standards'}
+- Specific Focus: ${focusTopic}
 - Is End-of-Term Assessment Package? Yes
 
 Instructions on Quality and Tone:
@@ -1008,31 +1031,51 @@ Include complete revision highlights, 15 high-quality objective multiple-choice 
           ]
         };
       } else {
-        systemPrompt = `You are a friendly, direct classroom teacher in Nigeria. Your job is to write a clean, easy-to-read lesson note for students.
+        systemPrompt = `You are a friendly, direct classroom teacher in Nigeria. Your job is to write a clean, easy-to-read lesson note and matching assessments for students.
 
 CRITICAL RULES TO AVOID JUNK OUTPUT:
 1. DO NOT mention the "Federal Ministry of Education", "NERDC", "alignment sessions", "national standards", or "curriculum frameworks". The student/teacher already knows this!
 2. DO NOT write meta-commentary like "In this lesson note, we will explore...". 
 3. Start IMMEDIATELY with the topic title and the lesson content.
 4. Speak directly to the student or keep it in a standard lesson note format (Definition, Examples, Classwork).
+5. Generate exactly 5 interactive multiple-choice questions (quizQuestions) and 3 short theory questions (theoryQuestions) based on the topic.
+6. Each multiple-choice question must have exactly 4 options and a zero-indexed correctIndex (0-3).`;
 
-Strictly return data in this JSON format:
-{
-  "topic_title": "[The clean topic name]",
-  "note_body": "### What is [Topic]?\\n[Simple, direct definition without preamble]\\n\\n### Examples\\n[Clear, bulleted examples appropriate for the class level]\\n\\n### Why this matters\\n[One short paragraph showing how it applies to daily life directly, NO generic filler text about socio-economic transformation]",
-  "class_activity": "[A short 3-question exercise or activity for the week]"
-}`;
-
-        userPrompt = `Write a lesson note for ${classLevel}, Subject: ${subject}, Term: ${term}, Week: ${week} about the topic "${focusTopic || 'General syllabus topic'}". Ensure to strictly follow the JSON structure and rules provided.`;
+        userPrompt = `Write a lesson note and matching assessments for ${classLevel}, Subject: ${subject}, Term: ${term}, Week: ${week} about the topic "${focusTopic}". Ensure to strictly follow the JSON structure and rules provided.`;
 
         responseSchema = {
           type: Type.OBJECT,
           properties: {
             topic_title: { type: Type.STRING },
             note_body: { type: Type.STRING },
-            class_activity: { type: Type.STRING }
+            class_activity: { type: Type.STRING },
+            quizQuestions: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  question: { type: Type.STRING },
+                  options: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  correctIndex: { type: Type.INTEGER },
+                  explanation: { type: Type.STRING }
+                },
+                required: ['question', 'options', 'correctIndex', 'explanation']
+              }
+            },
+            theoryQuestions: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  question: { type: Type.STRING },
+                  modelAnswer: { type: Type.STRING },
+                  markingScheme: { type: Type.STRING }
+                },
+                required: ['question', 'modelAnswer', 'markingScheme']
+              }
+            }
           },
-          required: ['topic_title', 'note_body', 'class_activity']
+          required: ['topic_title', 'note_body', 'class_activity', 'quizQuestions', 'theoryQuestions']
         };
       }
 
@@ -1042,8 +1085,9 @@ Strictly return data in this JSON format:
         console.log("[Gemini Integration] Launching End-of-Term Revision Package synthesis on gemini-3.5-flash...");
         const geminiResponse = await ai.models.generateContent({
           model: 'gemini-3.5-flash',
-          contents: [systemPrompt, userPrompt],
+          contents: userPrompt,
           config: {
+            systemInstruction: systemPrompt,
             responseMimeType: 'application/json',
             responseSchema,
             temperature: 0.7
@@ -1055,110 +1099,54 @@ Strictly return data in this JSON format:
       } else {
         console.log("[Gemini Integration] Launching regular lesson note synthesis on gemini-3.5-flash...");
         
-        // Generate note and interactive assessments in parallel
-        const notePromise = ai.models.generateContent({
+        // Generate note and interactive assessments in a single call for high performance and reliability
+        const geminiResponse = await ai.models.generateContent({
           model: 'gemini-3.5-flash',
-          contents: [systemPrompt, userPrompt],
+          contents: userPrompt,
           config: {
+            systemInstruction: systemPrompt,
             responseMimeType: 'application/json',
             responseSchema,
             temperature: 0.7
           }
         });
 
-        const assessmentPrompt = `You are an expert school examiner in Nigeria. Write exactly 5 interactive multiple-choice questions (quizQuestions) and 3 short theory questions (theoryQuestions) based on the topic: "${focusTopic || 'the week lesson'}".
-Each multiple-choice question must have exactly 4 options and a zero-indexed correctIndex (0-3).
-Format response strictly as JSON with this schema:
-{
-  "quizQuestions": [
-    { "question": "string", "options": ["string", "string", "string", "string"], "correctIndex": integer, "explanation": "string" }
-  ],
-  "theoryQuestions": [
-    { "question": "string", "modelAnswer": "string", "markingScheme": "string" }
-  ]
-}`;
-
-        const assessmentPromise = ai.models.generateContent({
-          model: 'gemini-3.5-flash',
-          contents: assessmentPrompt,
-          config: {
-            responseMimeType: 'application/json',
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                quizQuestions: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      question: { type: Type.STRING },
-                      options: { type: Type.ARRAY, items: { type: Type.STRING } },
-                      correctIndex: { type: Type.INTEGER },
-                      explanation: { type: Type.STRING }
-                    },
-                    required: ['question', 'options', 'correctIndex', 'explanation']
-                  }
-                },
-                theoryQuestions: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      question: { type: Type.STRING },
-                      modelAnswer: { type: Type.STRING },
-                      markingScheme: { type: Type.STRING }
-                    },
-                    required: ['question', 'modelAnswer', 'markingScheme']
-                  }
-                }
-              },
-              required: ['quizQuestions', 'theoryQuestions']
-            },
-            temperature: 0.7
-          }
-        });
-
-        const [noteRes, assessmentRes] = await Promise.all([notePromise, assessmentPromise]);
-
-        const noteText = noteRes.text || '{}';
-        const noteJson = JSON.parse(noteText.trim());
-
-        const assessmentText = assessmentRes.text || '{}';
-        const assessmentJson = JSON.parse(assessmentText.trim());
+        const responseText = geminiResponse.text || '{}';
+        const parsedJson = JSON.parse(responseText.trim());
 
         // Map the clean JSON into fully robust schema expected by React components
         data = {
-          topic_title: noteJson.topic_title,
-          note_body: noteJson.note_body,
-          class_activity: noteJson.class_activity,
+          topic_title: parsedJson.topic_title,
+          note_body: parsedJson.note_body,
+          class_activity: parsedJson.class_activity,
 
-          topic: noteJson.topic_title || focusTopic,
+          topic: parsedJson.topic_title || focusTopic,
           subtopic: `${classLevel} - ${term} Term, Week ${week}`,
           classLevel: classLevel,
           duration: "40 Minutes per period",
           objectives: [
-            `Understand the core definitions of ${noteJson.topic_title || focusTopic}.`,
+            `Understand the core definitions of ${parsedJson.topic_title || focusTopic}.`,
             `Examine simple, real-life examples suited for ${classLevel}.`,
             `Apply the concepts to practical class exercises and homework.`
           ],
-          keyVocabulary: [noteJson.topic_title || focusTopic],
+          keyVocabulary: [parsedJson.topic_title || focusTopic],
           teachingMaterials: ["Writing Notebooks", "Whiteboard and markers", "Daily life objects"],
-          introduction: `Welcome students! Today we are learning about: ${noteJson.topic_title || focusTopic}. Let's get started!`,
+          introduction: `Welcome students! Today we are learning about: ${parsedJson.topic_title || focusTopic}. Let's get started!`,
           teacherExplanationSteps: [
             "Introduce the main definition of the topic in clear terms.",
             "Discuss the illustrative examples from everyday Nigerian life.",
             "Facilitate the class activity exercises for hands-on feedback."
           ],
-          detailedLessonNote: noteJson.note_body,
+          detailedLessonNote: parsedJson.note_body,
           studentActivities: [
             "Listen carefully to the teacher's explanation of the topic.",
             "Write down definitions and examples in your exercise book.",
             "Attempt the weekly classwork questions."
           ],
-          classExercises: [noteJson.class_activity],
-          homeworkAssignment: `Practice what you have learned today by reviewing the definition and examples of ${noteJson.topic_title || focusTopic}.`,
-          quizQuestions: assessmentJson.quizQuestions || [],
-          theoryQuestions: assessmentJson.theoryQuestions || [],
+          classExercises: [parsedJson.class_activity],
+          homeworkAssignment: `Practice what you have learned today by reviewing the definition and examples of ${parsedJson.topic_title || focusTopic}.`,
+          quizQuestions: parsedJson.quizQuestions || [],
+          theoryQuestions: parsedJson.theoryQuestions || [],
           subjectSpecificFocus: {
             title: "Core Student Focus",
             content: `Encouraging friendly study habits in ${subject} for ${classLevel}.`,
