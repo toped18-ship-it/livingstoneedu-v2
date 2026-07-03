@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
@@ -824,8 +827,8 @@ Format the output as a clean, plain JSON object with the following schema:
     console.log(`AI Curriculum Generation request: Class=${classLevel}, Subject=${subject}, Term=${term}`);
 
     try {
-      if (!process.env.GEMINI_API_KEY) {
-        throw new Error('GEMINI_API_KEY is not configured');
+      if (!process.env.GEMINI_API_KEY && !process.env.OPENAI_API_KEY) {
+        throw new Error('Neither GEMINI_API_KEY nor OPENAI_API_KEY is configured');
       }
 
       const systemPrompt = `You are an expert curriculum design specialist, Nigerian NERDC educational consultant, and syllabus director.
@@ -870,17 +873,54 @@ Strictly use Nigerian context and terminology (such as using local examples, nam
         required: ['weeks']
       };
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: [systemPrompt, userPrompt],
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema
-        }
-      });
+      let data: any;
+      const openaiApiKey = process.env.OPENAI_API_KEY;
 
-      const responseText = response.text || '';
-      const data = JSON.parse(responseText.trim());
+      if (openaiApiKey) {
+        console.log("[OpenAI Integration] Launching curriculum synthesis on gpt-4o...");
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${openaiApiKey}`
+          },
+          body: JSON.stringify({
+            model: "gpt-4o",
+            messages: [
+              { role: "system", content: `${systemPrompt}\n\nIMPORTANT: Return ONLY a valid JSON object with the "weeks" property containing exactly 12 elements as described in the instructions.` },
+              { role: "user", content: userPrompt }
+            ],
+            response_format: { type: "json_object" },
+            temperature: 0.7
+          })
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`OpenAI API error: ${response.status} - ${errText}`);
+        }
+
+        const result: any = await response.json();
+        const rawText = result.choices[0]?.message?.content || '{}';
+        const cleanJsonText = rawText.replace(/^```json\s*/i, "").replace(/```\s*$/, "");
+        data = JSON.parse(cleanJsonText.trim());
+        console.log("[OpenAI Integration] Curriculum generation succeeded and parsed successfully.");
+      } else {
+        console.log("[Gemini Integration] Launching curriculum synthesis on gemini-2.5-flash...");
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: [systemPrompt, userPrompt],
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema
+          }
+        });
+
+        const responseText = response.text || '';
+        data = JSON.parse(responseText.trim());
+        console.log("[Gemini Integration] Curriculum generation succeeded and parsed successfully.");
+      }
+
       res.json({ success: true, curriculum: data.weeks });
 
     } catch (error: any) {
@@ -910,8 +950,8 @@ Strictly use Nigerian context and terminology (such as using local examples, nam
     console.log(`AI Lesson Note Generation request: Class=${classLevel}, Subject=${subject}, Term=${term}, Week=${week}`);
 
     try {
-      if (!process.env.GEMINI_API_KEY) {
-        throw new Error('GEMINI_API_KEY is not configured');
+      if (!process.env.GEMINI_API_KEY && !process.env.OPENAI_API_KEY) {
+        throw new Error('Neither GEMINI_API_KEY nor OPENAI_API_KEY is configured');
       }
 
       let systemPrompt = `You are an expert curriculum planner, NERDC educational planner, lesson-note writer, and academic supervisor in Nigeria.
@@ -1153,21 +1193,55 @@ Note: Ensure there are exactly 5 quiz questions and exactly 3 theory questions i
 
       const fullSystemPrompt = `${systemPrompt}\n\n${schemaDescription}`;
 
-      console.log("[Gemini Integration] Launching lesson notes synthesis on gemini-3.5-flash...");
-      const geminiResponse = await ai.models.generateContent({
-        model: 'gemini-3.5-flash',
-        contents: [fullSystemPrompt, userPrompt],
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema,
-          temperature: 0.7
-        }
-      });
+      let data: any;
+      const openaiApiKey = process.env.OPENAI_API_KEY;
 
-      const responseText = geminiResponse.text || '{}';
-      const data = JSON.parse(responseText.trim());
-      
-      console.log("[Gemini Integration] Lesson note generation succeeded and parsed successfully.");
+      if (openaiApiKey) {
+        console.log("[OpenAI Integration] Launching lesson notes synthesis on gpt-4o...");
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${openaiApiKey}`
+          },
+          body: JSON.stringify({
+            model: "gpt-4o",
+            messages: [
+              { role: "system", content: fullSystemPrompt },
+              { role: "user", content: `${userPrompt}\n\nIMPORTANT: Return ONLY a valid JSON object matching the requested schema. Do not wrap in markdown blocks, except standard \`\`\`json if needed.` }
+            ],
+            response_format: { type: "json_object" },
+            temperature: 0.7
+          })
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`OpenAI API error: ${response.status} - ${errText}`);
+        }
+
+        const result: any = await response.json();
+        const rawText = result.choices[0]?.message?.content || '{}';
+        const cleanJsonText = rawText.replace(/^```json\s*/i, "").replace(/```\s*$/, "");
+        data = JSON.parse(cleanJsonText.trim());
+        console.log("[OpenAI Integration] Lesson note generation succeeded and parsed successfully.");
+      } else {
+        console.log("[Gemini Integration] Launching lesson notes synthesis on gemini-3.5-flash...");
+        const geminiResponse = await ai.models.generateContent({
+          model: 'gemini-3.5-flash',
+          contents: [fullSystemPrompt, userPrompt],
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema,
+            temperature: 0.7
+          }
+        });
+
+        const responseText = geminiResponse.text || '{}';
+        data = JSON.parse(responseText.trim());
+        console.log("[Gemini Integration] Lesson note generation succeeded and parsed successfully.");
+      }
+
       res.json({ success: true, lessonNote: data });
 
     } catch (error: any) {
