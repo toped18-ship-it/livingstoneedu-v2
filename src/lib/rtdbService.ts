@@ -382,19 +382,19 @@ export const seedRtdbIfEmpty = async () => {
     }
 
     // Check default owner account setup in users node
-    const usersData = await rtdbGet(NODES.USERS);
-    if (!usersData) {
-      await rtdbSet(NODES.USERS, {
-        'toped18_gmail_com': {
-          id: 'toped18_gmail_com',
-          fullName: 'App Owner (Tope)',
-          email: 'toped18@gmail.com',
-          avatarSeed: 'scholar',
-          role: 'admin',
-          schoolName: 'Livingstone Educational Academy',
-          isPro: true
-        }
+    const usersData = await rtdbGet(NODES.USERS) || {};
+    if (!usersData['toped18_gmail_com'] || usersData['toped18_gmail_com'].role !== 'admin' || !usersData['toped18_gmail_com'].isPro) {
+      await rtdbSet(`${NODES.USERS}/toped18_gmail_com`, {
+        id: 'toped18_gmail_com',
+        fullName: 'App Owner (Tope)',
+        email: 'toped18@gmail.com',
+        avatarSeed: 'scholar',
+        role: 'admin',
+        schoolName: 'Livingstone Educational Academy',
+        isPro: true,
+        isOtpVerified: true
       });
+      console.log('[RTDB Seed] Admin account (toped18@gmail.com) verified or re-established in RTDB.');
     }
 
     console.log('[RTDB Seed] Database check/seeding complete!');

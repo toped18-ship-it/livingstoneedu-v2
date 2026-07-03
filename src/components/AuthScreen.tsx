@@ -284,6 +284,17 @@ export function AuthScreen({ onAuthComplete }: AuthScreenProps) {
           }
         }
 
+        // ABSOLUTE ADMIN GUARANTEE OVERRIDE
+        if (isOwnerEmail && userProfile) {
+          if (userProfile.role !== 'admin' || !userProfile.isPro || !userProfile.isOtpVerified) {
+            userProfile.role = 'admin';
+            userProfile.isPro = true;
+            userProfile.isOtpVerified = true;
+            await rtdbSet(`${NODES.USERS}/${id}`, userProfile);
+            console.log("[AuthScreen login] Admin account forced & synced with RTDB successfully.");
+          }
+        }
+
         if (userProfile.role === 'admin' && cleanEmail !== 'toped18@gmail.com') {
           userProfile.role = 'student'; // security restriction
         }

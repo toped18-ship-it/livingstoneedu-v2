@@ -674,7 +674,7 @@ export function getLessonContent(
       `Analyze simple prose texts and pick out key themes.`
     ];
     body = [
-      `Welcome to this week's English studies lesson on '${title}'. Good language skills are vital for communication, professional success, and writing comprehensive articles. In this chapter, we focus on grammar rules, punctuation guidelines, and correct vocabulary usage.`,
+      `This English studies lesson focuses on '${title}'. Good language skills are vital for communication, professional success, and writing comprehensive articles. We focus on grammar rules, punctuation guidelines, and correct vocabulary usage.`,
       `Vocabulary and grammar do not exist in isolation. They are tools that we pair together to craft clear meaning. Writing elegant letters, summarizing heavy prose, or answering structural sentence concords requires a solid understanding of agreement rules.`,
       `To speak or write correctly, we must pay attention to how words interact. In conversational Nigerian and formal contexts alike, matching subjects with their correct verb forms (the Principle of Concord) remains a key element of high scoring in standard examinations.`
     ];

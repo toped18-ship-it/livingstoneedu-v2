@@ -728,6 +728,27 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
       if (res.ok) {
         const data = await res.json();
         onConfigChange(data.config);
+
+        // Client-side Direct RTDB backup sync (guarantees update even if server-side admin key is offline)
+        try {
+          const configObject = {
+            brandName,
+            appSubtitle,
+            proPrice,
+            supportGroupUrl,
+            contactName,
+            paystackLink,
+            flutterwaveLink,
+            bankName,
+            bankAccountNumber,
+            bankAccountName
+          };
+          await rtdbSet(NODES.SCHOOL_SETTINGS, configObject);
+          console.log("[Client RTDB Sync] Saved school settings directly to RTDB successfully.");
+        } catch (rtdbClientErr) {
+          console.warn("[Client RTDB Sync Warning] Failed to save school settings directly to RTDB:", rtdbClientErr);
+        }
+
         setSaveStatus('success:Settings saved and pushed to production server successfully!');
         showToast('Branding settings deployed to school server.', 'success');
         

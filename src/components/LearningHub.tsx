@@ -25,6 +25,58 @@ interface LearningHubProps {
   trialTimeRemaining?: number | null;
 }
 
+export function formatLessonNote(note: any): any {
+  if (!note) return note;
+  const formatted = { ...note };
+
+  const cleanText = (text: string): string => {
+    if (!text) return text;
+    // 1. Strip out any text occurring before 'Subject'
+    const subjectIndex = text.search(/Subject\s*:/i);
+    if (subjectIndex !== -1) {
+      text = text.substring(subjectIndex);
+    }
+    // 2. Enforce the removal of forbidden phrases
+    const forbiddenPhrases = [
+      /Welcome to this week's/gi,
+      /Module Learning Objectives/gi,
+      /In this chapter/gi,
+      /By the end of this lesson/gi,
+      /Course Learning Objectives/gi
+    ];
+    for (const phrase of forbiddenPhrases) {
+      text = text.replace(phrase, "");
+    }
+    return text;
+  };
+
+  if (formatted.detailedLessonNote && typeof formatted.detailedLessonNote === 'string') {
+    formatted.detailedLessonNote = cleanText(formatted.detailedLessonNote);
+  }
+
+  if (formatted.introduction && typeof formatted.introduction === 'string') {
+    // Introduction doesn't have "Subject:", just clean phrases
+    const forbiddenPhrases = [
+      /Welcome to this week's/gi,
+      /Module Learning Objectives/gi,
+      /In this chapter/gi,
+      /By the end of this lesson/gi,
+      /Course Learning Objectives/gi
+    ];
+    let cleanedIntro = formatted.introduction;
+    for (const phrase of forbiddenPhrases) {
+      cleanedIntro = cleanedIntro.replace(phrase, "");
+    }
+    formatted.introduction = cleanedIntro;
+  }
+
+  if (formatted.note_body && typeof formatted.note_body === 'string') {
+    formatted.note_body = cleanText(formatted.note_body);
+  }
+
+  return formatted;
+}
+
 export function LearningHub({ 
   user, 
   progressList, 
@@ -170,13 +222,13 @@ export function LearningHub({
     });
 
     if (rtItem && (rtItem.detailedLessonNote || rtItem.introduction)) {
-      setAiLessonNote(rtItem);
+      setAiLessonNote(formatLessonNote(rtItem));
     } else {
       const storageKey = `livingstone_custom_lesson_note_${user.id}_${user.classLevel}_${selectedSubject.id}_${selectedTerm}_${selectedWeek}`;
       const cached = localStorage.getItem(storageKey);
       if (cached) {
         try {
-          setAiLessonNote(JSON.parse(cached));
+          setAiLessonNote(formatLessonNote(JSON.parse(cached)));
         } catch {
           setAiLessonNote(null);
         }
@@ -459,10 +511,11 @@ export function LearningHub({
       }
 
       if (generatedNote) {
-        setAiLessonNote(generatedNote);
+        const formattedNote = formatLessonNote(generatedNote);
+        setAiLessonNote(formattedNote);
         // Persist generated note to localStorage so user doesn't lose it!
         const storageKey = `livingstone_custom_lesson_note_${user.id}_${user.classLevel}_${selectedSubject.id}_${selectedTerm}_${selectedWeek}`;
-        localStorage.setItem(storageKey, JSON.stringify(generatedNote));
+        localStorage.setItem(storageKey, JSON.stringify(formattedNote));
       }
     } catch (err: any) {
       setAiError(err.message || 'Failed to connect to school AI generator.');
@@ -889,7 +942,7 @@ export function LearningHub({
               <div className="p-4 bg-blue-500/5 border-l-4 border-blue-600 rounded-r-xl space-y-1.5">
                 <h4 className="text-xs font-extrabold text-blue-800 uppercase tracking-widest flex items-center gap-1.5">
                   <Sparkles size={13} />
-                  <span>Module Learning Objectives</span>
+                  <span>Learning Objectives</span>
                 </h4>
                 <ul className="text-xs font-semibold text-slate-700 space-y-1">
                   {lesson.objectives.map((obj, oIdx) => {
@@ -899,7 +952,7 @@ export function LearningHub({
                       <li key={oIdx} className="flex items-center justify-between gap-2 p-1 hover:bg-black/5 rounded-lg transition group">
                         <span className="flex gap-2">
                           <span className="text-blue-700 font-bold">•</span>
-                          <span>By the end of this lesson, you will be able to: {obj}</span>
+                          <span>Objective: {obj}</span>
                         </span>
                         <button
                           type="button"
