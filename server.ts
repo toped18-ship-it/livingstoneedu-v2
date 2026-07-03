@@ -643,7 +643,7 @@ Make sure the questions:
 5. All elements are formatted in plain, valid JSON without Markdown blocks.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.5-flash',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -748,7 +748,7 @@ Format the output as a clean, plain JSON object with the following schema:
 }`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.5-flash',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -827,8 +827,8 @@ Format the output as a clean, plain JSON object with the following schema:
     console.log(`AI Curriculum Generation request: Class=${classLevel}, Subject=${subject}, Term=${term}`);
 
     try {
-      if (!process.env.GEMINI_API_KEY && !process.env.OPENAI_API_KEY) {
-        throw new Error('Neither GEMINI_API_KEY nor OPENAI_API_KEY is configured');
+      if (!process.env.GEMINI_API_KEY) {
+        throw new Error('GEMINI_API_KEY is not configured');
       }
 
       const systemPrompt = `You are an expert curriculum design specialist, Nigerian NERDC educational consultant, and syllabus director.
@@ -873,53 +873,19 @@ Strictly use Nigerian context and terminology (such as using local examples, nam
         required: ['weeks']
       };
 
-      let data: any;
-      const openaiApiKey = process.env.OPENAI_API_KEY;
-
-      if (openaiApiKey) {
-        console.log("[OpenAI Integration] Launching curriculum synthesis on gpt-4o...");
-        const response = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${openaiApiKey}`
-          },
-          body: JSON.stringify({
-            model: "gpt-4o",
-            messages: [
-              { role: "system", content: `${systemPrompt}\n\nIMPORTANT: Return ONLY a valid JSON object with the "weeks" property containing exactly 12 elements as described in the instructions.` },
-              { role: "user", content: userPrompt }
-            ],
-            response_format: { type: "json_object" },
-            temperature: 0.7
-          })
-        });
-
-        if (!response.ok) {
-          const errText = await response.text();
-          throw new Error(`OpenAI API error: ${response.status} - ${errText}`);
+      console.log("[Gemini Integration] Launching curriculum synthesis on gemini-3.5-flash...");
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.5-flash',
+        contents: [systemPrompt, userPrompt],
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema
         }
+      });
 
-        const result: any = await response.json();
-        const rawText = result.choices[0]?.message?.content || '{}';
-        const cleanJsonText = rawText.replace(/^```json\s*/i, "").replace(/```\s*$/, "");
-        data = JSON.parse(cleanJsonText.trim());
-        console.log("[OpenAI Integration] Curriculum generation succeeded and parsed successfully.");
-      } else {
-        console.log("[Gemini Integration] Launching curriculum synthesis on gemini-2.5-flash...");
-        const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: [systemPrompt, userPrompt],
-          config: {
-            responseMimeType: 'application/json',
-            responseSchema
-          }
-        });
-
-        const responseText = response.text || '';
-        data = JSON.parse(responseText.trim());
-        console.log("[Gemini Integration] Curriculum generation succeeded and parsed successfully.");
-      }
+      const responseText = response.text || '';
+      const data = JSON.parse(responseText.trim());
+      console.log("[Gemini Integration] Curriculum generation succeeded and parsed successfully.");
 
       res.json({ success: true, curriculum: data.weeks });
 
@@ -950,11 +916,16 @@ Strictly use Nigerian context and terminology (such as using local examples, nam
     console.log(`AI Lesson Note Generation request: Class=${classLevel}, Subject=${subject}, Term=${term}, Week=${week}`);
 
     try {
-      if (!process.env.GEMINI_API_KEY && !process.env.OPENAI_API_KEY) {
-        throw new Error('Neither GEMINI_API_KEY nor OPENAI_API_KEY is configured');
+      if (!process.env.GEMINI_API_KEY) {
+        throw new Error('GEMINI_API_KEY is not configured');
       }
 
-      let systemPrompt = `You are an expert curriculum planner, NERDC educational planner, lesson-note writer, and academic supervisor in Nigeria.
+      let systemPrompt = "";
+      let userPrompt = "";
+      let responseSchema: any = {};
+
+      if (isEndOfTerm) {
+        systemPrompt = `You are an expert curriculum planner, NERDC educational planner, lesson-note writer, and academic supervisor in Nigeria.
 Your job is to generate COMPLETE, UPDATED, DETAILED, and PROFESSIONALLY STRUCTURED lesson notes conforming strictly to the latest Nigerian NERDC curriculum guidelines, WAEC/NECO standards, and BECE criteria.
 
 CRITICAL M&E COMPLIANCE REQUIREMENT:
@@ -968,22 +939,13 @@ Context parameters:
 - Term: ${term}
 - Week: ${week}
 - Specific Focus: ${focusTopic || 'General syllabus topic and standards'}
-- Is End-of-Term Assessment Package? ${isEndOfTerm ? 'Yes' : 'No'}
+- Is End-of-Term Assessment Package? Yes
 
 Instructions on Quality and Tone:
 1. Every section must be fully written out. Do NOT use brief placeholders (e.g. "etc.", "Introduce topic..."). Give detailed, printable lesson notes.
 2. Ensure rigorous national educational context: Use Nigerian local names (Amina, Chidi, Tunde, Musa, Ngozi), Nigerian cities/markets (Kano, Lagos, Onitsha, Mile 12, Balogun), Nigerian currency (Naira and Kobo), and local examples (cassava farming, palm oil production, local manufacturing, NEPA/DisCo grids).
-3. Align to specific fields depending on the subject type:
-   - English: Comprehension text, grammar terms, sentence structures.
-   - Mathematics: Logical step-by-step mathematical calculations, equations, and alternative solving tricks.
-   - Science: Detailed laboratory apparatus, experiment protocols, and strict environment safety safeguards.
-   - Arts/Social Studies: National values, moral civic duties, cultural references.
-4. Structure the output as clean JSON matching the requested schema.`;
+3. Structure the output as clean JSON matching the requested schema.`;
 
-      let userPrompt = "";
-      let responseSchema: any = {};
-
-      if (isEndOfTerm) {
         userPrompt = `Generate a comprehensive End-of-Term Revision Syllabus and Assessment package for ${classLevel} - ${subject} for ${term} Term.
 Include complete revision highlights, 15 high-quality objective multiple-choice questions, 5 comprehensive theory discussion questions with detailed marking keys, a practical project assessment rubric, and expert examination tips.`;
         
@@ -999,13 +961,12 @@ Include complete revision highlights, 15 high-quality objective multiple-choice 
             teachingMaterials: { type: Type.ARRAY, items: { type: Type.STRING } },
             introduction: { type: Type.STRING },
             teacherExplanationSteps: { type: Type.ARRAY, items: { type: Type.STRING } },
-            detailedLessonNote: { type: Type.STRING, description: "A very detailed, structured, comprehensive review of the entire term's syllabus in markdown format." },
+            detailedLessonNote: { type: Type.STRING },
             studentActivities: { type: Type.ARRAY, items: { type: Type.STRING } },
             classExercises: { type: Type.ARRAY, items: { type: Type.STRING } },
             homeworkAssignment: { type: Type.STRING },
             quizQuestions: {
               type: Type.ARRAY,
-              description: "Must contain exactly 15 high-quality objective Multiple Choice Questions covering all topics from the entire term.",
               items: {
                 type: Type.OBJECT,
                 properties: {
@@ -1019,7 +980,6 @@ Include complete revision highlights, 15 high-quality objective multiple-choice 
             },
             theoryQuestions: {
               type: Type.ARRAY,
-              description: "Must contain exactly 5 multi-part theory questions with full marking guidelines.",
               items: {
                 type: Type.OBJECT,
                 properties: {
@@ -1048,188 +1008,41 @@ Include complete revision highlights, 15 high-quality objective multiple-choice 
           ]
         };
       } else {
-        userPrompt = `Generate a fully fleshed out, extremely structured, exhaustive Weekly Lesson Note for ${classLevel}, Subject: ${subject}, Term: ${term}, Week: ${week}.
-Focus on: ${focusTopic || 'Latest NERDC national lesson criteria for ' + subject}.
-Include an elegant introduction, key vocabulary words, 100% written explanatory notes (at least 6-8 comprehensive paragraphs packed with Nigerian relevant examples), student class activities, and formal exercises.
-Include a quiz with exactly 5 multiple choice questions and 3 detailed theory questions with model answers and evaluation keys.`;
+        systemPrompt = `You are a friendly, direct classroom teacher in Nigeria. Your job is to write a clean, easy-to-read lesson note for students.
+
+CRITICAL RULES TO AVOID JUNK OUTPUT:
+1. DO NOT mention the "Federal Ministry of Education", "NERDC", "alignment sessions", "national standards", or "curriculum frameworks". The student/teacher already knows this!
+2. DO NOT write meta-commentary like "In this lesson note, we will explore...". 
+3. Start IMMEDIATELY with the topic title and the lesson content.
+4. Speak directly to the student or keep it in a standard lesson note format (Definition, Examples, Classwork).
+
+Strictly return data in this JSON format:
+{
+  "topic_title": "[The clean topic name]",
+  "note_body": "### What is [Topic]?\\n[Simple, direct definition without preamble]\\n\\n### Examples\\n[Clear, bulleted examples appropriate for the class level]\\n\\n### Why this matters\\n[One short paragraph showing how it applies to daily life directly, NO generic filler text about socio-economic transformation]",
+  "class_activity": "[A short 3-question exercise or activity for the week]"
+}`;
+
+        userPrompt = `Write a lesson note for ${classLevel}, Subject: ${subject}, Term: ${term}, Week: ${week} about the topic "${focusTopic || 'General syllabus topic'}". Ensure to strictly follow the JSON structure and rules provided.`;
 
         responseSchema = {
           type: Type.OBJECT,
           properties: {
-            topic: { type: Type.STRING },
-            subtopic: { type: Type.STRING },
-            classLevel: { type: Type.STRING },
-            duration: { type: Type.STRING },
-            objectives: { type: Type.ARRAY, items: { type: Type.STRING } },
-            keyVocabulary: { type: Type.ARRAY, items: { type: Type.STRING } },
-            teachingMaterials: { type: Type.ARRAY, items: { type: Type.STRING } },
-            introduction: { type: Type.STRING },
-            teacherExplanationSteps: { type: Type.ARRAY, items: { type: Type.STRING } },
-            detailedLessonNote: { type: Type.STRING, description: "Highly comprehensive pedagogical textual body of the lesson note, detailed with examples, written in rich readable markdown formatting." },
-            studentActivities: { type: Type.ARRAY, items: { type: Type.STRING } },
-            classExercises: { type: Type.ARRAY, items: { type: Type.STRING } },
-            homeworkAssignment: { type: Type.STRING },
-            quizQuestions: {
-              type: Type.ARRAY,
-              description: "Must contain exactly 5 high-quality objective Multiple Choice Questions for this lesson.",
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  question: { type: Type.STRING },
-                  options: { type: Type.ARRAY, items: { type: Type.STRING } },
-                  correctIndex: { type: Type.INTEGER },
-                  explanation: { type: Type.STRING }
-                },
-                required: ['question', 'options', 'correctIndex', 'explanation']
-              }
-            },
-            theoryQuestions: {
-              type: Type.ARRAY,
-              description: "Must contain exactly 3 comprehensive short-answer theory questions.",
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  question: { type: Type.STRING },
-                  modelAnswer: { type: Type.STRING },
-                  markingScheme: { type: Type.STRING }
-                },
-                required: ['question', 'modelAnswer', 'markingScheme']
-              }
-            },
-            subjectSpecificFocus: {
-              type: Type.OBJECT,
-              properties: {
-                title: { type: Type.STRING },
-                content: { type: Type.STRING },
-                safeguardsOrMoralLesson: { type: Type.STRING }
-              },
-              required: ['title', 'content', 'safeguardsOrMoralLesson']
-            }
+            topic_title: { type: Type.STRING },
+            note_body: { type: Type.STRING },
+            class_activity: { type: Type.STRING }
           },
-          required: [
-            'topic', 'subtopic', 'classLevel', 'duration', 'objectives', 'keyVocabulary',
-            'teachingMaterials', 'introduction', 'teacherExplanationSteps', 'detailedLessonNote',
-            'studentActivities', 'classExercises', 'homeworkAssignment', 'quizQuestions',
-            'theoryQuestions', 'subjectSpecificFocus'
-          ]
+          required: ['topic_title', 'note_body', 'class_activity']
         };
       }
 
-      const schemaDescription = isEndOfTerm ? `
-The response must be a JSON object with the following schema:
-{
-  "topic": "string",
-  "subtopic": "string",
-  "classLevel": "string",
-  "duration": "string",
-  "objectives": ["string"],
-  "keyVocabulary": ["string"],
-  "teachingMaterials": ["string"],
-  "introduction": "string",
-  "teacherExplanationSteps": ["string"],
-  "detailedLessonNote": "string (A very detailed, structured, comprehensive review of the entire term's syllabus in markdown format)",
-  "studentActivities": ["string"],
-  "classExercises": ["string"],
-  "homeworkAssignment": "string",
-  "quizQuestions": [
-    {
-      "question": "string",
-      "options": ["string", "string", "string", "string"],
-      "correctIndex": integer (0 to 3),
-      "explanation": "string"
-    }
-  ],
-  "theoryQuestions": [
-    {
-      "question": "string",
-      "modelAnswer": "string",
-      "markingScheme": "string"
-    }
-  ],
-  "subjectSpecificFocus": {
-    "title": "string",
-    "content": "string",
-    "safeguardsOrMoralLesson": "string"
-  }
-}
-Note: Ensure there are exactly 15 quiz questions and exactly 5 theory questions in the end-of-term Revision package.` : `
-The response must be a JSON object with the following schema:
-{
-  "topic": "string",
-  "subtopic": "string",
-  "classLevel": "string",
-  "duration": "string",
-  "objectives": ["string"],
-  "keyVocabulary": ["string"],
-  "teachingMaterials": ["string"],
-  "introduction": "string",
-  "teacherExplanationSteps": ["string"],
-  "detailedLessonNote": "string (Highly comprehensive pedagogical textual body of the lesson note, detailed with examples, written in rich readable markdown formatting)",
-  "studentActivities": ["string"],
-  "classExercises": ["string"],
-  "homeworkAssignment": "string",
-  "quizQuestions": [
-    {
-      "question": "string",
-      "options": ["string", "string", "string", "string"],
-      "correctIndex": integer (0 to 3),
-      "explanation": "string"
-    }
-  ],
-  "theoryQuestions": [
-    {
-      "question": "string",
-      "modelAnswer": "string",
-      "markingScheme": "string"
-    }
-  ],
-  "subjectSpecificFocus": {
-    "title": "string",
-    "content": "string",
-    "safeguardsOrMoralLesson": "string"
-  }
-}
-Note: Ensure there are exactly 5 quiz questions and exactly 3 theory questions in the regular weekly lesson note.`;
-
-      const fullSystemPrompt = `${systemPrompt}\n\n${schemaDescription}`;
-
       let data: any;
-      const openaiApiKey = process.env.OPENAI_API_KEY;
 
-      if (openaiApiKey) {
-        console.log("[OpenAI Integration] Launching lesson notes synthesis on gpt-4o...");
-        const response = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${openaiApiKey}`
-          },
-          body: JSON.stringify({
-            model: "gpt-4o",
-            messages: [
-              { role: "system", content: fullSystemPrompt },
-              { role: "user", content: `${userPrompt}\n\nIMPORTANT: Return ONLY a valid JSON object matching the requested schema. Do not wrap in markdown blocks, except standard \`\`\`json if needed.` }
-            ],
-            response_format: { type: "json_object" },
-            temperature: 0.7
-          })
-        });
-
-        if (!response.ok) {
-          const errText = await response.text();
-          throw new Error(`OpenAI API error: ${response.status} - ${errText}`);
-        }
-
-        const result: any = await response.json();
-        const rawText = result.choices[0]?.message?.content || '{}';
-        const cleanJsonText = rawText.replace(/^```json\s*/i, "").replace(/```\s*$/, "");
-        data = JSON.parse(cleanJsonText.trim());
-        console.log("[OpenAI Integration] Lesson note generation succeeded and parsed successfully.");
-      } else {
-        console.log("[Gemini Integration] Launching lesson notes synthesis on gemini-3.5-flash...");
+      if (isEndOfTerm) {
+        console.log("[Gemini Integration] Launching End-of-Term Revision Package synthesis on gemini-3.5-flash...");
         const geminiResponse = await ai.models.generateContent({
           model: 'gemini-3.5-flash',
-          contents: [fullSystemPrompt, userPrompt],
+          contents: [systemPrompt, userPrompt],
           config: {
             responseMimeType: 'application/json',
             responseSchema,
@@ -1239,9 +1052,122 @@ Note: Ensure there are exactly 5 quiz questions and exactly 3 theory questions i
 
         const responseText = geminiResponse.text || '{}';
         data = JSON.parse(responseText.trim());
-        console.log("[Gemini Integration] Lesson note generation succeeded and parsed successfully.");
+      } else {
+        console.log("[Gemini Integration] Launching regular lesson note synthesis on gemini-3.5-flash...");
+        
+        // Generate note and interactive assessments in parallel
+        const notePromise = ai.models.generateContent({
+          model: 'gemini-3.5-flash',
+          contents: [systemPrompt, userPrompt],
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema,
+            temperature: 0.7
+          }
+        });
+
+        const assessmentPrompt = `You are an expert school examiner in Nigeria. Write exactly 5 interactive multiple-choice questions (quizQuestions) and 3 short theory questions (theoryQuestions) based on the topic: "${focusTopic || 'the week lesson'}".
+Each multiple-choice question must have exactly 4 options and a zero-indexed correctIndex (0-3).
+Format response strictly as JSON with this schema:
+{
+  "quizQuestions": [
+    { "question": "string", "options": ["string", "string", "string", "string"], "correctIndex": integer, "explanation": "string" }
+  ],
+  "theoryQuestions": [
+    { "question": "string", "modelAnswer": "string", "markingScheme": "string" }
+  ]
+}`;
+
+        const assessmentPromise = ai.models.generateContent({
+          model: 'gemini-3.5-flash',
+          contents: assessmentPrompt,
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                quizQuestions: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      question: { type: Type.STRING },
+                      options: { type: Type.ARRAY, items: { type: Type.STRING } },
+                      correctIndex: { type: Type.INTEGER },
+                      explanation: { type: Type.STRING }
+                    },
+                    required: ['question', 'options', 'correctIndex', 'explanation']
+                  }
+                },
+                theoryQuestions: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      question: { type: Type.STRING },
+                      modelAnswer: { type: Type.STRING },
+                      markingScheme: { type: Type.STRING }
+                    },
+                    required: ['question', 'modelAnswer', 'markingScheme']
+                  }
+                }
+              },
+              required: ['quizQuestions', 'theoryQuestions']
+            },
+            temperature: 0.7
+          }
+        });
+
+        const [noteRes, assessmentRes] = await Promise.all([notePromise, assessmentPromise]);
+
+        const noteText = noteRes.text || '{}';
+        const noteJson = JSON.parse(noteText.trim());
+
+        const assessmentText = assessmentRes.text || '{}';
+        const assessmentJson = JSON.parse(assessmentText.trim());
+
+        // Map the clean JSON into fully robust schema expected by React components
+        data = {
+          topic_title: noteJson.topic_title,
+          note_body: noteJson.note_body,
+          class_activity: noteJson.class_activity,
+
+          topic: noteJson.topic_title || focusTopic,
+          subtopic: `${classLevel} - ${term} Term, Week ${week}`,
+          classLevel: classLevel,
+          duration: "40 Minutes per period",
+          objectives: [
+            `Understand the core definitions of ${noteJson.topic_title || focusTopic}.`,
+            `Examine simple, real-life examples suited for ${classLevel}.`,
+            `Apply the concepts to practical class exercises and homework.`
+          ],
+          keyVocabulary: [noteJson.topic_title || focusTopic],
+          teachingMaterials: ["Writing Notebooks", "Whiteboard and markers", "Daily life objects"],
+          introduction: `Welcome students! Today we are learning about: ${noteJson.topic_title || focusTopic}. Let's get started!`,
+          teacherExplanationSteps: [
+            "Introduce the main definition of the topic in clear terms.",
+            "Discuss the illustrative examples from everyday Nigerian life.",
+            "Facilitate the class activity exercises for hands-on feedback."
+          ],
+          detailedLessonNote: noteJson.note_body,
+          studentActivities: [
+            "Listen carefully to the teacher's explanation of the topic.",
+            "Write down definitions and examples in your exercise book.",
+            "Attempt the weekly classwork questions."
+          ],
+          classExercises: [noteJson.class_activity],
+          homeworkAssignment: `Practice what you have learned today by reviewing the definition and examples of ${noteJson.topic_title || focusTopic}.`,
+          quizQuestions: assessmentJson.quizQuestions || [],
+          theoryQuestions: assessmentJson.theoryQuestions || [],
+          subjectSpecificFocus: {
+            title: "Core Student Focus",
+            content: `Encouraging friendly study habits in ${subject} for ${classLevel}.`,
+            safeguardsOrMoralLesson: "Do your best and always participate in class activities!"
+          }
+        };
       }
 
+      console.log("[Gemini Integration] Lesson note generation succeeded and mapped successfully.");
       res.json({ success: true, lessonNote: data });
 
     } catch (error: any) {

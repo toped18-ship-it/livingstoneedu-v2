@@ -1,10 +1,11 @@
 const fs = require('fs');
 const https = require('https');
+const path = require('path');
 const { spawnSync } = require('child_process');
 
 const jdkUrl = 'https://api.adoptium.net/v3/binary/latest/21/ga/linux/x64/jdk/hotspot/normal/eclipse';
-const destFile = '/tmp/jdk21.tar.gz';
-const destDir = '/tmp/jdk21';
+const destFile = path.resolve('./jdk21.tar.gz');
+const destDir = path.resolve('./jdk21');
 
 function downloadFile(url, dest) {
     return new Promise((resolve, reject) => {

@@ -1,4 +1,4 @@
-const CACHE_NAME = "livingstoneedu-cache-v1";
+const CACHE_NAME = "livingstoneedu-cache-BUILD_ID";
 const ASSETS_TO_CACHE = [
   "/",
   "/index.html",
@@ -46,6 +46,26 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Handle SPA client-side routes navigation safely (Network First, falling back to cached /index.html)
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put("/index.html", responseToCache);
+            });
+          }
+          return response;
+        })
+        .catch(() => {
+          return caches.match("/index.html");
+        })
+    );
+    return;
+  }
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
@@ -63,10 +83,6 @@ self.addEventListener("fetch", (event) => {
         return caches.match(event.request).then((cachedResponse) => {
           if (cachedResponse) {
             return cachedResponse;
-          }
-          // Fallback to offline start page if root navigation fails
-          if (event.request.mode === "navigate") {
-            return caches.match("/");
           }
         });
       })

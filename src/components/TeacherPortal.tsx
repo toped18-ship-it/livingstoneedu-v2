@@ -308,14 +308,32 @@ export function TeacherPortal({ user, onNavigateToHome, isPro, onPaymentTrigger,
       }
 
       if (!matchedCurriculum) {
-        console.warn(`[WARN] No matching curriculum record found in Firebase for Class: ${targetClass}, Subject: ${targetSubject}, Term: ${targetTerm}, Week: ${targetWeek} with status "Published".`);
+        console.warn(`[WARN] No matching curriculum record found in Firebase for Class: ${targetClass}, Subject: ${targetSubject}, Term: ${targetTerm}, Week: ${targetWeek}. Defaulting to system curriculum baseline.`);
         
-        const warningMessage = `The lesson note generator could not find any official curriculum entry in the database for Class: ${targetClass}, Subject: ${targetSubject}, Term: ${targetTerm}, Week: ${targetWeek}. Please publish a topic with status "Published" in the curriculum node first! You can use the 'Curriculum Generator' tab in this portal to establish it.`;
-        
-        throw new Error(warningMessage);
+        const termNumDecimal = targetTerm === '1st Term' ? 1 : targetTerm === '2nd Term' ? 2 : 3;
+        const subjectIdMapped = targetSubject.toLowerCase().replace(/\s+/g, '_');
+        const defaultTopicTitle = getWeeklyTopicTitle(
+          targetClass as any,
+          subjectIdMapped,
+          termNumDecimal as any,
+          targetWeek as any
+        );
+
+        matchedCurriculum = {
+          class: targetClass,
+          subject: targetSubject,
+          term: targetTerm,
+          week: targetWeek,
+          topic: defaultTopicTitle,
+          details: `NERDC standard guidelines lesson structure for ${defaultTopicTitle}`,
+          status: 'Published'
+        };
       }
 
-      console.log(`[DEBUG] Successfully located matching curriculum topic: "${matchedCurriculum.topic}"`, matchedCurriculum);
+      const finalFocusTopic = customTopic.trim() || matchedCurriculum.topic;
+      const finalTopicDescription = customTopic.trim() ? `Custom lesson focus: ${customTopic.trim()}` : (matchedCurriculum.details || matchedCurriculum.topic);
+
+      console.log(`[DEBUG] Successfully preparing lesson note generation on topic: "${finalFocusTopic}"`);
 
       const res = await fetch('/api/gemini/generate-lesson-note', {
         method: 'POST',
@@ -325,8 +343,8 @@ export function TeacherPortal({ user, onNavigateToHome, isPro, onPaymentTrigger,
           subject: matchedCurriculum.subject,
           term: matchedCurriculum.term,
           week: `Week ${matchedCurriculum.week}`,
-          focusTopic: matchedCurriculum.topic,
-          topicDescription: matchedCurriculum.details || matchedCurriculum.topic,
+          focusTopic: finalFocusTopic,
+          topicDescription: finalTopicDescription,
           isEndOfTerm: isEndOfTerm
         })
       });

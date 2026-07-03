@@ -1,5 +1,6 @@
 import { spawn, execSync } from "child_process";
 import fs from "fs";
+import path from "path";
 
 const logFile = "./build.log";
 const pidFile = "./build.pid";
@@ -24,8 +25,8 @@ try {
     cwd: "./android",
     env: { 
       ...process.env, 
-      JAVA_HOME: "/tmp/jdk21",
-      ANDROID_HOME: "/app/applet/android-sdk"
+      JAVA_HOME: path.resolve("./jdk21"),
+      ANDROID_HOME: path.resolve("./android-sdk")
     },
     detached: true,
     stdio: ["ignore", out, out]

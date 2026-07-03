@@ -165,94 +165,35 @@ export const seedRtdbIfEmpty = async () => {
   try {
     console.log('[RTDB Seed] Check if database requires seeding...');
     
-    // Check curriculum node
+    // Check curriculum node and clean up previous local NERDC mock curriculum records
     const currData = await rtdbGet(NODES.CURRICULUM) || {};
     
-    const mandatoryClasses = [
-      'Primary 1', 'Primary 2', 'Primary 3', 'Primary 4', 'Primary 5', 'Primary 6',
-      'JSS 1', 'JSS 2', 'JSS 3',
-      'SS 1', 'SS 2', 'SS 3'
-    ];
-    
-    // Check if any of these standard classes are missing in existing curriculum records
-    const existingCurriculumClasses = new Set(Object.values(currData).map((cur: any) => cur?.class));
-    const missingCurriculumClass = mandatoryClasses.some(mc => !existingCurriculumClasses.has(mc));
+    const cleanedCurriculum: Record<string, any> = {};
+    let needsDatabaseClean = false;
 
-    if (Object.keys(currData).length < 500 || missingCurriculumClass) {
-      console.log('[RTDB Seed] Seeding missing elements of the 12 classes curriculum node...');
+    Object.keys(currData).forEach(key => {
+      const item = currData[key];
+      if (!item) return;
+
+      // Keep only curriculum items that are:
+      // 1. AI-generated (starting with curr_ai_)
+      // 2. Real custom or deep-content notes (contains detailedLessonNote, teacherExplanationSteps, classExercises, etc.)
+      const isAiCurriculum = key.startsWith('curr_ai_');
+      const hasDetailedContent = !!(item.detailedLessonNote || item.teacherExplanationSteps || item.classExercises || item.homeworkAssignment || item.quiz);
       
-      const classesToProcess = [
-        'Primary 1', 'Primary 2', 'Primary 3', 'Primary 4', 'Primary 5', 'Primary 6',
-        'JSS 1', 'JSS 2', 'JSS 3',
-        'SS 1', 'SS 2', 'SS 3'
-      ];
-
-      const classMapping: Record<string, string[]> = {
-        'Primary 1': ['Primary 1'],
-        'Primary 2': ['Primary 2'],
-        'Primary 3': ['Primary 3'],
-        'Primary 4': ['Primary 4'],
-        'Primary 5': ['Primary 5'],
-        'Primary 6': ['Primary 6'],
-        'JSS 1': ['JSS 1'],
-        'JSS 2': ['JSS 2'],
-        'JSS 3': ['JSS 3'],
-        'SS 1': ['SS 1', 'SSS 1'],
-        'SS 2': ['SS 2', 'SSS 2'],
-        'SS 3': ['SS 3', 'SSS 3']
-      };
-
-      const seedCurriculum: Record<string, any> = {};
-
-      for (const classLevel of classesToProcess) {
-        const targetClasses = classMapping[classLevel] || [classLevel];
-        const subjects = getSubjectsForClass(classLevel as any);
-        
-        for (const targetClass of targetClasses) {
-          const cleanClass = targetClass.trim().replace(/[.#$[\]/]/g, '_');
-
-          for (const sub of subjects) {
-            const cleanSubj = sub.name.trim().replace(/[.#$[\]/]/g, '_');
-
-            for (const termNum of [1, 2, 3] as const) {
-              const termLabel = `${termNum}${termNum === 1 ? 'st' : termNum === 2 ? 'nd' : 'rd'} Term`;
-
-              for (const weekNum of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const) {
-                const topicTitle = getWeeklyTopicTitle(classLevel as any, sub.id, termNum, weekNum);
-                
-                let objectives: string[] = [];
-                try {
-                  const lesson = getLessonContent(classLevel as any, sub.id, termNum, weekNum);
-                  objectives = lesson.objectives || [];
-                } catch {
-                  objectives = [
-                    `Explain standard rules and operations of ${topicTitle}.`,
-                    `Analyze step-by-step calculations and practical occurrences in Nigeria.`,
-                    `Complete corresponding continuous assessment and exam quizzes.`
-                  ];
-                }
-
-                const keyId = `curr_${cleanClass}_${cleanSubj}_t${termNum}_W${weekNum}`.replace(/\s+/g, '_');
-                
-                seedCurriculum[keyId] = {
-                  id: keyId,
-                  class: targetClass,
-                  subject: sub.name,
-                  term: termLabel,
-                  week: weekNum,
-                  topic: topicTitle,
-                  objectives: objectives,
-                  details: objectives.join('\n') || sub.description || `National syllabus guidelines covering ${topicTitle}.`,
-                  status: 'Published'
-                };
-              }
-            }
-          }
-        }
+      if (isAiCurriculum || hasDetailedContent) {
+        cleanedCurriculum[key] = item;
+      } else {
+        needsDatabaseClean = true;
       }
-      // Merge with existing ones (currData overrides standard seedCurriculum where key matches)
-      await rtdbSet(NODES.CURRICULUM, { ...seedCurriculum, ...currData });
-      console.log('[RTDB Seed] Seeding complete curriculum successfully finished!');
+    });
+
+    if (needsDatabaseClean) {
+      console.log('[RTDB Seed] Purging previous local seeded mock curriculum records to let AI generate them on-the-fly...');
+      await rtdbSet(NODES.CURRICULUM, cleanedCurriculum);
+      console.log('[RTDB Seed] Purged successfully. Remaining valid curriculums:', Object.keys(cleanedCurriculum).length);
+    } else {
+      console.log('[RTDB Seed] Curriculum node is clean. No previous local mock curriculum records found.');
     }
 
     // Check school settings
