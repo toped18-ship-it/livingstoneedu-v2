@@ -69,6 +69,7 @@ jobs:
 
       - name: Deploy to gh-pages branch (for Deploy from Branch setting)
         uses: JamesIves/github-pages-deploy-action@v4
+        continue-on-error: true
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           folder: dist
@@ -76,14 +77,17 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
+        continue-on-error: true
 
       - name: Upload artifact for direct deployment
         uses: actions/upload-pages-artifact@v3
+        continue-on-error: true
         with:
           path: 'dist'
 
       - name: Deploy to GitHub Pages (for GitHub Actions setting)
         id: deployment
         uses: actions/deploy-pages@v4
+        continue-on-error: true
 
 
