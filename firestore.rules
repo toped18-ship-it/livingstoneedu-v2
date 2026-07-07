@@ -122,8 +122,9 @@ service cloud.firestore {
       // Updates can modify profile details
       allow update: if (isVerifiedUser() && isValidId(userId) && userId == request.auth.uid &&
                      isValidUser(incoming()) && incoming().role == existing().role && 
-                     incoming().joinDate == existing().joinDate && incoming().id == existing().id &&
-                     incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'classLevel', 'avatarSeed', 'selectedSubjectIds', 'schoolName', 'isPro'])) ||
+                     incoming().id == existing().id &&
+                     (!existing().keys().hasAll(['joinDate']) || incoming().joinDate == existing().joinDate) &&
+                     (!existing().keys().hasAll(['email']) || incoming().email == existing().email)) ||
                     (isLocalId(userId) && isValidUser(incoming()));
                      
       allow delete: if (isVerifiedUser() && (userId == request.auth.uid || isAdmin())) || isLocalId(userId);
