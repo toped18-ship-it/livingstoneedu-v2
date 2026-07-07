@@ -29,15 +29,8 @@ function safeParseJson(text: string): any {
   }
 }
 
-// Initialize the GoogleGenAI client
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    },
-  },
-});
+// Google Gen AI Client holder
+let aiClient: GoogleGenAI | null = null;
 
 interface AppDB {
   config: {
@@ -156,6 +149,26 @@ function saveDB(db: AppDB) {
   } catch (err) {
     console.error("Failed to commit DB to disk", err);
   }
+}
+
+function getGeminiClient(): GoogleGenAI {
+  if (aiClient) return aiClient;
+  
+  const db = getDB();
+  const key = process.env.GEMINI_API_KEY || (db as any).geminiApiKey;
+  if (!key) {
+    throw new Error('GEMINI_API_KEY is not configured on the server. Please configure it in your Admin Panel settings.');
+  }
+  
+  aiClient = new GoogleGenAI({
+    apiKey: key,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      },
+    },
+  });
+  return aiClient;
 }
 
 async function startServer() {
@@ -496,6 +509,32 @@ Livingstone Educational Academy Team`;
     }
   });
 
+  // API Route: Get Secure Settings (Admin Only)
+  app.get('/api/admin/secure-settings', (req, res) => {
+    const db = getDB();
+    const key = (db as any).geminiApiKey || '';
+    const maskedKey = key ? `${key.substring(0, Math.min(6, key.length))}...${key.substring(Math.max(0, key.length - 4))}` : '';
+    res.json({ geminiApiKey: maskedKey, hasKey: !!key });
+  });
+
+  // API Route: Update Secure Settings (Admin Only)
+  app.post('/api/admin/secure-settings', (req, res) => {
+    const { geminiApiKey } = req.body;
+    const db = getDB();
+    
+    if (geminiApiKey && !geminiApiKey.includes('...')) {
+      (db as any).geminiApiKey = geminiApiKey.trim();
+      aiClient = null; // reset dynamic client cache to reload on next request
+      saveDB(db);
+    } else if (geminiApiKey === '') {
+      (db as any).geminiApiKey = '';
+      aiClient = null;
+      saveDB(db);
+    }
+    
+    res.json({ success: true, hasKey: !(!(db as any).geminiApiKey) });
+  });
+
   // API Route: Get App Custom Config
   app.get('/api/admin/config', (req, res) => {
     const db = getDB();
@@ -686,7 +725,7 @@ Make sure the questions:
         required: ['questions']
       };
 
-      const response = await ai.models.generateContent({
+      const response = await getGeminiClient().models.generateContent({
         model: 'gemini-3.5-flash',
         contents: [systemPrompt, `Generate ${questionsCount} questions now.`],
         config: {
@@ -744,10 +783,6 @@ Make sure the questions:
     try {
       console.log(`AI Grading Request for student: ${studentName}, Class=${classLevel}, Subject=${subject}`);
 
-      if (!process.env.GEMINI_API_KEY) {
-        throw new Error('GEMINI_API_KEY is not configured');
-      }
-
       const prompt = `You are an expert exam paper grader in West Africa (WAEC/NECO team).
 Grade the student script below.
 Student: ${studentName}
@@ -775,7 +810,7 @@ Format the output as a clean, plain JSON object with the following schema:
   "aiWeaknesses": array of strings (areas of curriculum they need to read about)
 }`;
 
-      const response = await ai.models.generateContent({
+      const response = await getGeminiClient().models.generateContent({
         model: 'gemini-3.5-flash',
         contents: prompt,
         config: {
