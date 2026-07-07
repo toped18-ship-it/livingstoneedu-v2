@@ -1,4 +1,4 @@
-const CACHE_NAME = "livingstoneedu-cache-49c45fc38e4b19516ff69b21c23d9f95177bad69";
+const CACHE_NAME = "livingstoneedu-cache-a8279a83121dc1456223c45fca5ead30f2f38241";
 const ASSETS_TO_CACHE = [
   "/",
   "/index.html",
