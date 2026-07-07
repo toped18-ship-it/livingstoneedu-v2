@@ -11,6 +11,23 @@ import { getFirestore as getAdminFirestore } from 'firebase-admin/firestore';
 import { getMessaging as getAdminMessaging } from 'firebase-admin/messaging';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
+import { jsonrepair } from 'jsonrepair';
+
+function safeParseJson(text: string): any {
+  const trimmed = text.trim();
+  try {
+    return JSON.parse(trimmed);
+  } catch (err: any) {
+    console.warn("[JSON Parse warning] Standard JSON.parse failed. Attempting jsonrepair...", err.message || err);
+    try {
+      const repaired = jsonrepair(trimmed);
+      return JSON.parse(repaired);
+    } catch (repairErr: any) {
+      console.error("[JSON Parse Error] jsonrepair also failed.", repairErr.message || repairErr);
+      throw err;
+    }
+  }
+}
 
 // Initialize the GoogleGenAI client
 const ai = new GoogleGenAI({
@@ -635,56 +652,51 @@ Livingstone Educational Academy Team`;
     const questionsCount = parseInt(numQuestions) || 5;
 
     try {
-      console.log(`AI Gen Exam Request: Class=${classLevel}, Subject=${subject}, QCount=${questionsCount}`);
+      console.log(`[Gemini Integration] AI Gen Exam Request: Class=${classLevel}, Subject=${subject}, QCount=${questionsCount}`);
 
-      if (!process.env.GEMINI_API_KEY) {
-        throw new Error('GEMINI_API_KEY is not configured');
-      }
-
-      // Generate content via GoogleGenAI using modern schema configuration
-      const prompt = `You are a professional teacher under the Nigerian Educational Research and Development Council (NERDC).
+      const systemPrompt = `You are a professional teacher under the Nigerian Educational Research and Development Council (NERDC).
 Generate a set of ${questionsCount} multiple-choice exam questions for ${classLevel}, Subject: ${subject}, Term: ${term || '1st Term'}, covering topics like: "${topic || 'General curriculum'}".
 
 Make sure the questions:
 1. Are appropriate for the academic level of a student in ${classLevel}.
 2. Contain active local Nigerian contexts, names, and scenarios (e.g., using Naira, Lagos, Abuja, Aliyu, Chinedu, Ngozi) where applicable.
 3. Every question must have exactly 4 options.
-4. "correctIndex" is a zero-indexed integer referencing the correct option index (e.g. 0 for A, 1 for B, 2 for C, 3 for D).
-5. All elements are formatted in plain, valid JSON without Markdown blocks.`;
+4. "correctIndex" is a zero-indexed integer referencing the correct option index (e.g. 0 for A, 1 for B, 2 for C, 3 for D).`;
+
+      const responseSchema = {
+        type: Type.OBJECT,
+        properties: {
+          questions: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                question: { type: Type.STRING },
+                options: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING }
+                },
+                correctIndex: { type: Type.INTEGER },
+                explanation: { type: Type.STRING }
+              },
+              required: ['question', 'options', 'correctIndex', 'explanation']
+            }
+          }
+        },
+        required: ['questions']
+      };
 
       const response = await ai.models.generateContent({
         model: 'gemini-3.5-flash',
-        contents: prompt,
+        contents: [systemPrompt, `Generate ${questionsCount} questions now.`],
         config: {
           responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              questions: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    question: { type: Type.STRING, description: 'The question text.' },
-                    options: { 
-                      type: Type.ARRAY, 
-                      items: { type: Type.STRING },
-                      description: 'Array of exactly four choice options.'
-                    },
-                    correctIndex: { type: Type.INTEGER, description: 'The index of the correct option (0-3).' },
-                    explanation: { type: Type.STRING, description: 'Brief expert teaching explanation of why this answer is correct.' }
-                  },
-                  required: ['question', 'options', 'correctIndex', 'explanation']
-                }
-              }
-            },
-            required: ['questions']
-          }
+          responseSchema
         }
       });
 
-      const responseText = response.text || '';
-      const data = JSON.parse(responseText.trim());
+      const responseText = response.text || '{}';
+      const data = safeParseJson(responseText);
       res.json({ success: true, questions: data.questions || [] });
 
     } catch (error: any) {
@@ -711,7 +723,7 @@ Make sure the questions:
             `Practical everyday application D option`
           ],
           correctIndex: (i * 2) % 4, // Pseudo random but repeatable correct index
-          explanation: `This is an automatic fallback explanation for ${subject} ${classLevel} because the external AI key was not declared or responded with a timeout. The correct standard option is verified.`
+          explanation: `This is an automatic fallback explanation for ${subject} ${classLevel}.`
         });
       }
 
@@ -785,7 +797,7 @@ Format the output as a clean, plain JSON object with the following schema:
       });
 
       const responseText = response.text || '';
-      const data = JSON.parse(responseText.trim());
+      const data = safeParseJson(responseText);
       res.json({ success: true, ...data });
 
     } catch (error: any) {
@@ -833,6 +845,211 @@ Format the output as a clean, plain JSON object with the following schema:
         aiWeaknesses: ['Needs to pay continuous attention to fundamental definitions', 'Revise weekly practical test exercises'],
         isFallback: true
       });
+    }
+  });
+
+  // API Route: Expert NERDC Aligned Lesson Note Generator (with strict topic-focus)
+  app.post('/api/gemini/generate-lesson-note', async (req, res) => {
+    const {
+      classLevel = "SS 1",
+      subject = "Mathematics",
+      term = "1st Term",
+      week = "Week 1",
+      focusTopic = "General Topic",
+      topicDescription = "",
+      isEndOfTerm = false,
+      studentFocus = false
+    } = req.body || {};
+
+    try {
+      console.log(`[Gemini Integration] AI Lesson Note Generation request: Class=${classLevel}, Subject=${subject}, Topic="${focusTopic}"`);
+
+      if (!process.env.GEMINI_API_KEY) {
+        throw new Error('GEMINI_API_KEY is not configured');
+      }
+
+      const systemPrompt = `You are an expert Nigerian school teacher, senior pedagogy specialist, and educational content developer aligned with the official NERDC (National Educational Research and Development Council) syllabus guidelines.
+Your job is to generate a comprehensive, highly structured, and complete Lesson Note explaining the requested academic topic.
+
+CRITICAL INSTRUCTION:
+You MUST explain the given topic: "${focusTopic}" under the subject: "${subject}" for the class level: "${classLevel}" in depth, following the target term (${term}) and week (${week}).
+You MUST NOT add or introduce anything outside the given topic. Focus entirely on the specific educational concepts, formulas, rules, grammar principles, historical context, or practical procedures of the given topic. Do not wander into unrelated domains, other subjects, or unrequested chapters. Keep the explanation laser-focused on the topic title and description provided.
+
+Ensure all markdown content inside 'detailedLessonNote' explains the specific topic thoroughly with clear explanations, formulas (if any), local Nigerian examples, and step-by-step procedures. Never use placeholder text like "etc." or "continue explaining here...". Everything must be fully written out.`;
+
+      const userPrompt = `Generate a complete lesson note object for the following lesson:
+Class Level: ${classLevel}
+Subject: ${subject}
+Term: ${term}
+Week: ${week}
+Focus Topic: ${focusTopic}
+Topic Description/Details: ${topicDescription || focusTopic}
+Is End Of Term Exam Prep: ${isEndOfTerm}
+Student Focused Mode: ${studentFocus}
+
+Output the result as a raw JSON object matching the requested schema exactly.`;
+
+      const responseSchema = {
+        type: Type.OBJECT,
+        properties: {
+          topic: { type: Type.STRING },
+          objectives: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING }
+          },
+          teachingMaterials: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING }
+          },
+          keyVocabulary: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING }
+          },
+          introduction: { type: Type.STRING },
+          teacherExplanationSteps: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING }
+          },
+          detailedLessonNote: { 
+            type: Type.STRING,
+            description: "Extremely detailed, complete lesson note in clear Markdown format explaining the specific topic completely. Do not truncate."
+          },
+          studentActivities: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING }
+          },
+          classExercises: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING }
+          },
+          homeworkAssignment: { type: Type.STRING },
+          quizQuestions: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                question: { type: Type.STRING },
+                options: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING }
+                },
+                correctIndex: { type: Type.INTEGER },
+                explanation: { type: Type.STRING }
+              },
+              required: ['question', 'options', 'correctIndex', 'explanation']
+            }
+          },
+          theoryQuestions: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                question: { type: Type.STRING },
+                modelAnswer: { type: Type.STRING },
+                markingSchemeName: { type: Type.STRING }
+              },
+              required: ['question', 'modelAnswer', 'markingSchemeName']
+            }
+          },
+          subjectSpecificFocus: {
+            type: Type.OBJECT,
+            properties: {
+              title: { type: Type.STRING },
+              content: { type: Type.STRING },
+              safeguardsOrMoralLesson: { type: Type.STRING }
+            },
+            required: ['title', 'content', 'safeguardsOrMoralLesson']
+          }
+        },
+        required: [
+          'topic', 'objectives', 'teachingMaterials', 'keyVocabulary',
+          'introduction', 'teacherExplanationSteps', 'detailedLessonNote',
+          'studentActivities', 'classExercises', 'homeworkAssignment',
+          'quizQuestions', 'theoryQuestions', 'subjectSpecificFocus'
+        ]
+      };
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.5-flash',
+        contents: [systemPrompt, userPrompt],
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema
+        }
+      });
+
+      const responseText = response.text || '';
+      const data = safeParseJson(responseText);
+
+      res.json({ success: true, lessonNote: data });
+
+    } catch (error: any) {
+      console.warn("AI lesson note generation failed, returning high-fidelity fallbacks explaining the topic directly...", error.message || error);
+      
+      const fallbackNote = {
+        topic: focusTopic,
+        objectives: [
+          `Understand the core definitions and principles of ${focusTopic}.`,
+          `Examine practical real-world applications of ${focusTopic} in the Nigerian context.`,
+          `Solve foundational exercise problems and answer conceptual questions on ${focusTopic}.`
+        ],
+        teachingMaterials: [
+          "Whiteboard & markers",
+          "NERDC aligned textbook and reference curriculum booklet",
+          "Relevant visual aids, illustrations, and local case materials"
+        ],
+        keyVocabulary: [
+          focusTopic.split(' ')[0] || "Foundations",
+          "NERDC Syllabus",
+          "Nigerian context",
+          "Core principles"
+        ],
+        introduction: `Welcome to this week's lesson on ${focusTopic} under the subject of ${subject} for ${classLevel}. Today we are exploring the essential concepts of ${focusTopic} to build a solid foundational understanding.`,
+        teacherExplanationSteps: [
+          `Introduce the term '${focusTopic}' and write the key definitions on the board.`,
+          `Explain the core rules, formulas, or grammar principles governing this topic.`,
+          `Demonstrate step-by-step examples or case studies relevant to the lesson.`,
+          `Allow students to ask clarifying questions and conduct a brief formative assessment.`
+        ],
+        detailedLessonNote: `## Lesson Note: ${focusTopic}\n\n### Introduction to ${focusTopic}\nIn this lesson, we study **${focusTopic}**, which is an essential part of the **${subject}** curriculum for **${classLevel}**. ${topicDescription || 'This lesson covers the core principles, definitions, and applications of this concept.'}\n\n### Key Concepts and Explanation\n1. **Core Definition**: This concept is fundamental to mastering advanced topics in this subject.\n2. **Step-by-Step Procedure**: \n   - Always start by analyzing the given terms.\n   - Apply the relevant rules or equations strictly.\n   - Verify your answers against standard guidelines.\n\n### Local Context & Nigerian Alignment\nIn Nigeria, understanding ${focusTopic} helps us solve local community challenges, optimize economic trades, improve agricultural yields, or articulate standard grammar points clearly, depending on the subject domain. Keeping our studies grounded in local context ensures that we build practical skills for national development.`,
+        studentActivities: [
+          "Take notes on the board and read the textbook introduction page.",
+          "Participate in the classroom discussion and explain key terms in their own words.",
+          "Solve the practice problems individually or in small study pairs."
+        ],
+        classExercises: [
+          `Define '${focusTopic}' in your own words and write down its primary principles.`,
+          `Give one real-world or local example where the principles of this lesson are applied.`
+        ],
+        homeworkAssignment: `Read the next sub-section of ${focusTopic} in your textbook and write a 100-word summary of how it relates to our everyday life in Nigeria.`,
+        quizQuestions: [
+          {
+            question: `What is the primary focus of studying ${focusTopic}?`,
+            options: [
+              `To understand the key definitions, rules, and applications of ${focusTopic}`,
+              "To learn how to draw unrelated diagrams",
+              "To ignore standard NERDC guidelines",
+              "To skip class assignments completely"
+            ],
+            correctIndex: 0,
+            explanation: `The lesson is strictly focused on explaining ${focusTopic} thoroughly and correctly.`
+          }
+        ],
+        theoryQuestions: [
+          {
+            question: `Explain the fundamental importance of ${focusTopic} under the ${subject} syllabus for ${classLevel}.`,
+            modelAnswer: `Understanding ${focusTopic} provides the necessary logical framework to solve more complex academic problems and apply these rules in standard everyday activities.`,
+            markingSchemeName: "Award 10 marks for a clear definition and complete list of principles."
+          }
+        ],
+        subjectSpecificFocus: {
+          title: `${subject} Pedagogy & Ethical Guidance`,
+          content: `Teachers should guide students to connect ${focusTopic} with daily observations, ensuring active student participation and logical deductions.`,
+          safeguardsOrMoralLesson: "Apply honest effort and collaborative integrity when solving class tasks."
+        }
+      };
+
+      res.json({ success: true, lessonNote: fallbackNote, isFallback: true });
     }
   });
 
@@ -904,7 +1121,7 @@ Strictly use Nigerian context and terminology (such as using local examples, nam
       });
 
       const responseText = response.text || '';
-      const data = JSON.parse(responseText.trim());
+      const data = safeParseJson(responseText);
       console.log("[Gemini Integration] Curriculum generation succeeded and parsed successfully.");
 
       res.json({ success: true, curriculum: data.weeks });
@@ -928,457 +1145,7 @@ Strictly use Nigerian context and terminology (such as using local examples, nam
       res.json({ success: true, curriculum: fallbackWeeks, isFallback: true });
     }
   });
-
-  // API Route: Expert NERDC Curriculum Lesson Note Generator
-  app.post('/api/gemini/generate-lesson-note', async (req, res) => {
-    const { 
-      classLevel = "Primary 1", 
-      subject = "General Study", 
-      term = "First Term", 
-      week = "Week 1", 
-      focusTopic = "General Topic", 
-      isEndOfTerm = false 
-    } = req.body || {};
-
-    try {
-      console.log(`AI Lesson Note Generation request: Class=${classLevel}, Subject=${subject}, Term=${term}, Week=${week}`);
-
-      if (!process.env.GEMINI_API_KEY) {
-        throw new Error('GEMINI_API_KEY is not configured');
-      }
-
-      let systemPrompt = "";
-      let userPrompt = "";
-      const responseSchema = {
-        type: Type.OBJECT,
-        properties: {
-          topic: { type: Type.STRING },
-          subtopic: { type: Type.STRING },
-          classLevel: { type: Type.STRING },
-          duration: { type: Type.STRING },
-          objectives: { type: Type.ARRAY, items: { type: Type.STRING } },
-          keyVocabulary: { type: Type.ARRAY, items: { type: Type.STRING } },
-          teachingMaterials: { type: Type.ARRAY, items: { type: Type.STRING } },
-          introduction: { type: Type.STRING },
-          teacherExplanationSteps: { type: Type.ARRAY, items: { type: Type.STRING } },
-          detailedLessonNote: { type: Type.STRING },
-          studentActivities: { type: Type.ARRAY, items: { type: Type.STRING } },
-          classExercises: { type: Type.ARRAY, items: { type: Type.STRING } },
-          homeworkAssignment: { type: Type.STRING },
-          quizQuestions: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                question: { type: Type.STRING },
-                options: { type: Type.ARRAY, items: { type: Type.STRING } },
-                correctIndex: { type: Type.INTEGER },
-                explanation: { type: Type.STRING }
-              },
-              required: ['question', 'options', 'correctIndex', 'explanation']
-            }
-          },
-          theoryQuestions: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                question: { type: Type.STRING },
-                modelAnswer: { type: Type.STRING },
-                markingScheme: { type: Type.STRING }
-              },
-              required: ['question', 'modelAnswer', 'markingScheme']
-            }
-          },
-          subjectSpecificFocus: {
-            type: Type.OBJECT,
-            properties: {
-              title: { type: Type.STRING },
-              content: { type: Type.STRING },
-              safeguardsOrMoralLesson: { type: Type.STRING }
-            },
-            required: ['title', 'content', 'safeguardsOrMoralLesson']
-          }
-        },
-        required: [
-          'topic', 'subtopic', 'classLevel', 'duration', 'objectives', 'keyVocabulary',
-          'teachingMaterials', 'introduction', 'teacherExplanationSteps', 'detailedLessonNote',
-          'studentActivities', 'classExercises', 'homeworkAssignment', 'quizQuestions',
-          'theoryQuestions', 'subjectSpecificFocus'
-        ]
-      };
-
-      if (isEndOfTerm) {
-        systemPrompt = `You are an expert Nigerian curriculum developer, professional lesson-note writer, and instructional designer.
-Your task is to generate complete, accurate, and professionally structured lesson notes based ONLY on the information provided by the user.
-
-STRICT INSTRUCTIONS:
-1. Generate lesson notes ONLY for the revision/assessment of the exact topic or term subject area: "${focusTopic}".
-2. Follow the current Nigerian curriculum standards.
-3. Do NOT change the topic.
-4. Do NOT introduce unrelated topics.
-5. Do NOT add WAEC, NECO, JAMB preparation, examination/study tips, career advice, national development discussions, entrepreneurship, or general educational commentary.
-6. Do NOT write any welcome messages, course introductions, module learning objectives, chapter introductions, weekly lesson introductions, or generic educational content.
-7. Begin immediately with the lesson note.
-8. The lesson note must remain focused entirely on the supplied topic: "${focusTopic}".
-9. Every explanation, example, activity, and assessment must relate directly to the topic.
-10. Never invent extra curriculum content outside the specified topic.
-11. The text inside the "detailedLessonNote" field MUST begin immediately with the word "Subject:" and there must be NO text, markdown titles, header lines, greetings, or introductions before "Subject:".
-
-Inside the "detailedLessonNote" field, you MUST write the core revision lesson note starting IMMEDIATELY with the following exact headers and format (ensure there is absolutely no text before "Subject:"):
-
-Subject: ${subject}
-Class: ${classLevel}
-Term: ${term}
-Week: ${week}
-Topic: ${focusTopic} (Revision and Assessment)
-Duration: 40 Minutes
-
-### Reference Materials
-[Provide reference books/materials]
-
-### Previous Knowledge
-[Describe previous knowledge]
-
-### Instructional Materials
-[Describe instructional materials]
-
-### Behavioural Objectives
-[Describe behavioural objectives]
-
-### Learning Objectives
-[Describe learning objectives]
-
-### Set Induction
-[Describe set induction]
-
-### Lesson Introduction
-[Describe lesson introduction]
-
-### Lesson Development
-[Detailed step-by-step revision of the term's key concepts and topics, Definitions, Explanation of Concepts, Step-by-step Teaching Points, and Worked Examples]
-
-### Teacher Activities
-[Describe teacher activities]
-
-### Learner Activities
-[Describe learner activities]
-
-### Evaluation
-[Provide class evaluation questions]
-
-### Assignment
-[Provide homework assignment]
-
-### Summary
-[Provide lesson summary]
-
-### Conclusion
-[Provide lesson conclusion]
-
-Provide accurate academic language, explain concepts thoroughly, and ensure factual correctness.`;
-
-        userPrompt = `Write a complete, highly-detailed revision lesson note and matching assessments for ${classLevel}, Subject: ${subject}, Term: ${term}, Week: ${week} about the revision topic "${focusTopic}". Make sure the "detailedLessonNote" field in the JSON structure begins immediately with "Subject:" and contains all specified sections exactly.`;
-      } else {
-        systemPrompt = `You are an expert Nigerian curriculum developer, professional lesson-note writer, and instructional designer.
-Your task is to generate complete, accurate, and professionally structured lesson notes based ONLY on the information provided by the user.
-
-STRICT INSTRUCTIONS:
-1. Generate lesson notes ONLY for the exact topic: "${focusTopic}".
-2. Follow the current Nigerian curriculum standards.
-3. Do NOT change the topic.
-4. Do NOT introduce unrelated topics.
-5. Do NOT add WAEC, NECO, JAMB preparation, examination/study tips, career advice, national development discussions, entrepreneurship, or general educational commentary.
-6. Do NOT write any welcome messages, course introductions, module learning objectives, chapter introductions, weekly lesson introductions, or generic educational content.
-7. Begin immediately with the lesson note.
-8. The lesson note must remain focused entirely on the supplied topic: "${focusTopic}".
-9. Every explanation, example, activity, and assessment must relate directly to the topic.
-10. Never invent extra curriculum content outside the specified topic.
-11. The text inside the "detailedLessonNote" field MUST begin immediately with the word "Subject:" and there must be NO text, markdown titles, header lines, greetings, or introductions before "Subject:".
-
-Inside the "detailedLessonNote" field, you MUST write the core lesson note starting IMMEDIATELY with the following exact headers and format (ensure there is absolutely no text before "Subject:"):
-
-Subject: ${subject}
-Class: ${classLevel}
-Term: ${term}
-Week: ${week}
-Topic: ${focusTopic}
-Duration: 40 Minutes
-
-### Reference Materials
-[Provide reference books/materials]
-
-### Previous Knowledge
-[Describe previous knowledge]
-
-### Instructional Materials
-[Describe instructional materials]
-
-### Behavioural Objectives
-[Describe behavioural objectives]
-
-### Learning Objectives
-[Describe learning objectives]
-
-### Set Induction
-[Describe set induction]
-
-### Lesson Introduction
-[Describe lesson introduction]
-
-### Lesson Development
-[Detailed step-by-step lesson development, Definitions, Explanation of Concepts, Step-by-step Teaching Points, and Worked Examples]
-
-### Teacher Activities
-[Describe teacher activities]
-
-### Learner Activities
-[Describe learner activities]
-
-### Evaluation
-[Provide class evaluation questions]
-
-### Assignment
-[Provide homework assignment]
-
-### Summary
-[Provide lesson summary]
-
-### Conclusion
-[Provide lesson conclusion]
-
-Provide accurate academic language, explain concepts thoroughly, provide correct worked examples where applicable (for Mathematics and Science), and ensure factual correctness.`;
-
-        userPrompt = `Write a complete, highly-detailed lesson note and matching assessments for ${classLevel}, Subject: ${subject}, Term: ${term}, Week: ${week} about the topic "${focusTopic}". Ensure the "detailedLessonNote" field in the JSON structure begins immediately with "Subject:" and contains all specified sections exactly.`;
-      }
-
-      let data: any;
-
-      if (isEndOfTerm) {
-        console.log("[Gemini Integration] Launching End-of-Term Revision Package synthesis on gemini-3.5-flash...");
-        const geminiResponse = await ai.models.generateContent({
-          model: 'gemini-3.5-flash',
-          contents: userPrompt,
-          config: {
-            systemInstruction: systemPrompt,
-            responseMimeType: 'application/json',
-            responseSchema,
-            temperature: 0.7
-          }
-        });
-
-        const responseText = geminiResponse.text || '{}';
-        data = JSON.parse(responseText.trim());
-        // Map top-level aliases for compatibility
-        data.topic_title = data.topic;
-        data.note_body = data.detailedLessonNote;
-        data.class_activity = (data.classExercises && data.classExercises[0]) || "";
-      } else {
-        console.log("[Gemini Integration] Launching regular lesson note synthesis on gemini-3.5-flash...");
-        
-        const geminiResponse = await ai.models.generateContent({
-          model: 'gemini-3.5-flash',
-          contents: userPrompt,
-          config: {
-            systemInstruction: systemPrompt,
-            responseMimeType: 'application/json',
-            responseSchema,
-            temperature: 0.7
-          }
-        });
-
-        const responseText = geminiResponse.text || '{}';
-        const parsedJson = JSON.parse(responseText.trim());
-
-        // Map the detailed response JSON and ensure compatibilities
-        data = {
-          ...parsedJson,
-          topic_title: parsedJson.topic,
-          note_body: parsedJson.detailedLessonNote,
-          class_activity: (parsedJson.classExercises && parsedJson.classExercises[0]) || ""
-        };
-      }
-
-      // Post-processing helper to clean up unwanted text before 'Subject:' and forbidden phrases
-      const cleanLessonText = (text: string): string => {
-        if (!text) return text;
-        const subjectIndex = text.search(/Subject\s*:/i);
-        if (subjectIndex !== -1) {
-          text = text.substring(subjectIndex);
-        }
-        const forbiddenPhrases = [
-          /Welcome to this week's/gi,
-          /Module Learning Objectives/gi,
-          /In this chapter/gi,
-          /By the end of this lesson/gi,
-          /Course Learning Objectives/gi
-        ];
-        for (const phrase of forbiddenPhrases) {
-          text = text.replace(phrase, "");
-        }
-        return text;
-      };
-
-      if (data) {
-        if (data.detailedLessonNote && typeof data.detailedLessonNote === "string") {
-          data.detailedLessonNote = cleanLessonText(data.detailedLessonNote);
-        }
-        if (data.introduction && typeof data.introduction === "string") {
-          // Introduction might not start with "Subject:", let's just clean forbidden phrases there
-          const forbiddenPhrases = [
-            /Welcome to this week's/gi,
-            /Module Learning Objectives/gi,
-            /In this chapter/gi,
-            /By the end of this lesson/gi,
-            /Course Learning Objectives/gi
-          ];
-          let cleanedIntro = data.introduction;
-          for (const phrase of forbiddenPhrases) {
-            cleanedIntro = cleanedIntro.replace(phrase, "");
-          }
-          data.introduction = cleanedIntro;
-        }
-        if (data.note_body && typeof data.note_body === "string") {
-          data.note_body = cleanLessonText(data.note_body);
-        }
-      }
-
-      console.log("[Gemini Integration] Lesson note generation succeeded and mapped successfully.");
-      res.json({ success: true, lessonNote: data });
-
-    } catch (error: any) {
-      console.warn("Generating lesson notes failed. Invoking master curriculum local generator...", error.message || error);
-      
-      // Highly robust fallback content generator utilizing Nigerian context to prevent applet failures
-      const finalTopic = focusTopic || `Nigerian Curriculum ${subject} Foundations`;
-      const fallbackNote: any = {
-        topic: finalTopic,
-        subtopic: `${classLevel} - ${term} Term, Week ${week}`,
-        classLevel: classLevel,
-        duration: "40 Minutes per period",
-        objectives: [
-          `Identify core concepts related to ${subject} and apply them.`,
-          `Discuss real-life practical examples of ${subject}.`,
-          `Solve standard test problems regarding ${subject}.`
-        ],
-        keyVocabulary: ["Curriculum Standards", "Topic Core", "Key Concepts"],
-        teachingMaterials: ["Standard Textbooks", "Whiteboard and markers"],
-        introduction: `Introduction to ${finalTopic}.`,
-        teacherExplanationSteps: [
-          "Present the fundamental definition to the class clearly.",
-          "Highlight real-world examples from the immediate environment.",
-          "Assign practice exercises to students for feedback."
-        ],
-        detailedLessonNote: `Subject: ${subject}
-Class: ${classLevel}
-Term: ${term}
-Week: ${week}
-Topic: ${finalTopic}
-Duration: 40 Minutes per period
-
-### Reference Materials
-- Approved National curriculum handbook
-- Recommended subject textbook for secondary/primary schools
-
-### Previous Knowledge
-Students are already familiar with the basic introductory concepts related to ${subject} from previous classes or real-world observation.
-
-### Instructional Materials
-- Notebooks, writing materials, whiteboard, and markers
-- Illustrative charts showing key definitions and concepts
-
-### Behavioural Objectives
-By the end of the lesson, the students should be able to:
-1. Explain the meaning of ${finalTopic} clearly in their own words.
-2. Outline the main features or characteristics of ${finalTopic}.
-3. Apply the knowledge gained to solve exercises and practical questions.
-
-### Learning Objectives
-1. Comprehend the core definition of ${finalTopic}.
-2. Categorize the different types or forms of ${finalTopic}.
-3. Solve practical problems or identify examples in everyday life.
-
-### Set Induction
-Introduce the topic by asking the students everyday questions related to ${finalTopic} to gauge their initial understanding and spark interest.
-
-### Lesson Introduction
-Introduce ${finalTopic} as the primary theme of today's study. Explain its direct relevance to the subject of ${subject}.
-
-### Lesson Development
-#### Definitions
-${finalTopic} is defined as the core area of study for this period. 
-
-#### Explanation of Concepts
-This topic deals with the structured exploration of its principal components, ensuring students gain a thorough and complete academic understanding.
-
-#### Step-by-step Teaching Points
-1. Step 1: Definition and core meaning.
-2. Step 2: Key characteristics and elements.
-3. Step 3: Practical examples and problem solving.
-
-#### Worked Examples
-Example 1: Demonstrating the application of ${finalTopic} under standard conditions.
-Example 2: Step-by-step resolution of a topic-specific exercise.
-
-### Teacher Activities
-1. Explain the definition and concepts of ${finalTopic} clearly on the board.
-2. Provide worked examples and facilitate student participation.
-3. Supervise the classroom activities, evaluate student performance, and answer questions.
-
-### Learner Activities
-1. Listen attentively to the teacher's explanations and write down key points in their notebooks.
-2. Ask questions for clarification where necessary.
-3. Complete the class exercises and copy the homework assignment.
-
-### Evaluation
-1. What is the definition of ${finalTopic}?
-2. State two major characteristics of ${finalTopic}.
-3. Solve/discuss the primary question related to this topic.
-
-### Assignment
-Write a brief paragraph explaining how ${finalTopic} is applied in everyday activities at home.
-
-### Summary
-Today we studied ${finalTopic}, covering its definition, key concepts, step-by-step points, and practical applications in ${subject}.
-
-### Conclusion
-The lesson is concluded by summarizing the key learning outcomes and encouraging students to practice the assigned tasks.`,
-        studentActivities: [
-          "Listen carefully to the teacher's explanations.",
-          "Write down definitions and examples in notebooks.",
-          "Attempt the evaluation questions."
-        ],
-        classExercises: [
-          `Explain the meaning of ${finalTopic} in your own words.`,
-          `List two key applications of ${finalTopic}.`
-        ],
-        homeworkAssignment: `Complete the assignment given in the lesson note above.`,
-        quizQuestions: [
-          {
-            question: `What is the primary focus of ${finalTopic}?`,
-            options: [`Core principles of the topic`, `Unrelated concepts`, `General discussions`, `None of the above`],
-            correctIndex: 0,
-            explanation: `The lesson specifically addresses the core principles of ${finalTopic}.`
-          }
-        ],
-        theoryQuestions: [
-          {
-            question: `Discuss the practical application of ${finalTopic} in daily life.`,
-            modelAnswer: `Students should explain how the topic applies to their direct environment.`,
-            markingSchemeName: `Award full marks for logical, topic-specific discussion.`
-          }
-        ],
-        subjectSpecificFocus: {
-          title: "Topic Focus",
-          content: `Encouraging mastery of ${finalTopic} through structured study.`,
-          safeguardsOrMoralLesson: "Always double-check your definitions and practice regularly."
-        }
-      };
-
-      res.json({ success: true, lessonNote: fallbackNote, isFallback: true });
-    }
-  });
-
+  
   // Serve static files in production, use Vite in dev
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

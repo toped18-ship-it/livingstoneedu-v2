@@ -16,6 +16,9 @@ export function HomeDashboard({ user, progressList, onNavigateToHub, onClassChan
   const subjects = React.useMemo(() => {
     const allClassSubjects = getSubjectsForClass(user.classLevel);
     if (user.selectedSubjectIds && user.selectedSubjectIds.length > 0) {
+      if (user.selectedSubjectIds.length < allClassSubjects.length) {
+        return allClassSubjects;
+      }
       return allClassSubjects.filter(s => user.selectedSubjectIds!.includes(s.id));
     }
     return allClassSubjects;

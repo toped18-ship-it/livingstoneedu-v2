@@ -177,6 +177,9 @@ export function InteractiveQuizzes({
   const subjects = useMemo(() => {
     const all = getSubjectsForClass(targetClass);
     if (targetClass === user.classLevel && user.selectedSubjectIds && user.selectedSubjectIds.length > 0) {
+      if (user.selectedSubjectIds.length < all.length) {
+        return all;
+      }
       return all.filter(s => user.selectedSubjectIds!.includes(s.id));
     }
     return all;

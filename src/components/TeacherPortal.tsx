@@ -673,6 +673,44 @@ ${generatedNote.homeworkAssignment || ''}
     localStorage.setItem(`livingstone_exams_${user.id}`, JSON.stringify(updated));
   };
 
+  const handleDownloadExam = (exam: AIExam) => {
+    let contentHtml = `
+      <h1>${exam.title}</h1>
+      <p>Class: ${exam.classLevel} | Date: ${exam.createdAt} | Duration: 1 Hour</p>
+      <hr />
+      <h2>Multiple Choice Questions</h2>
+    `;
+    exam.questions.forEach((q, idx) => {
+      contentHtml += `
+        <p><strong>Question ${idx + 1}: ${q.question}</strong></p>
+        <ol type="A">
+          <li>${q.options[0] || ''}</li>
+          <li>${q.options[1] || ''}</li>
+          <li>${q.options[2] || ''}</li>
+          <li>${q.options[3] || ''}</li>
+        </ol>
+        <p style="color: #059669;"><em>Correct Answer: Option ${String.fromCharCode(65 + q.correctIndex)}</em></p>
+        <p style="color: #6b7280; font-size: 11px;">Explanation: ${q.explanation || ''}</p>
+        <br />
+      `;
+    });
+    
+    const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' " +
+          "xmlns:w='urn:schemas-microsoft-com:office:office:word' " +
+          "xmlns='http://www.w3.org/TR/REC-html40'>" +
+          "<head><title>Exam Paper</title><style>body { font-family: Arial, sans-serif; line-height: 1.5; }</style></head><body>";
+    const footer = "</body></html>";
+    const sourceHTML = header + contentHtml + footer;
+    
+    const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML);
+    const fileDownload = document.createElement("a");
+    document.body.appendChild(fileDownload);
+    fileDownload.href = source;
+    fileDownload.download = `${exam.title.replace(/\s+/g, '_')}.doc`;
+    fileDownload.click();
+    document.body.removeChild(fileDownload);
+  };
+
 
   // AI Autograder state variables
   const [graderStudentId, setGraderStudentId] = useState('');
@@ -775,6 +813,106 @@ ${generatedNote.homeworkAssignment || ''}
   // Printing trigger
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleDownloadReportCard = (student: TeacherStudent) => {
+    let contentHtml = `
+      <div style="text-align: center; font-family: Arial, sans-serif; padding: 20px;">
+        <h2 style="margin: 0; text-transform: uppercase;">Livingston Educational Academy Lagos</h2>
+        <p style="margin: 5px 0; font-size: 12px; font-weight: bold; color: #16a34a;">MINISTRY OF EDUCATION NATIONAL INTEGRAL SYLLABUS RECORD</p>
+        <p style="margin: 5px 0; font-size: 10px; color: #6b7280;">Lagos State District Authority, Federal Republic of Nigeria</p>
+        <h1 style="font-size: 20px; font-weight: bold; margin-top: 15px; border-bottom: 2px solid #000; padding-bottom: 10px;">STUDENT TERM REPORT CARD</h1>
+      </div>
+      
+      <table style="width: 100%; font-family: Arial, sans-serif; font-size: 12px; margin-bottom: 20px; border-collapse: collapse;">
+        <tr>
+          <td style="padding: 5px;"><strong>Student Name:</strong> ${student.name}</td>
+          <td style="padding: 5px;"><strong>Class Assigned:</strong> ${classLevel}</td>
+        </tr>
+        <tr>
+          <td style="padding: 5px;"><strong>Academic Term:</strong> 3rd Term Comprehensive</td>
+          <td style="padding: 5px;"><strong>Attendance Ratio:</strong> ${Object.values(student.attendance).filter(Boolean).length} of 12 classes Present</td>
+        </tr>
+      </table>
+
+      <h3 style="font-family: Arial, sans-serif; font-size: 14px; margin-bottom: 10px;">I. COGNITIVE ACADEMIC RECORDS TABLE</h3>
+      <table style="width: 100%; border: 1px solid #000; border-collapse: collapse; font-family: Arial, sans-serif; font-size: 11px; margin-bottom: 20px;">
+        <thead>
+          <tr style="background-color: #f3f4f6; text-align: left; border-bottom: 1px solid #000;">
+            <th style="padding: 8px; border-right: 1px solid #000;">Subject Name</th>
+            <th style="padding: 8px; border-right: 1px solid #000; text-align: center;">CA Score (40)</th>
+            <th style="padding: 8px; border-right: 1px solid #000; text-align: center;">Exam Mark (60)</th>
+            <th style="padding: 8px; border-right: 1px solid #000; text-align: center;">Total (100)</th>
+            <th style="padding: 8px; border-right: 1px solid #000; text-align: center;">Grade</th>
+            <th style="padding: 8px;">Weekly Comments / Remarks</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    classSubjects.forEach((subject) => {
+      const scoreData = student.termScores[subject.id] || {
+        caScore: 0,
+        examScore: 0,
+        remark: 'No examination record logged in the active portal term.'
+      };
+
+      const total = scoreData.caScore + scoreData.examScore;
+      let letterGrade = 'F9';
+      if (total >= 85) letterGrade = 'A1';
+      else if (total >= 75) letterGrade = 'B2';
+      else if (total >= 65) letterGrade = 'C4';
+      else if (total >= 50) letterGrade = 'C6';
+      else if (total >= 40) letterGrade = 'D7';
+      else if (total > 0) letterGrade = 'E8';
+
+      contentHtml += `
+        <tr style="border-bottom: 1px solid #e5e7eb;">
+          <td style="padding: 8px; border-right: 1px solid #000; font-weight: bold;">${subject.name}</td>
+          <td style="padding: 8px; border-right: 1px solid #000; text-align: center;">${scoreData.caScore || '-'}</td>
+          <td style="padding: 8px; border-right: 1px solid #000; text-align: center;">${scoreData.examScore || '-'}</td>
+          <td style="padding: 8px; border-right: 1px solid #000; text-align: center; font-weight: bold;">${total || '-'}</td>
+          <td style="padding: 8px; border-right: 1px solid #000; text-align: center; font-weight: bold; color: #4f46e5;">${total > 0 ? letterGrade : '-'}</td>
+          <td style="padding: 8px; font-style: italic;">${scoreData.remark}</td>
+        </tr>
+      `;
+    });
+
+    contentHtml += `
+        </tbody>
+      </table>
+
+      <h3 style="font-family: Arial, sans-serif; font-size: 14px; margin-bottom: 10px;">II. AFFECTIVE & PSYCHOMOTOR DOMAINS</h3>
+      <table style="width: 100%; border: 1px solid #e5e7eb; border-collapse: collapse; font-family: Arial, sans-serif; font-size: 11px;">
+        <tr style="border-bottom: 1px solid #e5e7eb;">
+          <td style="padding: 8px; font-weight: bold; width: 50%;">Punctuality / Attendance</td>
+          <td style="padding: 8px; color: #15803d; font-weight: bold;">Excellent (A)</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #e5e7eb;">
+          <td style="padding: 8px; font-weight: bold;">Classroom Participation</td>
+          <td style="padding: 8px; color: #15803d; font-weight: bold;">Very Good (B)</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #e5e7eb;">
+          <td style="padding: 8px; font-weight: bold;">Moral Conduct</td>
+          <td style="padding: 8px; color: #15803d; font-weight: bold;">Excellent (A)</td>
+        </tr>
+      </table>
+    `;
+
+    const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' " +
+          "xmlns:w='urn:schemas-microsoft-com:office:office' " +
+          "xmlns='http://www.w3.org/TR/REC-html40'>" +
+          "<head><title>Report Card</title></head><body>";
+    const footer = "</body></html>";
+    const sourceHTML = header + contentHtml + footer;
+    
+    const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML);
+    const fileDownload = document.createElement("a");
+    document.body.appendChild(fileDownload);
+    fileDownload.href = source;
+    fileDownload.download = `Report_Card_${student.name.replace(/\s+/g, '_')}.doc`;
+    fileDownload.click();
+    document.body.removeChild(fileDownload);
   };
 
   return (
@@ -1279,15 +1417,27 @@ ${generatedNote.homeworkAssignment || ''}
               ) : (
                 <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                   {savedExams.map((ex) => (
-                    <div key={ex.id} className="p-2.5 rounded-xl border border-slate-100 bg-slate-50 relative group">
-                      <button
-                        onClick={() => handleDeleteExam(ex.id)}
-                        className="absolute right-2 top-2 text-slate-400 hover:text-rose-600 transition"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                      <h4 className="text-[11px] font-black text-slate-800 pr-5 truncate">{ex.title}</h4>
-                      <p className="text-[9px] text-slate-400 mt-1">Class: {ex.classLevel} | {ex.questions.length} Items</p>
+                    <div key={ex.id} className="p-2.5 rounded-xl border border-slate-100 bg-slate-50 relative group flex justify-between items-start">
+                      <div className="cursor-pointer flex-1 mr-2" onClick={() => setPreviewExam(ex)}>
+                        <h4 className="text-[11px] font-black text-slate-800 truncate">{ex.title}</h4>
+                        <p className="text-[9px] text-slate-400 mt-1">Class: {ex.classLevel} | {ex.questions.length} Items</p>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          title="Download Exam"
+                          onClick={() => handleDownloadExam(ex)}
+                          className="text-slate-500 hover:text-indigo-600 transition cursor-pointer"
+                        >
+                          <Download size={12} />
+                        </button>
+                        <button
+                          title="Delete Exam"
+                          onClick={() => handleDeleteExam(ex.id)}
+                          className="text-slate-400 hover:text-rose-600 transition cursor-pointer"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1306,6 +1456,13 @@ ${generatedNote.homeworkAssignment || ''}
                     <p className="text-[10px] text-blue-600 font-bold uppercase tracking-wider">AI Generated Document Preview & Validations</p>
                   </div>
                   <div className="flex gap-2">
+                    <button
+                      onClick={() => handleDownloadExam(previewExam)}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-[11px] flex items-center gap-1 transition cursor-pointer"
+                    >
+                      <Download size={12} />
+                      Download Doc
+                    </button>
                     <button
                       onClick={() => setPreviewExam(null)}
                       className="px-3 py-1.5 border border-slate-200 text-slate-500 font-bold rounded-lg text-[11px] hover:bg-slate-50 transition cursor-pointer"
@@ -1577,13 +1734,22 @@ ${generatedNote.homeworkAssignment || ''}
               </select>
 
               {activeReportStudent && (
-                <button
-                  onClick={handlePrint}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-750 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 transition shadow-md shadow-indigo-500/10 cursor-pointer"
-                >
-                  <Printer size={13} />
-                  Print Report Card
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleDownloadReportCard(activeReportStudent)}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 transition shadow-md shadow-emerald-500/10 cursor-pointer"
+                  >
+                    <Download size={13} />
+                    Download Report Card
+                  </button>
+                  <button
+                    onClick={handlePrint}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-750 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 transition shadow-md shadow-indigo-500/10 cursor-pointer"
+                  >
+                    <Printer size={13} />
+                    Print Report Card
+                  </button>
+                </div>
               )}
             </div>
           </div>

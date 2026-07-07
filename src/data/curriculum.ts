@@ -596,6 +596,110 @@ export function getWeeklyTopicTitle(
   return fallbacks[weekNum - 1] || `${subjectId.replace('_', ' ').toUpperCase()} Syllabus Concept (Week ${weekNum})`;
 }
 
+export function generateSpecificExplanations(subjectId: string, title: string, classLevel: string): string[] {
+  const cleanTitle = title.trim();
+  
+  let subjectName = "this subject";
+  if (subjectId === 'mathematics') subjectName = "Mathematics";
+  else if (subjectId === 'english') subjectName = "English Studies";
+  else if (subjectId === 'basic_science') subjectName = "Basic Science";
+  else if (subjectId === 'physics') subjectName = "Physics";
+  else if (subjectId === 'chemistry') subjectName = "Chemistry";
+  else if (subjectId === 'biology') subjectName = "Biology";
+  else if (subjectId === 'national_values') subjectName = "National Values";
+  else if (subjectId === 'social_studies') subjectName = "Social Studies";
+  else if (subjectId === 'civic_education') subjectName = "Civic Education";
+  else if (subjectId === 'government') subjectName = "Government";
+  else if (subjectId === 'economics') subjectName = "Economics";
+  else if (subjectId === 'accounting') subjectName = "Financial Accounting";
+  else if (subjectId === 'business_studies') subjectName = "Business Studies";
+  else if (subjectId === 'commerce') subjectName = "Commerce";
+  else if (subjectId === 'crs') subjectName = "Christian Religious Studies";
+  else if (subjectId === 'irs') subjectName = "Islamic Religious Studies";
+  else if (subjectId === 'agricultural_science') subjectName = "Agricultural Science";
+  else if (subjectId === 'home_economics') subjectName = "Home Economics";
+  else if (subjectId === 'computer_studies') subjectName = "Computer Studies";
+  else if (subjectId === 'creative_arts') subjectName = "Cultural and Creative Arts";
+  else if (subjectId === 'french') subjectName = "French Language";
+  else if (subjectId === 'phe') subjectName = "Physical and Health Education";
+  else if (subjectId === 'further_math') subjectName = "Further Mathematics";
+  else if (subjectId === 'geography') subjectName = "Geography";
+
+  let p1 = `This lesson covers the topic of **${cleanTitle}** under **${subjectName}** for **${classLevel}**. We focus entirely on understanding the core definitions, fundamental concepts, and primary functions of **${cleanTitle}**. Mastering these concepts is essential to achieving competence in the curriculum.`;
+  let p2 = `When exploring **${cleanTitle}**, we analyze the exact steps, rules, or formulas that govern it. For instance, we examine how these principles operate in real-world scenarios, local communities, or standard practical evaluations. Understanding the relationship between these variables allows students to draw accurate conclusions and apply correct methods.`;
+  let p3 = `To master **${cleanTitle}** completely, regular practice is essential. Write down the key rules, practice the exercises, and verify that your solutions match the academic standards. Building a strong grasp of **${cleanTitle}** prepares you for success in examinations and practical challenges.`;
+
+  const lowerTitle = cleanTitle.toLowerCase();
+  
+  if (subjectId === 'mathematics' || subjectId === 'further_math') {
+    if (lowerTitle.includes('count') || lowerTitle.includes('number') || lowerTitle.includes('whole')) {
+      p1 = `This lesson introduces the essential concept of **${cleanTitle}** for **${classLevel}** students. Numbers are the building blocks of mathematics. Understanding how to count, group, and represent numbers is crucial for developing numerical literacy and strong logical thinking skills.`;
+      p2 = `To study **${cleanTitle}**, we focus on sequential numbering, place value (units, tens, hundreds, and thousands), and correct counting intervals. We practice counting forward and backward, noting how numbers increase or decrease systematically. For example, in counting up to 100, we learn that each number is exactly one unit greater than the previous one.`;
+      p3 = `By mastering **${cleanTitle}**, you prepare yourself to perform addition, subtraction, and higher arithmetic with confidence. Practice writing the numbers, identifying their place values, and checking your sequences to ensure there are no skipped values.`;
+    } else if (lowerTitle.includes('add') || lowerTitle.includes('subtract') || lowerTitle.includes('sum') || lowerTitle.includes('difference')) {
+      p1 = `This lesson focuses on the core mathematical processes of **${cleanTitle}** for **${classLevel}**. Addition and subtraction are the primary operations used to combine or remove quantities, forming the foundation of all numerical problems.`;
+      p2 = `When working on **${cleanTitle}**, we align numbers by place value and compute from right to left (units first, then tens, then hundreds). For addition, we carry over values when a column exceeds nine. For subtraction, we borrow from the next column when a column value is smaller than what is being subtracted.`;
+      p3 = `Practice is key to speed and accuracy. Solve the provided exercises, verify your arithmetic step-by-step, and double-check your answers by reversing the operations (addition checks subtraction, and vice versa).`;
+    } else if (lowerTitle.includes('multipl') || lowerTitle.includes('divid') || lowerTitle.includes('fraction')) {
+      p1 = `This lesson covers **${cleanTitle}** for **${classLevel}** students. These operations allow us to scale, group, or divide numbers and quantities into equal parts, which is fundamental to algebraic thinking and real-world transactions.`;
+      p2 = `To compute **${cleanTitle}**, we apply multiplication tables or division algorithms. For fractions, we identify the numerator (the part) and the denominator (the whole), learning to simplify or find common denominators to perform calculations.`;
+      p3 = `Review your multiplication tables regularly and practice splitting numbers into equal portions. Check your calculations by multiplying or dividing back to the original values to ensure perfect accuracy.`;
+    } else if (lowerTitle.includes('algebra') || lowerTitle.includes('equation')) {
+      p1 = `This lesson explores the principles of **${cleanTitle}** for **${classLevel}**. Algebra introduces letters or symbols to represent unknown numbers, helping us create mathematical models to solve real-world problems.`;
+      p2 = `When solving equations under **${cleanTitle}**, the absolute rule is to maintain balance on both sides of the equal sign (=). Whatever operation you perform on the left side (addition, subtraction, multiplication, or division), you must perform exactly the same operation on the right side to find the unknown variable.`;
+      p3 = `Write down each step clearly, group like terms together, and check your final solution by substituting the value back into the original equation to verify that it holds true.`;
+    } else if (lowerTitle.includes('geometry') || lowerTitle.includes('shape') || lowerTitle.includes('angle') || lowerTitle.includes('triangle')) {
+      p1 = `This lesson is dedicated to **${cleanTitle}** under **${classLevel}** Mathematics. Geometry is the study of shapes, sizes, positions, and angles in space, allowing us to understand and measure the physical world.`;
+      p2 = `We study different shapes (like triangles, rectangles, or circles) and their unique properties, such as side lengths, angles, perimeter, and area. For angles, we learn how to measure them in degrees and classify them as acute, right, obtuse, or reflex.`;
+      p3 = `Practice drawing these geometric shapes with a ruler, labeling all dimensions correctly, and applying standard formulas for area or perimeter to solve practical measurement problems.`;
+    } else if (lowerTitle.includes('stat') || lowerTitle.includes('mean') || lowerTitle.includes('graph') || lowerTitle.includes('data')) {
+      p1 = `This lesson introduces **${cleanTitle}** for **${classLevel}** students. Statistics is the science of collecting, organizing, analyzing, and presenting numerical data, helping us make informed decisions based on patterns.`;
+      p2 = `We learn to calculate key measures of central tendency, including the mean (average), median (middle value), and mode (most frequent value), or represent data visually using bar charts, pie charts, and pictograms.`;
+      p3 = `Ensure you sum and count values carefully when calculating statistics, and label the axes of your charts clearly to present data in an easily understandable format.`;
+    }
+  } else if (subjectId === 'english') {
+    if (lowerTitle.includes('grammar') || lowerTitle.includes('verb') || lowerTitle.includes('noun') || lowerTitle.includes('pronoun') || lowerTitle.includes('tense')) {
+      p1 = `This English studies lesson is centered on the rules of **${cleanTitle}** for **${classLevel}**. Understanding grammatical structures equips you to speak and write standard English clearly and confidently.`;
+      p2 = `We focus on identifying parts of speech and applying agreement rules (concord) to ensure singular subjects take singular verbs, and plural subjects take plural verbs. We also study tenses to accurately represent when actions take place: past, present, or future.`;
+      p3 = `To build strong language habits, practice writing sentences using these rules, read quality articles, and pay close attention to grammatical structure in both oral and written communication.`;
+    } else if (lowerTitle.includes('comprehens') || lowerTitle.includes('read') || lowerTitle.includes('vocab')) {
+      p1 = `This lesson focuses on **${cleanTitle}** to improve reading comprehension and vocabulary development for **${classLevel}** students. Strong reading skills are vital for academic and career success.`;
+      p2 = `We practice techniques such as skimming (reading quickly for a general overview) and scanning (searching for specific information), and learning to deduce the meaning of unfamiliar words by looking at the surrounding context of the passage.`;
+      p3 = `Read a wide variety of texts regularly, write down new words in your vocabulary diary, and practice answering comprehension questions in clear, complete sentences.`;
+    } else if (lowerTitle.includes('writ') || lowerTitle.includes('letter') || lowerTitle.includes('essay')) {
+      p1 = `This lesson is designed to develop your writing skills by focusing on **${cleanTitle}** for **${classLevel}**. Writing is a powerful form of expression and communication used in personal and professional life.`;
+      p2 = `We explore correct writing formats, such as formal and informal letter structures, or how to organize essays with a clear introduction, body paragraphs containing supporting points, and a strong concluding paragraph.`;
+      p3 = `Plan your writing with a brief outline before you begin, pay attention to spelling and punctuation, and proofread your completed work to eliminate errors and improve clarity.`;
+    }
+  } else if (subjectId === 'basic_science' || subjectId === 'physics' || subjectId === 'chemistry' || subjectId === 'biology') {
+    if (lowerTitle.includes('liv') || lowerTitle.includes('plant') || lowerTitle.includes('anim') || lowerTitle.includes('cell') || lowerTitle.includes('organ')) {
+      p1 = `This science lesson introduces **${cleanTitle}** for **${classLevel}** students, exploring the structure and functions of living organisms and the systems that keep them alive.`;
+      p2 = `We investigate the cellular level, organ systems, or environmental adaptations that characterize different species. By studying classification kingdoms, we organize organisms into groups based on shared physical traits and evolutionary history.`;
+      p3 = `Study the biological diagrams carefully, label the structures correctly, and write down the functions of each part to consolidate your scientific knowledge.`;
+    } else if (lowerTitle.includes('chem') || lowerTitle.includes('matter') || lowerTitle.includes('element') || lowerTitle.includes('acid') || lowerTitle.includes('mixture')) {
+      p1 = `This lesson is centered on **${cleanTitle}** for **${classLevel}**, examining the properties of matter, chemical elements, and the transformations they undergo.`;
+      p2 = `We study the states of matter (solids, liquids, gases), atomic structure, chemical symbols, or the differences between pure substances and mixtures. We look at physical and chemical changes, noticing how energy is absorbed or released.`;
+      p3 = `Always follow safety protocols when handling laboratory materials, observe reactions closely, and write down your observations systematically in your study notebook.`;
+    } else if (lowerTitle.includes('physic') || lowerTitle.includes('force') || lowerTitle.includes('motion') || lowerTitle.includes('energy') || lowerTitle.includes('light') || lowerTitle.includes('work')) {
+      p1 = `This lesson covers **${cleanTitle}** under **${classLevel}**, exploring the physical laws, forces, and energy transformations that govern the universe.`;
+      p2 = `We analyze mechanical concepts such as speed, velocity, acceleration, work, power, and simple machines, or study forms of energy like heat, light, and sound. We write down mathematical formulas to calculate these physical properties precisely.`;
+      p3 = `Learn the standard SI units for every physical quantity, practice solving calculation problems, and verify your steps to ensure correct mathematical deductions.`;
+    }
+  } else if (subjectId === 'national_values' || subjectId === 'social_studies' || subjectId === 'civic_education' || subjectId === 'government') {
+    if (lowerTitle.includes('value') || lowerTitle.includes('citizen') || lowerTitle.includes('honesty') || lowerTitle.includes('cooperat')) {
+      p1 = `This lesson focuses on the core principles of **${cleanTitle}** for **${classLevel}**, exploring positive values and active citizenship required for national integration.`;
+      p2 = `We study personal and societal values such as honesty, discipline, cooperation, respect, and patriotism. Developing these qualities prevents corruption, maintains social order, and encourages community development.`;
+      p3 = `Reflect on how you can practice these values in your daily school life, home, and community to contribute positively to a peaceful and progressive Nigeria.`;
+    } else if (lowerTitle.includes('govern') || lowerTitle.includes('constitut') || lowerTitle.includes('law') || lowerTitle.includes('right') || lowerTitle.includes('democr')) {
+      p1 = `This lesson explores **${cleanTitle}** for **${classLevel}** students, analyzing the structures of government, constitutional laws, and human rights.`;
+      p2 = `We examine the three arms of government (Executive, Legislature, and Judiciary), the constitution of Nigeria, electoral systems, and our rights and duties as citizens. This builds political awareness and a strong understanding of legal systems.`;
+      p3 = `Review the constitutional articles or rights discussed in the lesson, write summaries of civic duties, and discuss the value of democracy in maintaining peace.`;
+    }
+  }
+
+  return [p1, p2, p3];
+}
+
 // Generate the complete lesson mockup dynamically.
 // This allows us to serve thousands of distinct topics on the fly, with REAL comprehensive, helpful summaries, bullets, and multi-choice quizzes!
 export function getLessonContent(
@@ -1044,6 +1148,9 @@ export function getLessonContent(
       }
     ];
   }
+
+  // Dynamically generate the precise lesson note explanations to keep it laser-focused on the requested topic
+  body = generateSpecificExplanations(subjectId, title, classLevel);
 
   return {
     title,

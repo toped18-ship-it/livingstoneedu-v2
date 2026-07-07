@@ -165,9 +165,8 @@ export const seedRtdbIfEmpty = async () => {
   try {
     console.log('[RTDB Seed] Check if database requires seeding...');
     
-    // Check curriculum node and clean up previous local NERDC mock curriculum records
+    // Strip previous detailed lesson notes from all curriculum alignment records to satisfy user request
     const currData = await rtdbGet(NODES.CURRICULUM) || {};
-    
     const cleanedCurriculum: Record<string, any> = {};
     let needsDatabaseClean = false;
 
@@ -175,25 +174,42 @@ export const seedRtdbIfEmpty = async () => {
       const item = currData[key];
       if (!item) return;
 
-      // Keep only curriculum items that are:
-      // 1. AI-generated (starting with curr_ai_)
-      // 2. Real custom or deep-content notes (contains detailedLessonNote, teacherExplanationSteps, classExercises, etc.)
-      const isAiCurriculum = key.startsWith('curr_ai_');
-      const hasDetailedContent = !!(item.detailedLessonNote || item.teacherExplanationSteps || item.classExercises || item.homeworkAssignment || item.quiz);
-      
-      if (isAiCurriculum || hasDetailedContent) {
-        cleanedCurriculum[key] = item;
-      } else {
+      // If the curriculum record contains detailed lesson notes or related lesson assets, strip them
+      if (
+        item.detailedLessonNote || 
+        item.note_body || 
+        item.details || 
+        item.introduction || 
+        item.teacherExplanationSteps || 
+        item.studentActivities || 
+        item.classExercises || 
+        item.homeworkAssignment || 
+        item.quiz || 
+        item.theoryQuestions || 
+        item.subjectSpecificFocus
+      ) {
         needsDatabaseClean = true;
+        // Keep only high-level curriculum/syllabus properties (class, subject, term, week, topic, objectives, keyVocabulary)
+        cleanedCurriculum[key] = {
+          id: item.id || key,
+          class: item.class,
+          subject: item.subject,
+          term: item.term,
+          week: item.week,
+          topic: item.topic,
+          objectives: item.objectives || [],
+          keyVocabulary: item.keyVocabulary || []
+        };
+      } else {
+        cleanedCurriculum[key] = item;
       }
     });
 
     if (needsDatabaseClean) {
-      console.log('[RTDB Seed] Purging previous local seeded mock curriculum records to let AI generate them on-the-fly...');
+      console.log('[RTDB Seed] Purged detailed lesson notes from curriculum alignment records.');
       await rtdbSet(NODES.CURRICULUM, cleanedCurriculum);
-      console.log('[RTDB Seed] Purged successfully. Remaining valid curriculums:', Object.keys(cleanedCurriculum).length);
     } else {
-      console.log('[RTDB Seed] Curriculum node is clean. No previous local mock curriculum records found.');
+      console.log('[RTDB Seed] Curriculum node is clean of previous detailed lesson notes.');
     }
 
     // Check school settings
@@ -293,13 +309,8 @@ export const seedRtdbIfEmpty = async () => {
       });
     }
 
-    // Check lesson_notes
-    const lessonNotesData = await rtdbGet(NODES.LESSON_NOTES);
-    if (!lessonNotesData) {
-      await rtdbSet(NODES.LESSON_NOTES, {
-        'note-1': { id: 'note-1', title: 'Number Bases Foundations', content: 'Detailed lesson notes covering standard binary and hexadecimal computations.', subjectId: 'mathematics', classLevel: 'SS 1', termNum: 1, weekNum: 1 }
-      });
-    }
+    // Wipe out the lesson_notes node to remove all previous lesson notes from storage
+    await rtdbSet(NODES.LESSON_NOTES, null);
 
     // Check cbt
     const cbtData = await rtdbGet(NODES.CBT);

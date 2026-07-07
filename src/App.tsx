@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Helmet } from 'react-helmet-async';
 import { ClassLevel, User, LessonProgress, TermNumber, WeekNumber } from './types';
+import { getSubjectsForClass } from './data/curriculum';
 import { AuthScreen } from './components/AuthScreen';
 import { HomeDashboard } from './components/HomeDashboard';
 import { LearningHub } from './components/LearningHub';
@@ -21,6 +21,20 @@ import { GraduationCap, LogOut, Home, BookOpen, HelpCircle, MessageSquare, Shiel
 import { seedRtdbIfEmpty, rtdbSubscribe, rtdbSet, rtdbGet, NODES } from './lib/rtdbService';
 import { auth } from './lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
+
+const ensureAllSubjectsSelected = (u: User): User => {
+  if (u.role === 'student' && u.classLevel) {
+    const allClassSubjects = getSubjectsForClass(u.classLevel);
+    const classSubjectIds = allClassSubjects.map(s => s.id);
+    if (!u.selectedSubjectIds || u.selectedSubjectIds.length < classSubjectIds.length) {
+      return {
+        ...u,
+        selectedSubjectIds: classSubjectIds
+      };
+    }
+  }
+  return u;
+};
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -88,18 +102,30 @@ export default function App() {
     }
   }, [currentUser, activeTab]);
 
-  const renderHelmet = () => (
-    <Helmet>
-      <title>{helmetData.title}</title>
-      <meta name="description" content={helmetData.description} />
-      <meta property="og:title" content={helmetData.title} />
-      <meta property="og:description" content={helmetData.description} />
-      <meta property="og:type" content="website" />
-      <meta name="twitter:card" content="summary_large_image" />
-      <meta name="twitter:title" content={helmetData.title} />
-      <meta name="twitter:description" content={helmetData.description} />
-    </Helmet>
-  );
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.title = helmetData.title;
+      const setMetaTag = (nameOrProperty: string, content: string, isProperty = false) => {
+        const attr = isProperty ? 'property' : 'name';
+        let element = document.querySelector(`meta[${attr}="${nameOrProperty}"]`);
+        if (!element) {
+          element = document.createElement('meta');
+          element.setAttribute(attr, nameOrProperty);
+          document.head.appendChild(element);
+        }
+        element.setAttribute('content', content);
+      };
+      setMetaTag('description', helmetData.description);
+      setMetaTag('og:title', helmetData.title, true);
+      setMetaTag('og:description', helmetData.description, true);
+      setMetaTag('og:type', 'website', true);
+      setMetaTag('twitter:card', 'summary_large_image');
+      setMetaTag('twitter:title', helmetData.title);
+      setMetaTag('twitter:description', helmetData.description);
+    }
+  }, [helmetData]);
+
+  const renderHelmet = () => null;
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isCustomizingSubjects, setIsCustomizingSubjects] = useState(false);
@@ -129,6 +155,28 @@ export default function App() {
   const [trialTimeRemaining, setTrialTimeRemaining] = useState<number | null>(null);
   const [showTimeExpiredScreen, setShowTimeExpiredScreen] = useState<boolean>(false);
   const [premiumReminder, setPremiumReminder] = useState<{ title: string; body: string } | null>(null);
+  const [showWelcomeModal, setShowWelcomeModal] = useState<boolean>(false);
+
+  // Trigger one-time Welcome Modal for new users
+  useEffect(() => {
+    if (currentUser) {
+      const shownKey = `hub_welcome_shown_${currentUser.id}`;
+      const hasShown = localStorage.getItem(shownKey);
+      if (!hasShown) {
+        setShowWelcomeModal(true);
+      }
+    } else {
+      setShowWelcomeModal(false);
+    }
+  }, [currentUser?.id]);
+
+  const handleCloseWelcomeModal = () => {
+    if (currentUser) {
+      const shownKey = `hub_welcome_shown_${currentUser.id}`;
+      localStorage.setItem(shownKey, 'true');
+    }
+    setShowWelcomeModal(false);
+  };
 
   // Synchronize trial timer state with currentUser changes
   useEffect(() => {
@@ -576,9 +624,25 @@ export default function App() {
 
   // 1. Load authenticated user and progress from localStorage on initial render
   useEffect(() => {
+    // Clear any locally cached custom lesson notes to satisfy removal request
+    try {
+      Object.keys(localStorage).forEach((key) => {
+        if (key.startsWith('livingstone_custom_lesson_note_')) {
+          localStorage.removeItem(key);
+        }
+      });
+    } catch (err) {
+      console.warn('Failed to clear local cached lesson notes:', err);
+    }
+
     const loadedProfile = localStorage.getItem('hub_active_user');
     if (loadedProfile) {
-      setCurrentUser(JSON.parse(loadedProfile));
+      try {
+        const parsed = JSON.parse(loadedProfile);
+        setCurrentUser(ensureAllSubjectsSelected(parsed));
+      } catch (e) {
+        localStorage.removeItem('hub_active_user');
+      }
     }
 
     const loadedProgress = localStorage.getItem('hub_lesson_progress');
@@ -592,7 +656,7 @@ export default function App() {
     const isTeacher = profileData.role === 'teacher';
     const isAdmin = profileData.role === 'admin';
 
-    const newProfile: User = {
+    const baseProfile: User = {
       ...profileData,
       role: profileData.role || 'student',
       classLevel: isTeacher ? 'SS 1' : isAdmin ? 'SS 1' : profileData.classLevel,
@@ -601,6 +665,8 @@ export default function App() {
       joinDate: new Date().toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }),
       isPro: isAdmin ? true : profileData.isPro
     };
+
+    const newProfile = ensureAllSubjectsSelected(baseProfile);
 
     setCurrentUser(newProfile);
     localStorage.setItem('hub_active_user', JSON.stringify(newProfile));
@@ -1522,6 +1588,137 @@ export default function App() {
             >
               Go back to Home Dashboard
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* One-Time Welcome Modal for New Users */}
+      {showWelcomeModal && currentUser && (
+        <div id="welcome-modal-overlay" className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-[250] animate-fade-in font-sans overflow-y-auto">
+          <div id="welcome-modal-container" className="bg-white dark:bg-slate-900 rounded-3xl overflow-hidden shadow-2xl max-w-2xl w-full border border-slate-100 dark:border-slate-800 flex flex-col max-h-[calc(100dvh-2rem)] sm:max-h-[90vh] transform transition-all animate-scale-in">
+            
+            {/* Header with deep indigo gradient */}
+            <div className="bg-gradient-to-r from-blue-700 via-indigo-800 to-indigo-950 p-6 sm:p-8 text-white text-center relative shrink-0">
+              <button 
+                id="welcome-modal-close"
+                onClick={handleCloseWelcomeModal}
+                className="absolute top-4 right-4 text-white/80 hover:text-white p-1.5 hover:bg-white/10 rounded-full transition cursor-pointer"
+                title="Dismiss Welcome Guide"
+              >
+                <X size={18} />
+              </button>
+              <div className="inline-flex p-3 bg-white/10 rounded-2xl mb-3 text-blue-200">
+                <GraduationCap size={32} className="animate-pulse" />
+              </div>
+              <h3 className="text-xl sm:text-2xl font-black tracking-tight leading-none">WELCOME TO {appConfig.brandName.toUpperCase()}!</h3>
+              <p className="text-xs text-indigo-200 uppercase tracking-wider mt-2 font-bold">Your Comprehensive Curriculum Companion</p>
+            </div>
+
+            {/* Content area */}
+            <div className="p-6 sm:p-8 space-y-6 flex-1 overflow-y-auto">
+              <div className="space-y-2 text-center">
+                <p className="text-sm text-slate-600 dark:text-slate-300 font-medium">
+                  Hello, <span className="font-extrabold text-indigo-600 dark:text-indigo-400">{currentUser.fullName}</span>! We are excited to guide you on your learning journey. Let's get you set up with everything you need to succeed.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Learning Hub Guide Card */}
+                <div className="p-5 bg-indigo-50/40 dark:bg-indigo-950/20 border border-indigo-100/50 dark:border-indigo-900/30 rounded-2xl space-y-3.5">
+                  <div className="flex items-center gap-2 text-indigo-900 dark:text-indigo-300 font-extrabold text-sm sm:text-base">
+                    <div className="p-1.5 bg-indigo-100 dark:bg-indigo-900/50 rounded-lg text-indigo-600 dark:text-indigo-400">
+                      <BookOpen size={16} />
+                    </div>
+                    <span>How to Use the Learning Hub</span>
+                  </div>
+                  <ul className="text-xs text-slate-600 dark:text-slate-300 space-y-2.5 font-semibold">
+                    <li className="flex items-start gap-2">
+                      <span className="text-indigo-500 font-black text-sm shrink-0 leading-none">✦</span>
+                      <span><strong className="text-indigo-900 dark:text-indigo-200">NERDC Curriculum Lessons:</strong> Browse structured weekly topics fully aligned with official high school standards.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-indigo-500 font-black text-sm shrink-0 leading-none">✦</span>
+                      <span><strong className="text-indigo-900 dark:text-indigo-200">Study Checklists:</strong> Click checkboxes to complete weekly lessons, maintain daily streaks, and earn points.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-indigo-500 font-black text-sm shrink-0 leading-none">✦</span>
+                      <span><strong className="text-indigo-900 dark:text-indigo-200">Livingstone AI Notes:</strong> Click "Generate" to create comprehensive, student-friendly class study summaries instantly.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-indigo-500 font-black text-sm shrink-0 leading-none">✦</span>
+                      <span><strong className="text-indigo-900 dark:text-indigo-200">Interactive CBT Mocks:</strong> Solve real past questions with custom time settings and detailed step-by-step scoring.</span>
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Free Trial Benefits Card */}
+                <div className="p-5 bg-amber-50/40 dark:bg-amber-950/20 border border-amber-100/50 dark:border-amber-900/30 rounded-2xl space-y-3.5">
+                  <div className="flex items-center gap-2 text-amber-900 dark:text-amber-400 font-extrabold text-sm sm:text-base">
+                    <div className="p-1.5 bg-amber-100 dark:bg-amber-900/50 rounded-lg text-amber-600 dark:text-amber-400">
+                      <Clock size={16} />
+                    </div>
+                    <span>Your 20-Min Daily Free Trial</span>
+                  </div>
+                  <ul className="text-xs text-slate-600 dark:text-slate-300 space-y-2.5 font-semibold">
+                    <li className="flex items-start gap-2">
+                      <span className="text-amber-500 font-black text-sm shrink-0 leading-none">✦</span>
+                      <span><strong className="text-amber-900 dark:text-amber-200">1,200 Seconds Daily:</strong> Get free learning access to core subject curricula, study notes, and mocks every single day.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-amber-500 font-black text-sm shrink-0 leading-none">✦</span>
+                      <span><strong className="text-amber-900 dark:text-amber-200">Midnight Resets:</strong> Your 20-minute daily countdown timer resets completely at 12:00 AM WAT to support daily studying.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-amber-500 font-black text-sm shrink-0 leading-none">✦</span>
+                      <span><strong className="text-amber-900 dark:text-amber-200">Scientific Sweet Spot:</strong> 20 minutes is optimal for concentrated retention and building durable micro-learning habits.</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-amber-500 font-black text-sm shrink-0 leading-none">✦</span>
+                      <span><strong className="text-amber-900 dark:text-amber-200">Ad-Free Learning:</strong> Zero popups, zero interruptions. Study standard subject outlines with absolute peace of mind.</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {currentUser.role === 'student' && !currentUser.isPro && (
+                <div className="p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+                  <div className="space-y-0.5">
+                    <h4 className="text-xs font-black text-emerald-800 dark:text-emerald-400 uppercase tracking-wider flex items-center justify-center sm:justify-start gap-1">
+                      <Sparkles size={12} className="text-emerald-500" /> Unlock Unlimited Core Mastery
+                    </h4>
+                    <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                      Remove the 20-minute timer entirely, access premium advanced topics, and download class notes.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleCloseWelcomeModal();
+                      setIsPaymentModalOpen(true);
+                    }}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[10px] uppercase tracking-wider rounded-xl transition shadow-md shadow-emerald-500/15 shrink-0 cursor-pointer"
+                  >
+                    Go Premium
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-900/50 flex flex-col sm:flex-row gap-3 items-center justify-between shrink-0">
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 dark:text-slate-500 max-w-sm leading-snug text-center sm:text-left">
+                Need help anytime? View user guides, FAQs, and reach support in the Support Help Desk.
+              </span>
+              <button
+                type="button"
+                id="welcome-modal-action"
+                onClick={handleCloseWelcomeModal}
+                className="w-full sm:w-auto px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-lg shadow-indigo-500/20 transition cursor-pointer select-none text-center"
+              >
+                Let's Start Learning!
+              </button>
+            </div>
+
           </div>
         </div>
       )}

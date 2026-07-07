@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { ClassLevel, User, Subject, TermNumber, WeekNumber, LessonProgress, LessonContent } from '../types';
 import { getSubjectsForClass, getWeeklyTopicTitle, getLessonContent } from '../data/curriculum';
 import { SubjectIcon } from './SubjectIcon';
-import { rtdbGet, NODES } from '../lib/rtdbService';
+import { rtdbGet, rtdbSet, NODES } from '../lib/rtdbService';
 import { 
   BookOpen, ChevronRight, CheckCircle, Search, HelpCircle, 
   Flame, Award, ArrowLeft, RotateCcw, AlertCircle, Save, Sparkles,
@@ -31,23 +31,57 @@ export function formatLessonNote(note: any): any {
 
   const cleanText = (text: string): string => {
     if (!text) return text;
-    // 1. Strip out any text occurring before 'Subject'
-    const subjectIndex = text.search(/Subject\s*:/i);
-    if (subjectIndex !== -1) {
-      text = text.substring(subjectIndex);
+    
+    let cleaned = text.trim();
+
+    // 1. Strip surrounding quotes and markdown code blocks
+    if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
+      cleaned = cleaned.substring(1, cleaned.length - 1).trim();
     }
-    // 2. Enforce the removal of forbidden phrases
+    if (cleaned.startsWith('`') && cleaned.endsWith('`')) {
+      cleaned = cleaned.replace(/^```[a-zA-Z]*\n/, '').replace(/```$/, '').trim();
+    }
+
+    // 2. Filter out conversational introductory/meta phrases often returned by AI
+    const conversationalRegexes = [
+      /^(here\s+is|certainly!|surely,|sure,|below\s+is|this\s+lesson\s+note\s+is)\s+.*?\n/i,
+      /^as\s+an\s+expert\s+nigerian\s+school\s+teacher.*?\n/i,
+      /^this\s+lesson\s+note\s+has\s+been\s+compiled.*?\n/i,
+      /^aligned\s+with\s+the\s+official\s+nerdc.*?\n/i,
+      /^here\s+is\s+a\s+complete\s+and\s+highly\s+structured\s+lesson\s+note.*?\n/i
+    ];
+
+    for (const regex of conversationalRegexes) {
+      cleaned = cleaned.replace(regex, '').trim();
+    }
+
+    // 3. Strip out any meta text occurring before 'Subject' label if it's there
+    const subjectIndex = cleaned.search(/Subject\s*:/i);
+    if (subjectIndex !== -1) {
+      cleaned = cleaned.substring(subjectIndex);
+    }
+
+    // 4. Clean specific forbidden phrases
     const forbiddenPhrases = [
       /Welcome to this week's/gi,
       /Module Learning Objectives/gi,
       /In this chapter/gi,
       /By the end of this lesson/gi,
-      /Course Learning Objectives/gi
+      /Course Learning Objectives/gi,
+      /Here is the complete lesson note/gi,
+      /Here is a complete lesson note/gi,
+      /Certainly! Here is/gi,
+      /Hope this helps/gi,
+      /This lesson note is fully aligned/gi,
+      /Fully aligned with official NERDC/gi,
+      /I hope this complete lesson note is helpful/gi
     ];
+
     for (const phrase of forbiddenPhrases) {
-      text = text.replace(phrase, "");
+      cleaned = cleaned.replace(phrase, "");
     }
-    return text;
+
+    return cleaned.trim();
   };
 
   if (formatted.detailedLessonNote && typeof formatted.detailedLessonNote === 'string') {
@@ -55,19 +89,26 @@ export function formatLessonNote(note: any): any {
   }
 
   if (formatted.introduction && typeof formatted.introduction === 'string') {
-    // Introduction doesn't have "Subject:", just clean phrases
+    // Introduction doesn't have "Subject:", just clean conversational phrases
     const forbiddenPhrases = [
       /Welcome to this week's/gi,
       /Module Learning Objectives/gi,
       /In this chapter/gi,
       /By the end of this lesson/gi,
-      /Course Learning Objectives/gi
+      /Course Learning Objectives/gi,
+      /Here is the complete lesson note/gi,
+      /Here is a complete lesson note/gi,
+      /Certainly! Here is/gi,
+      /Hope this helps/gi,
+      /This lesson note is fully aligned/gi,
+      /Fully aligned with official NERDC/gi,
+      /I hope this complete lesson note is helpful/gi
     ];
     let cleanedIntro = formatted.introduction;
     for (const phrase of forbiddenPhrases) {
       cleanedIntro = cleanedIntro.replace(phrase, "");
     }
-    formatted.introduction = cleanedIntro;
+    formatted.introduction = cleanedIntro.trim();
   }
 
   if (formatted.note_body && typeof formatted.note_body === 'string') {
@@ -94,6 +135,22 @@ export function LearningHub({
 }: LearningHubProps) {
   // Speech synthesis states
   const [currentlySpeaking, setCurrentlySpeaking] = useState<string | null>(null);
+
+  // Welcome Modal state (one-time for new users)
+  const [showWelcomeModal, setShowWelcomeModal] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const seen = localStorage.getItem(`livingstone_welcome_seen_${user.id}`);
+      return !seen;
+    }
+    return false;
+  });
+
+  const handleCloseWelcomeModal = () => {
+    setShowWelcomeModal(false);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`livingstone_welcome_seen_${user.id}`, 'true');
+    }
+  };
 
   // Stop pronunciation on unmount
   React.useEffect(() => {
@@ -140,6 +197,9 @@ export function LearningHub({
   const subjects = useMemo(() => {
     const allClassSubjects = getSubjectsForClass(user.classLevel);
     if (user.selectedSubjectIds && user.selectedSubjectIds.length > 0) {
+      if (user.selectedSubjectIds.length < allClassSubjects.length) {
+        return allClassSubjects;
+      }
       return allClassSubjects.filter(s => user.selectedSubjectIds!.includes(s.id));
     }
     return allClassSubjects;
@@ -492,7 +552,8 @@ export function LearningHub({
           week: `Week ${matchedCurriculum.week}`,
           focusTopic: matchedCurriculum.topic,
           topicDescription: matchedCurriculum.details || matchedCurriculum.topic,
-          isEndOfTerm: selectedWeek === 12
+          isEndOfTerm: selectedWeek === 12,
+          studentFocus: user?.role === 'student'
         })
       });
 
@@ -516,11 +577,80 @@ export function LearningHub({
         // Persist generated note to localStorage so user doesn't lose it!
         const storageKey = `livingstone_custom_lesson_note_${user.id}_${user.classLevel}_${selectedSubject.id}_${selectedTerm}_${selectedWeek}`;
         localStorage.setItem(storageKey, JSON.stringify(formattedNote));
+
+        // If admin, auto-save to Firebase Realtime Database
+        if (user?.role === 'admin') {
+          setTimeout(() => {
+            handleSaveToDatabase(formattedNote);
+          }, 100);
+        }
       }
     } catch (err: any) {
       setAiError(err.message || 'Failed to connect to school AI generator.');
     } finally {
       setIsGeneratingAI(false);
+    }
+  };
+
+  const [isSavingToDB, setIsSavingToDB] = useState(false);
+  const [dbSaveSuccess, setDbSaveSuccess] = useState('');
+
+  const handleSaveToDatabase = async (noteToSave = aiLessonNote) => {
+    if (!noteToSave) return;
+    setIsSavingToDB(true);
+    setDbSaveSuccess('');
+    try {
+      const termStr = selectedTerm === 1 ? '1st Term' : selectedTerm === 2 ? '2nd Term' : '3rd Term';
+      const targetClass = user.classLevel || 'SS 1';
+      const targetSubject = selectedSubject.name;
+      const targetTerm = termStr;
+      const targetWeek = selectedWeek;
+
+      // Find matched curriculum record
+      const matched = (curriculums || []).find((c) => {
+        const norm = (s: any) => String(s || '').trim().toLowerCase();
+        const normWeek = (w: any) => {
+          const m = String(w || '').match(/\d+/);
+          return m ? parseInt(m[0], 10) : null;
+        };
+        return norm(c.class) === norm(targetClass) &&
+               norm(c.subject) === norm(targetSubject) &&
+               norm(c.term) === norm(targetTerm) &&
+               normWeek(c.week) === normWeek(targetWeek);
+      });
+
+      const keyId = (matched && matched.id) || `curr_ai_${targetClass.replace(/\s+/g, '_')}_${targetSubject.replace(/\s+/g, '_')}_${targetTerm.replace(/\s+/g, '_')}_W${targetWeek}`.replace(/[.#$[\]/]/g, '_');
+
+      const currentRecord = matched || {};
+      const updatedRecord = {
+        ...currentRecord,
+        id: keyId,
+        class: targetClass,
+        subject: targetSubject,
+        term: targetTerm,
+        week: `Week ${targetWeek}`,
+        topic: noteToSave.topic || currentRecord.topic || `Week ${targetWeek} Topic`,
+        detailedLessonNote: noteToSave.detailedLessonNote,
+        details: noteToSave.detailedLessonNote, // Overwrite with clean study notes
+        introduction: noteToSave.introduction || "",
+        keyVocabulary: noteToSave.keyVocabulary || [],
+        teachingMaterials: noteToSave.teachingMaterials || [],
+        homeworkAssignment: noteToSave.homeworkAssignment || "",
+        classExercises: noteToSave.classExercises || [],
+        quiz: noteToSave.quizQuestions || noteToSave.quiz || [],
+        theoryQuestions: noteToSave.theoryQuestions || [],
+        subjectSpecificFocus: noteToSave.subjectSpecificFocus || null,
+        status: 'Published'
+      };
+
+      await rtdbSet(`${NODES.CURRICULUM}/${keyId}`, updatedRecord);
+      setDbSaveSuccess('Success! Clean lesson notes saved and published to Realtime Database.');
+      setTimeout(() => setDbSaveSuccess(''), 4000);
+    } catch (err: any) {
+      console.error(err);
+      setAiError(err.message || 'Failed to save lesson note to database.');
+    } finally {
+      setIsSavingToDB(false);
     }
   };
 
@@ -552,6 +682,11 @@ export function LearningHub({
     const storageKey = `livingstone_custom_lesson_note_${user.id}_${user.classLevel}_${selectedSubject.id}_${selectedTerm}_${selectedWeek}`;
     localStorage.setItem(storageKey, JSON.stringify(updatedNote));
     setIsEditingLocal(false);
+
+    // If admin, auto-save to Firebase Realtime Database
+    if (user?.role === 'admin') {
+      handleSaveToDatabase(updatedNote);
+    }
   };
 
   const handleCancelEditing = () => {
@@ -640,6 +775,91 @@ export function LearningHub({
 
   return (
     <div className="space-y-8 animate-fade-in">
+      {/* Welcome Modal for New Users */}
+      {showWelcomeModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-lg w-full overflow-hidden flex flex-col relative max-h-[90vh]">
+            {/* Header with beautiful indigo gradient */}
+            <div className="bg-gradient-to-tr from-blue-700 to-indigo-800 p-6 text-white text-center relative">
+              <div className="absolute top-4 right-4">
+                <button
+                  type="button"
+                  onClick={handleCloseWelcomeModal}
+                  className="p-1 rounded-full bg-white/10 hover:bg-white/20 transition cursor-pointer text-white"
+                  title="Close welcome modal"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="h-12 w-12 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                <Sparkles size={24} className="text-amber-300 fill-amber-300 animate-pulse" />
+              </div>
+              <h2 className="text-xl font-black tracking-tight">Welcome to Livingstone, {user.fullName || 'Scholar'}! 🌟</h2>
+              <p className="text-xs text-blue-100 mt-1">Your premium companion for NERDC curriculum-aligned learning</p>
+            </div>
+
+            {/* Content area */}
+            <div className="p-6 overflow-y-auto space-y-5">
+              <div className="space-y-3.5">
+                <h3 className="font-extrabold text-xs text-slate-500 uppercase tracking-wider">How to Use the Learning Hub</h3>
+                
+                <div className="space-y-3">
+                  <div className="flex gap-3">
+                    <div className="h-6 w-6 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center text-xs font-bold shrink-0">1</div>
+                    <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                      <strong>Select Subject & Term</strong>: Use the grade controls and subject lists to quickly find NERDC national curriculum guidelines tailored to your current class.
+                    </p>
+                  </div>
+                  
+                  <div className="flex gap-3">
+                    <div className="h-6 w-6 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center text-xs font-bold shrink-0">2</div>
+                    <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                      <strong>Generate Clean AI Notes</strong>: Let our smart AI assemble highly descriptive, pure academic study notes on any topic instantly without bloated templates.
+                    </p>
+                  </div>
+                  
+                  <div className="flex gap-3">
+                    <div className="h-6 w-6 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center text-xs font-bold shrink-0">3</div>
+                    <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                      <strong>Listen Read Aloud</strong>: Have the entire study guide narrated using clear speech synthesis to learn and retain definitions on the go.
+                    </p>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <div className="h-6 w-6 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center text-xs font-bold shrink-0">4</div>
+                    <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                      <strong>Test Your Skills</strong>: Answer real-world diagnostic CBT quizzes, copy classroom assignments, and track your school progress.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Benefits of 20-Minute daily free trial */}
+              <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-1.5">
+                <h4 className="text-xs font-black text-amber-900 flex items-center gap-1.5 uppercase tracking-wider">
+                  <Flame size={14} className="text-amber-600 fill-amber-500" />
+                  Your 20-Minute Daily Free Trial
+                </h4>
+                <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                  Every day, we gift you <strong>20 minutes of completely free premium AI access</strong>. Use it to generate notes, hear narrations, and take smart quizzes. No credentials required! Upgrade to Pro for unlimited lifelong access.
+                </p>
+              </div>
+            </div>
+
+            {/* Footer with actions */}
+            <div className="border-t border-slate-100 p-5 bg-slate-50 flex justify-end">
+              <button
+                type="button"
+                onClick={handleCloseWelcomeModal}
+                className="w-full sm:w-auto px-6 py-2.5 bg-indigo-700 hover:bg-indigo-800 text-white text-xs font-black rounded-xl transition cursor-pointer text-center shadow-md shadow-indigo-200"
+              >
+                Start Learning Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Search and Navigation Bar details */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
         <div className="flex items-center gap-2">
@@ -1022,15 +1242,39 @@ export function LearningHub({
                         )}
                       </button>
 
-                      <button
-                        type="button"
-                        onClick={handleGenerateAISyllabus}
-                        className="bg-white border border-indigo-200 hover:bg-indigo-50 text-indigo-700 text-[11px] font-extrabold py-1 px-2.5 rounded-lg flex items-center gap-1 transition cursor-pointer"
-                        title="Regenerate with AI"
-                      >
-                        <RotateCcw size={12} />
-                        <span>Regenerate</span>
-                      </button>
+                       {(user?.role === 'admin' || user?.role === 'student' || !user?.role) && (
+                        <button
+                          type="button"
+                          onClick={handleGenerateAISyllabus}
+                          className="bg-white border border-indigo-200 hover:bg-indigo-50 text-indigo-700 text-[11px] font-extrabold py-1 px-2.5 rounded-lg flex items-center gap-1 transition cursor-pointer"
+                          title="Regenerate with AI"
+                        >
+                          <RotateCcw size={12} />
+                          <span>Regenerate</span>
+                        </button>
+                      )}
+
+                      {user?.role === 'admin' && (
+                        <button
+                          type="button"
+                          disabled={isSavingToDB}
+                          onClick={() => handleSaveToDatabase(aiLessonNote)}
+                          className="bg-[#059669] hover:bg-[#047857] text-white text-[11px] font-extrabold py-1 px-2.5 rounded-lg flex items-center gap-1 transition cursor-pointer disabled:opacity-55"
+                          title="Publish clean lesson notes to Realtime Database"
+                        >
+                          {isSavingToDB ? (
+                            <>
+                              <RotateCcw size={12} className="animate-spin" />
+                              <span>Saving...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Save size={12} />
+                              <span>Save & Publish</span>
+                            </>
+                          )}
+                        </button>
+                      )}
 
                       <button
                         type="button"
@@ -1062,55 +1306,68 @@ export function LearningHub({
                     </div>
                   </div>
 
-                  {/* Vocabulary & Teaching Helpers */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-3.5 bg-white rounded-xl border border-slate-200 space-y-1.5">
-                      <h4 className="text-[10px] font-black text-[#1e1b4b] uppercase tracking-wider">Key Vocabulary Terms</h4>
-                      <ul className="text-xs font-semibold text-slate-600 space-y-1.5">
-                        {aiLessonNote.keyVocabulary && aiLessonNote.keyVocabulary.map((word: string, wIdx: number) => {
-                          const isSpeaking = currentlySpeaking === word;
-                          return (
-                            <li key={wIdx} className="flex items-center justify-between p-1 hover:bg-slate-50 rounded transition group">
-                              <span className="flex gap-2">
-                                <span className="text-indigo-500 font-bold">•</span>
-                                <span>{word}</span>
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => handleSpeak(word)}
-                                className={`p-1 rounded hover:bg-indigo-50 transition shrink-0 cursor-pointer ${
-                                  isSpeaking ? 'text-[#1e1b4b]' : 'text-slate-400 opacity-0 group-hover:opacity-100 focus:opacity-100'
-                                }`}
-                                title="Hear term read aloud"
-                              >
-                                {isSpeaking ? <VolumeX size={12} className="animate-pulse" /> : <Volume2 size={12} />}
-                              </button>
-                            </li>
-                          );
-                        })}
-                      </ul>
+                  {dbSaveSuccess && (
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-800 flex gap-2 animate-bounce">
+                      <CheckCircle size={15} className="shrink-0 text-emerald-600" />
+                      <span>{dbSaveSuccess}</span>
                     </div>
+                  )}
 
-                    <div className="p-3.5 bg-white rounded-xl border border-slate-200 space-y-1.5">
-                      <h4 className="text-[10px] font-black text-[#1e1b4b] uppercase tracking-wider">Teaching / Reference Materials</h4>
-                      <ul className="text-xs font-semibold text-slate-600 space-y-1.5">
-                        {aiLessonNote.teachingMaterials && aiLessonNote.teachingMaterials.map((mat: string, mIdx: number) => (
-                          <li key={mIdx} className="flex gap-2">
-                            <span className="text-indigo-500 font-bold">•</span>
-                            <span>{mat}</span>
-                          </li>
-                        ))}
-                      </ul>
+                  {/* Vocabulary & Teaching Helpers */}
+                  {user?.role !== 'student' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-3.5 bg-white rounded-xl border border-slate-200 space-y-1.5">
+                        <h4 className="text-[10px] font-black text-[#1e1b4b] uppercase tracking-wider">Key Vocabulary Terms</h4>
+                        <ul className="text-xs font-semibold text-slate-600 space-y-1.5">
+                          {aiLessonNote.keyVocabulary && aiLessonNote.keyVocabulary.map((word: string, wIdx: number) => {
+                            const isSpeaking = currentlySpeaking === word;
+                            return (
+                              <li key={wIdx} className="flex items-center justify-between p-1 hover:bg-slate-50 rounded transition group">
+                                <span className="flex gap-2">
+                                  <span className="text-indigo-500 font-bold">•</span>
+                                  <span>{word}</span>
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSpeak(word)}
+                                  className={`p-1 rounded hover:bg-indigo-50 transition shrink-0 cursor-pointer ${
+                                    isSpeaking ? 'text-[#1e1b4b]' : 'text-slate-400 opacity-0 group-hover:opacity-100 focus:opacity-100'
+                                  }`}
+                                  title="Hear term read aloud"
+                                >
+                                  {isSpeaking ? <VolumeX size={12} className="animate-pulse" /> : <Volume2 size={12} />}
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+
+                      <div className="p-3.5 bg-white rounded-xl border border-slate-200 space-y-1.5">
+                        <h4 className="text-[10px] font-black text-[#1e1b4b] uppercase tracking-wider">Teaching / Reference Materials</h4>
+                        <ul className="text-xs font-semibold text-slate-600 space-y-1.5">
+                          {aiLessonNote.teachingMaterials && aiLessonNote.teachingMaterials.map((mat: string, mIdx: number) => (
+                            <li key={mIdx} className="flex gap-2">
+                              <span className="text-indigo-500 font-bold">•</span>
+                              <span>{mat}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Detailed Body Output */}
                   <div className="space-y-3.5">
-                    <h4 className="text-xs font-extrabold text-[#1e1b4b] uppercase tracking-wider">Comprehensive Lesson Text</h4>
+                    <h4 className="text-xs font-extrabold text-[#1e1b4b] uppercase tracking-wider">
+                      {user?.role === 'student' ? 'AI Topic Study Notes' : 'Comprehensive Lesson Text'}
+                    </h4>
                     <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-3">
-                      <p className="text-xs font-extrabold text-indigo-905 italic text-slate-800">
-                        Introduction: {aiLessonNote.introduction}
-                      </p>
+                      {user?.role !== 'student' && aiLessonNote.introduction && (
+                        <p className="text-xs font-extrabold text-indigo-905 italic text-slate-800">
+                          Introduction: {aiLessonNote.introduction}
+                        </p>
+                      )}
                       <div className="text-xs sm:text-sm text-slate-705 leading-relaxed whitespace-pre-wrap font-sans text-slate-700">
                         {aiLessonNote.detailedLessonNote}
                       </div>
@@ -1118,7 +1375,7 @@ export function LearningHub({
                   </div>
 
                   {/* Teacher's delivery steps */}
-                  {aiLessonNote.teacherExplanationSteps && (
+                  {user?.role !== 'student' && aiLessonNote.teacherExplanationSteps && (
                     <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-2">
                       <h4 className="text-[10px] font-black text-[#1e1b4b] uppercase tracking-wider">Curriculum Classroom Steps</h4>
                       <ol className="text-xs font-semibold text-slate-600 space-y-2">
@@ -1133,26 +1390,28 @@ export function LearningHub({
                   )}
 
                   {/* Exercises & Homework assignments */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-slate-200 pt-4.5">
-                    <div className="space-y-2">
-                      <h4 className="text-xs font-extrabold text-[#1e1b4b] uppercase tracking-wider">Practice Activities</h4>
-                      <div className="bg-white p-3.5 rounded-xl border border-slate-200 text-xs space-y-2">
-                        {aiLessonNote.classExercises && aiLessonNote.classExercises.map((ex: string, exIdx: number) => (
-                          <p key={exIdx} className="font-semibold text-slate-700 flex gap-2">
-                            <span className="text-indigo-500 font-bold">•</span>
-                            <span>{ex}</span>
-                          </p>
-                        ))}
+                  {user?.role !== 'student' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-slate-200 pt-4.5">
+                      <div className="space-y-2">
+                        <h4 className="text-xs font-extrabold text-[#1e1b4b] uppercase tracking-wider">Practice Activities</h4>
+                        <div className="bg-white p-3.5 rounded-xl border border-slate-200 text-xs space-y-2">
+                          {aiLessonNote.classExercises && aiLessonNote.classExercises.map((ex: string, exIdx: number) => (
+                            <p key={exIdx} className="font-semibold text-slate-700 flex gap-2">
+                              <span className="text-indigo-500 font-bold">•</span>
+                              <span>{ex}</span>
+                            </p>
+                          ))}
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="space-y-2">
-                      <h4 className="text-xs font-extrabold text-[#1e1b4b] uppercase tracking-wider">Weekly Assignment</h4>
-                      <div className="bg-amber-500/5 p-4 rounded-xl border border-amber-205 text-xs font-semibold text-amber-950 leading-relaxed">
-                        {aiLessonNote.homeworkAssignment}
+                      <div className="space-y-2">
+                        <h4 className="text-xs font-extrabold text-[#1e1b4b] uppercase tracking-wider">Weekly Assignment</h4>
+                        <div className="bg-amber-500/5 p-4 rounded-xl border border-amber-205 text-xs font-semibold text-amber-950 leading-relaxed">
+                          {aiLessonNote.homeworkAssignment}
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-6">
@@ -1180,25 +1439,30 @@ export function LearningHub({
                   </div>
 
                   {/* AI Generation Suggestion Panel */}
-                  <div className="p-6 bg-gradient-to-r from-indigo-500/5 to-purple-500/5 border border-indigo-150/60 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-1.5">
-                        <Sparkles size={16} className="text-indigo-600" />
-                        <h4 className="text-xs font-extrabold text-[#1e1b4b] uppercase tracking-wider">Unleash Livingstone AI Study Assistant</h4>
+                  {(user?.role === 'admin' || user?.role === 'student' || !user?.role) && (
+                    <div className="p-6 bg-gradient-to-r from-indigo-500/5 to-purple-500/5 border border-indigo-150/60 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5">
+                          <Sparkles size={16} className="text-indigo-600" />
+                          <h4 className="text-xs font-extrabold text-[#1e1b4b] uppercase tracking-wider">Unleash Livingstone AI Study Assistant</h4>
+                        </div>
+                        <p className="text-xs text-slate-500 max-w-lg leading-relaxed">
+                          {user?.role === 'student'
+                            ? "Generate an in-depth, topic-focused study note for this week's lesson dynamically using Livingstone's AI engine."
+                            : "Need a fully comprehensive study note with structured academic explanations, key vocabulary terms, teaching materials, classroom exercises, and instant interactive CBT quizzes?"
+                          }
+                        </p>
                       </div>
-                      <p className="text-xs text-slate-500 max-w-lg leading-relaxed">
-                        Need a fully comprehensive study note with structured academic explanations, key vocabulary terms, teaching materials, classroom exercises, and instant interactive CBT quizzes?
-                      </p>
+                      <button
+                        type="button"
+                        onClick={handleGenerateAISyllabus}
+                        className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-md shadow-indigo-100 cursor-pointer transition flex items-center gap-1.5 select-none shrink-0"
+                      >
+                        <Sparkles size={14} />
+                        <span>{user?.role === 'student' ? 'Generate Topic Notes' : 'Generate Detailed Lesson Note'}</span>
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleGenerateAISyllabus}
-                      className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-md shadow-indigo-100 cursor-pointer transition flex items-center gap-1.5 select-none shrink-0"
-                    >
-                      <Sparkles size={14} />
-                      <span>Generate Detailed Lesson Note</span>
-                    </button>
-                  </div>
+                  )}
                 </div>
               )}
 

@@ -78,6 +78,9 @@ export function StudentProgressPage({ user, progressList, onNavigateToQuizzes }:
   const activeClassSubjects = useMemo(() => {
     const all = getSubjectsForClass(user.classLevel);
     if (user.selectedSubjectIds && user.selectedSubjectIds.length > 0) {
+      if (user.selectedSubjectIds.length < all.length) {
+        return all;
+      }
       return all.filter(s => user.selectedSubjectIds!.includes(s.id));
     }
     return all;
