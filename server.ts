@@ -918,9 +918,6 @@ Subject: ${subject}
 Term: ${term}
 Week: ${week}
 Focus Topic: ${focusTopic}
-Topic Description/Details: ${topicDescription || focusTopic}
-Is End Of Term Exam Prep: ${isEndOfTerm}
-Student Focused Mode: ${studentFocus}
 
 Output the result as a raw JSON object matching the requested schema exactly.`;
 
