@@ -51,6 +51,12 @@ import {
   Sparkles
 } from 'lucide-react';
 
+import { Dashboard } from './admin/Dashboard';
+import { CurriculumManager } from './admin/CurriculumManager';
+import { PromptManager } from './admin/PromptManager';
+import { AISettings } from './admin/AISettings';
+import { AIPlayground } from './admin/AIPlayground';
+
 interface InquiryItem {
   id: string;
   name: string;
@@ -1317,17 +1323,18 @@ ${(lessonContent.keyPoints || []).map((pt: string) => `- ${pt}`).join('\n')}
     setAiShowAnswerKey(false);
     
     try {
-      let targetTopic = aiCustomTopic.trim();
-      if (!targetTopic) {
-        const subjectIdMapped = aiNoteSubject.toLowerCase().replace(/\s+/g, '_');
-        const termNumDecimal = aiNoteTerm === '1st Term' ? 1 : aiNoteTerm === '2nd Term' ? 2 : 3;
-        targetTopic = getWeeklyTopicTitle(
-          aiNoteClass as any,
-          subjectIdMapped,
-          termNumDecimal as any,
-          aiNoteWeek as any
-        );
-      }
+      const foundCurr = curriculums.find(c => 
+        c.class === aiNoteClass && 
+        c.subject === aiNoteSubject && 
+        c.term === aiNoteTerm && 
+        (c.week === aiNoteWeek || c.week === `Week ${aiNoteWeek}` || Number(c.week) === aiNoteWeek)
+      );
+      const targetTopic = foundCurr?.topic || getWeeklyTopicTitle(
+        aiNoteClass as any,
+        aiNoteSubject.toLowerCase().replace(/\s+/g, '_'),
+        (aiNoteTerm === '1st Term' ? 1 : aiNoteTerm === '2nd Term' ? 2 : 3) as any,
+        aiNoteWeek as any
+      );
       
       let generatedAiNoteResult: any = null;
       try {
@@ -2135,6 +2142,51 @@ ${(lessonContent.keyPoints || []).map((pt: string) => `- ${pt}`).join('\n')}
 
             <button
               type="button"
+              onClick={() => setActiveAdminTab('ai-settings')}
+              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
+                activeAdminTab === 'ai-settings'
+                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
+                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <BrainCircuit size={13} className="stroke-[2.5] text-indigo-500" />
+                <span>AI Core Settings</span>
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveAdminTab('ai-prompts')}
+              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
+                activeAdminTab === 'ai-prompts'
+                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
+                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <FileText size={13} className="stroke-[2.5] text-amber-500" />
+                <span>AI Prompt Governance</span>
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveAdminTab('ai-playground')}
+              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
+                activeAdminTab === 'ai-playground'
+                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
+                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <Sparkles size={13} className="stroke-[2.5] text-emerald-500" />
+                <span>AI Sandbox Playground</span>
+              </span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setActiveAdminTab('branding')}
               className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
                 activeAdminTab === 'branding'
@@ -2253,141 +2305,16 @@ ${(lessonContent.keyPoints || []).map((pt: string) => `- ${pt}`).join('\n')}
           
           {/* TAB 1: SAAS ANALYTICS SYSTEM */}
           {activeAdminTab === 'dashboard' && (
-            <div className="space-y-6 animate-fade-in text-slate-800">
-              <div className="border-b pb-3 flex justify-between items-center flex-wrap gap-2">
-                <div>
-                  <h3 className="font-extrabold text-base text-slate-900">SaaS Command performance Center</h3>
-                  <p className="text-xs text-slate-500">Live academic performance metrics, dynamic cash logs, and subscriptions analytics.</p>
-                </div>
-                <div className="text-[10px] text-slate-400 font-extrabold flex items-center gap-1">
-                  <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping" />
-                  <span>Interactive Real-time Feed</span>
-                </div>
-              </div>
-
-              {/* Analytical Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* Simulated SVG Graph: Nigerian Term Subscriptions & Payments */}
-                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-150 space-y-4">
-                  <div className="flex justify-between items-baseline">
-                    <div>
-                      <h4 className="text-xs font-black uppercase text-indigo-950 tracking-wider">Income & Ledger Stream</h4>
-                      <p className="text-[10px] text-slate-400">Quarterly growth tracker (Paystack & Flutterwave aggregates)</p>
-                    </div>
-                    <span className="text-xs font-extrabold text-emerald-800 bg-emerald-100/60 px-2 py-0.5 rounded">₦{statsSummary.revenueSum} YTD</span>
-                  </div>
-
-                  {/* SVG Line Graph */}
-                  <div className="h-44 w-full flex items-end">
-                    <svg className="w-full h-full" viewBox="0 0 400 150">
-                      <defs>
-                        <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#4f46e5" stopOpacity="0.2"/>
-                          <stop offset="100%" stopColor="#4f46e5" stopOpacity="0"/>
-                        </linearGradient>
-                      </defs>
-                      {/* Grid lines */}
-                      <line x1="10%" y1="10%" x2="90%" y2="10%" stroke="#e2e8f0" strokeDasharray="3,3" />
-                      <line x1="10%" y1="50%" x2="90%" y2="50%" stroke="#e2e8f0" strokeDasharray="3,3" />
-                      <line x1="10%" y1="90%" x2="90%" y2="90%" stroke="#e2e8f0" strokeDasharray="3,3" />
-
-                      {/* Area path */}
-                      <path d="M 40 135 L 40 100 L 120 75 L 200 95 L 280 40 L 360 25 L 360 135 Z" fill="url(#chartGrad)" />
-                      
-                      {/* Trend Line */}
-                      <path d="M 40 100 L 120 75 L 200 95 L 280 40 L 360 25" fill="none" stroke="#4f46e5" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                      
-                      {/* Interactive plot circles */}
-                      <circle cx="40" cy="100" r="4.5" fill="#4f46e5" stroke="#ffffff" strokeWidth="1.5" />
-                      <circle cx="120" cy="75" r="4.5" fill="#4f46e5" stroke="#ffffff" strokeWidth="1.5" />
-                      <circle cx="200" cy="95" r="4.5" fill="#4f46e5" stroke="#ffffff" strokeWidth="1.5" />
-                      <circle cx="280" cy="40" r="4.5" fill="#4f46e5" stroke="#ffffff" strokeWidth="1.5" />
-                      <circle cx="360" cy="25" r="5" fill="#4f46e5" stroke="#ffffff" strokeWidth="2" />
-
-                      {/* Labels */}
-                      <text x="40" y="148" textAnchor="middle" fontSize="8" fill="#94a3b8" fontWeight="bold">Jan</text>
-                      <text x="120" y="148" textAnchor="middle" fontSize="8" fill="#94a3b8" fontWeight="bold">Mar</text>
-                      <text x="200" y="148" textAnchor="middle" fontSize="8" fill="#94a3b8" fontWeight="bold">May</text>
-                      <text x="280" y="148" textAnchor="middle" fontSize="8" fill="#94a3b8" fontWeight="bold">Jul</text>
-                      <text x="360" y="148" textAnchor="middle" fontSize="8" fill="#4f46e5" fontWeight="bold">Active</text>
-                    </svg>
-                  </div>
-                </div>
-
-                {/* Performance Analytics: Class levels metrics */}
-                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-150 space-y-4">
-                  <h4 className="text-xs font-black uppercase text-indigo-950 tracking-wider">Evaluation Retention score Metrics</h4>
-                  <div className="space-y-3">
-                    <div>
-                      <div className="flex justify-between text-[11px] font-bold text-slate-650">
-                        <span>Senior Secondary (SS 1 - SS 3) Performance index</span>
-                        <span>82% Exam pass rate</span>
-                      </div>
-                      <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden mt-1">
-                        <div className="bg-indigo-600 h-full rounded-full" style={{ width: '82%' }} />
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between text-[11px] font-bold text-slate-650">
-                        <span>Junior Secondary (JSS 1 - JSS 3) Retention rate</span>
-                        <span>74% Midterm aggregate</span>
-                      </div>
-                      <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden mt-1">
-                        <div className="bg-indigo-650 h-full rounded-full" style={{ width: '74%' }} />
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex justify-between text-[11px] font-bold text-slate-650">
-                        <span>Primary Grade Levels Quiz Completion</span>
-                        <span>90% Interactive trials</span>
-                      </div>
-                      <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden mt-1">
-                        <div className="bg-emerald-600 h-full rounded-full" style={{ width: '90%' }} />
-                      </div>
-                    </div>
-                  </div>
-
-                  <p className="text-[10px] text-slate-400 font-semibold italic">
-                    💡 High quiz averages of 90% in Primary segments indicates excellent adaptation of game mechanics education.
-                  </p>
-                </div>
-
-              </div>
-
-              {/* Recent activity & Quick settings notifications */}
-              <div className="p-4 rounded-xl bg-orange-50 border border-orange-200 flex gap-3">
-                <AlertCircle size={18} className="shrink-0 text-orange-600 mt-0.5" />
-                <div className="space-y-1">
-                  <h5 className="text-xs font-black text-orange-950">Pending Examination Submissions Approval</h5>
-                  <p className="text-[11px] text-orange-800 leading-relaxed">
-                    There are currently {grades.filter(g => g.status === 'Pending Approval').length} new student scores uploaded by class teachers from primary/JSS sectors waiting validation in standard Nigeria-wide term plan records files. Approve these grades in the <strong>Continuous Assessment</strong> panel.
-                  </p>
-                </div>
-              </div>
-
-              {/* Digital download center */}
-              <div className="p-5 border border-slate-150 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div className="space-y-1">
-                  <h5 className="text-xs font-medium text-slate-800 flex items-center gap-1">
-                    <Download size={13} className="text-indigo-600" />
-                    <span>Download Comprehensive Ledger Sheet</span>
-                  </h5>
-                  <p className="text-[10px] text-slate-400">Export active school directories, payments, and curriculum maps to local format.</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => showToast('Initiated secure download bundle compilation...', 'info')}
-                  className="px-3.5 py-1.5 bg-slate-900 text-white hover:bg-black font-extrabold text-[10px] uppercase rounded-lg shadow-sm cursor-pointer transition flex items-center gap-1.5"
-                >
-                  <Download size={12} />
-                  <span>Download CSV Suite</span>
-                </button>
-              </div>
-
-            </div>
+            <Dashboard 
+              usersList={usersList}
+              payments={payments}
+              curriculums={curriculums}
+              cbtExams={cbtExams}
+              inquiries={inquiries}
+              appConfig={currentConfig}
+              onNavigate={(tab) => setActiveAdminTab(tab)}
+              grades={grades}
+            />
           )}
 
           {/* TAB 2: ACADEMIC USER DIRECTORY */}
@@ -2890,6 +2817,22 @@ ${(lessonContent.keyPoints || []).map((pt: string) => `- ${pt}`).join('\n')}
 
           {/* TAB 3: CURRICULUM MANAGEMENT */}
           {activeAdminTab === 'curriculum' && (
+            <CurriculumManager 
+              curriculums={curriculums}
+              onCurriculumsChange={(next) => {
+                setCurriculums(next);
+                localStorage.setItem('system_curriculums', JSON.stringify(next));
+              }}
+              showToast={showToast}
+              isSeeding={isSeeding}
+              seedingProgress={seedingProgress}
+              seedingStatus={seedingStatus}
+              onGenerateCompleteCurriculum={handleGenerateCompleteCurriculum}
+            />
+          )}
+
+          {/* LEGACY TAB 3: CURRICULUM MANAGEMENT BYPASS */}
+          {false && activeAdminTab === 'curriculum_legacy' && (
             <div className="space-y-6 animate-fade-in text-slate-800">
               <div className="border-b pb-3 flex justify-between items-center flex-wrap gap-4">
                 <div>
@@ -4008,16 +3951,36 @@ ${(lessonContent.keyPoints || []).map((pt: string) => `- ${pt}`).join('\n')}
                       </div>
                     </div>
 
-                    {/* Custom focus topic */}
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-extrabold uppercase text-slate-500">Custom Focus Topic (Optional)</label>
-                      <input 
-                        type="text"
-                        value={aiCustomTopic} 
-                        onChange={(e) => setAiCustomTopic(e.target.value)} 
-                        placeholder="Leave blank to use NERDC baseline topic"
-                        className="w-full px-3 py-2 border rounded-xl bg-white text-xs font-semibold outline-none placeholder:text-slate-400"
-                      />
+                    {/* Auto-Loaded Topic from Curriculum Database */}
+                    <div className="space-y-1.5 p-3.5 bg-indigo-50/50 border border-indigo-150 rounded-xl">
+                      <label className="text-[9px] font-black uppercase text-indigo-950 block tracking-wider">
+                        Auto-Loaded Curriculum Topic
+                      </label>
+                      {(() => {
+                        const foundCurr = curriculums.find(c => 
+                          c.class === aiNoteClass && 
+                          c.subject === aiNoteSubject && 
+                          c.term === aiNoteTerm && 
+                          (c.week === aiNoteWeek || c.week === `Week ${aiNoteWeek}` || Number(c.week) === aiNoteWeek)
+                        );
+                        const displayTopic = foundCurr?.topic || getWeeklyTopicTitle(
+                          aiNoteClass as any,
+                          aiNoteSubject.toLowerCase().replace(/\s+/g, '_'),
+                          (aiNoteTerm === '1st Term' ? 1 : aiNoteTerm === '2nd Term' ? 2 : 3) as any,
+                          aiNoteWeek as any
+                        );
+                        
+                        return (
+                          <div className="space-y-1">
+                            <div className="text-xs font-extrabold text-indigo-950 leading-snug">
+                              {displayTopic}
+                            </div>
+                            <span className="text-[8px] font-bold text-slate-400 uppercase">
+                              {foundCurr ? 'Loaded from Database Node' : 'NERDC Standard Baseline'}
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     <button
@@ -5809,6 +5772,54 @@ ${(lessonContent.keyPoints || []).map((pt: string) => `- ${pt}`).join('\n')}
               )}
             </div>
           )}
+
+          {/* TAB: AI CORE SETTINGS */}
+          {activeAdminTab === 'ai-settings' && (
+            <AISettings 
+              appConfig={currentConfig}
+              onUpdateConfig={async (updatedConfig) => {
+                onConfigChange(updatedConfig);
+                showToast('AI Settings updated successfully.', 'success');
+              }}
+              showToast={showToast}
+              onVerifyKey={async (key) => {
+                try {
+                  const res = await fetch('/api/admin/secure-settings', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${window.localStorage.getItem('admin_jwt_token') || ''}`
+                    },
+                    body: JSON.stringify({ geminiApiKey: key })
+                  });
+                  const data = await res.json();
+                  return !!data.success;
+                } catch (err) {
+                  return false;
+                }
+              }}
+            />
+          )}
+
+          {/* TAB: AI PROMPT GOVERNANCE */}
+          {activeAdminTab === 'ai-prompts' && (
+            <PromptManager 
+              appConfig={currentConfig}
+              onUpdateConfig={async (updatedConfig) => {
+                onConfigChange(updatedConfig);
+                showToast('AI Prompt Governance updated successfully.', 'success');
+              }}
+              showToast={showToast}
+            />
+          )}
+
+          {/* TAB: AI SANDBOX PLAYGROUND */}
+          {activeAdminTab === 'ai-playground' && (
+            <AIPlayground 
+              showToast={showToast}
+            />
+          )}
+
           {activeAdminTab === 'db' && (
             <div className="space-y-6 animate-fade-in text-slate-800">
               <div className="border-b pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
