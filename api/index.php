@@ -280,12 +280,16 @@ switch ($apiPath) {
         $topic = $body['topic'] ?? 'General';
 
         // Check for Gemini API Key in server variables or database configuration
-        $apiKey = getenv('GEMINI_API_KEY') ?: ($db['config']['gemini_api_key'] ?? '');
+        $apiKey = getenv('GEMINI_API_KEY') ?: ($db['config']['geminiApiKey'] ?? ($db['config']['gemini_api_key'] ?? ''));
 
         if (empty($apiKey)) {
             echo json_encode(getExamFallback($subject, $classLevel, $numQuestions, $topic));
             break;
         }
+
+        $model = $db['config']['aiModel'] ?? 'gemini-2.5-flash';
+        $temp = isset($db['config']['aiTemperature']) ? (float)$db['config']['aiTemperature'] : 0.2;
+        $maxTokens = isset($db['config']['aiMaxTokens']) ? (int)$db['config']['aiMaxTokens'] : 8192;
 
         $prompt = "You are a professional teacher under the Nigerian Educational Research and Development Council (NERDC).\n" .
                   "Generate a set of $numQuestions multiple-choice exam questions for $classLevel, Subject: $subject, Term: $term, covering topics like: \"$topic\".\n\n" .
@@ -320,7 +324,7 @@ switch ($apiPath) {
             "required" => ["questions"]
         ];
 
-        $aiResult = callGeminiAPI($apiKey, $prompt, $schema);
+        $aiResult = callGeminiAPI($apiKey, $prompt, $schema, $model, $temp, $maxTokens);
         if ($aiResult && isset($aiResult['questions'])) {
             echo json_encode(["success" => true, "questions" => $aiResult['questions']]);
         } else {
@@ -335,12 +339,16 @@ switch ($apiPath) {
         $questions = $body['questions'] ?? [];
         $studentAnswers = $body['studentAnswers'] ?? [];
 
-        $apiKey = getenv('GEMINI_API_KEY') ?: ($db['config']['gemini_api_key'] ?? '');
+        $apiKey = getenv('GEMINI_API_KEY') ?: ($db['config']['geminiApiKey'] ?? ($db['config']['gemini_api_key'] ?? ''));
 
         if (empty($apiKey)) {
             echo json_encode(getGradingFallback($questions, $studentAnswers, $subject));
             break;
         }
+
+        $model = $db['config']['aiModel'] ?? 'gemini-2.5-flash';
+        $temp = isset($db['config']['aiTemperature']) ? (float)$db['config']['aiTemperature'] : 0.2;
+        $maxTokens = isset($db['config']['aiMaxTokens']) ? (int)$db['config']['aiMaxTokens'] : 8192;
 
         $prompt = "You are an expert exam paper grader in West Africa (WAEC/NECO team).\n" .
                   "Grade the student script below.\n" .
@@ -371,7 +379,7 @@ switch ($apiPath) {
             "required" => ["scoreOutOf100", "caScore", "examScore", "letterGrade", "teacherRemark", "aiStrengths", "aiWeaknesses"]
         ];
 
-        $aiResult = callGeminiAPI($apiKey, $prompt, $schema);
+        $aiResult = callGeminiAPI($apiKey, $prompt, $schema, $model, $temp, $maxTokens);
         if ($aiResult && isset($aiResult['scoreOutOf100'])) {
             echo json_encode(array_merge(["success" => true], $aiResult));
         } else {
@@ -384,12 +392,16 @@ switch ($apiPath) {
         $subject = $body['subject'] ?? 'General';
         $term = $body['term'] ?? '1st Term';
 
-        $apiKey = getenv('GEMINI_API_KEY') ?: ($db['config']['gemini_api_key'] ?? '');
+        $apiKey = getenv('GEMINI_API_KEY') ?: ($db['config']['geminiApiKey'] ?? ($db['config']['gemini_api_key'] ?? ''));
 
         if (empty($apiKey)) {
             echo json_encode(getCurriculumFallback($subject, $classLevel, $term));
             break;
         }
+
+        $model = $db['config']['aiModel'] ?? 'gemini-2.5-flash';
+        $temp = isset($db['config']['aiTemperature']) ? (float)$db['config']['aiTemperature'] : 0.2;
+        $maxTokens = isset($db['config']['aiMaxTokens']) ? (int)$db['config']['aiMaxTokens'] : 8192;
 
         $prompt = "You are an expert curriculum design specialist, Nigerian NERDC educational consultant, and syllabus director.\n" .
                   "Generate a comprehensive 12-week Academic Curriculum for the Student Class: \"$classLevel\", Subject: \"$subject\", Term: \"$term\" following NERDC guidelines.\n" .
@@ -422,7 +434,7 @@ switch ($apiPath) {
             "required" => ["weeks"]
         ];
 
-        $aiResult = callGeminiAPI($apiKey, $prompt, $schema);
+        $aiResult = callGeminiAPI($apiKey, $prompt, $schema, $model, $temp, $maxTokens);
         if ($aiResult && isset($aiResult['weeks'])) {
             echo json_encode(["success" => true, "curriculum" => $aiResult['weeks']]);
         } else {
@@ -438,12 +450,16 @@ switch ($apiPath) {
         $focusTopic = $body['focusTopic'] ?? '';
         $isEndOfTerm = isset($body['isEndOfTerm']) && $body['isEndOfTerm'];
 
-        $apiKey = getenv('GEMINI_API_KEY') ?: ($db['config']['gemini_api_key'] ?? '');
+        $apiKey = getenv('GEMINI_API_KEY') ?: ($db['config']['geminiApiKey'] ?? ($db['config']['gemini_api_key'] ?? ''));
 
         if (empty($apiKey)) {
             echo json_encode(getLessonNoteFallback($subject, $classLevel, $term, $week, $focusTopic, $isEndOfTerm));
             break;
         }
+
+        $model = $db['config']['aiModel'] ?? 'gemini-2.5-flash';
+        $temp = isset($db['config']['aiTemperature']) ? (float)$db['config']['aiTemperature'] : 0.2;
+        $maxTokens = isset($db['config']['aiMaxTokens']) ? (int)$db['config']['aiMaxTokens'] : 8192;
 
         $prompt = "Generate a professional Weekly Lesson Note or End-of-Term revision package conforming to Nigerian NERDC guidelines.\n" .
                   "Parameters: Class=$classLevel, Subject=$subject, Term=$term, Week=$week, Topic=$focusTopic, EndOfTerm=" . ($isEndOfTerm ? 'Yes' : 'No') . ".\n" .
@@ -530,7 +546,7 @@ switch ($apiPath) {
             ]
         ];
 
-        $aiResult = callGeminiAPI($apiKey, $prompt, $schema);
+        $aiResult = callGeminiAPI($apiKey, $prompt, $schema, $model, $temp, $maxTokens);
         if ($aiResult && isset($aiResult['topic'])) {
             echo json_encode(["success" => true, "lessonNote" => $aiResult]);
         } else {
@@ -579,9 +595,16 @@ function sendGmail($token, $to, $subject, $bodyText) {
 /**
  * Makes cURL request to Google Gemini API
  */
-function callGeminiAPI($apiKey, $prompt, $schema) {
-    // Model changed to gemini-2.5-flash as per skill guidelines
-    $url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" . urlencode($apiKey);
+function callGeminiAPI($apiKey, $prompt, $schema, $model = 'gemini-2.5-flash', $temperature = 0.2, $maxOutputTokens = 8192) {
+    // Standardize selected model tags to match active gemini model names
+    if (empty($model) || strpos($model, 'gemini') === false) {
+        $model = 'gemini-2.5-flash';
+    } else if ($model === 'gemini-3.5-flash') {
+        // Fall back to gemini-2.5-flash since 3.5 isn't GA in API yet
+        $model = 'gemini-2.5-flash';
+    }
+
+    $url = "https://generativelanguage.googleapis.com/v1beta/models/" . urlencode($model) . ":generateContent?key=" . urlencode($apiKey);
 
     $payload = [
         "contents" => [
@@ -593,7 +616,9 @@ function callGeminiAPI($apiKey, $prompt, $schema) {
         ],
         "generationConfig" => [
             "responseMimeType" => "application/json",
-            "responseSchema" => $schema
+            "responseSchema" => $schema,
+            "temperature" => (float)$temperature,
+            "maxOutputTokens" => (int)$maxOutputTokens
         ]
     ];
 
