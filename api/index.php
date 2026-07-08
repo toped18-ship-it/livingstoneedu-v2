@@ -116,6 +116,25 @@ $body = json_decode(file_get_contents("php://input"), true) ?? [];
 
 // Router logic
 switch ($apiPath) {
+    case 'admin/secure-settings':
+        if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+            $key = $db['config']['geminiApiKey'] ?? ($db['config']['gemini_api_key'] ?? '');
+            $maskedKey = $key ? substr($key, 0, min(6, strlen($key))) . '...' . substr($key, max(0, strlen($key) - 4)) : '';
+            echo json_encode(["geminiApiKey" => $maskedKey, "hasKey" => !empty($key)]);
+        } else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $geminiApiKey = $body['geminiApiKey'] ?? '';
+            if ($geminiApiKey !== '' && strpos($geminiApiKey, '...') === false) {
+                $db['config']['geminiApiKey'] = trim($geminiApiKey);
+                saveDB($dbFile, $db);
+            } else if ($geminiApiKey === '') {
+                $db['config']['geminiApiKey'] = '';
+                saveDB($dbFile, $db);
+            }
+            $key = $db['config']['geminiApiKey'] ?? '';
+            echo json_encode(["success" => true, "hasKey" => !empty($key)]);
+        }
+        break;
+
     case 'admin/config':
         if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             echo json_encode($db['config']);
