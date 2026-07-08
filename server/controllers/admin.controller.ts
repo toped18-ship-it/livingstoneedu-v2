@@ -22,9 +22,31 @@ export class AdminController {
 
     try {
       const config = await FirebaseService.getConfig();
+      const incomingKey = geminiApiKey ? geminiApiKey.trim() : '';
+      const isNewKey = incomingKey && !incomingKey.includes('...');
+
+      if (isNewKey) {
+        // Perform an actual lightweight request to Google Gemini API to test key validity
+        try {
+          const client = getGeminiClient(incomingKey);
+          await client.models.generateContent({
+            model: 'gemini-3.5-flash',
+            contents: 'ping',
+            config: {
+              maxOutputTokens: 2,
+            },
+          });
+        } catch (error: any) {
+          Logger.error('ADMIN', `Gemini API Key verification failed: ${error.message || error}`);
+          return res.status(400).json({
+            success: false,
+            message: `Gemini Verification failed: ${error.message || 'Check key validity or connection.'}`
+          });
+        }
+      }
       
-      if (geminiApiKey && !geminiApiKey.includes('...')) {
-        config.geminiApiKey = geminiApiKey.trim();
+      if (isNewKey) {
+        config.geminiApiKey = incomingKey;
         await FirebaseService.updateConfig(config);
       } else if (geminiApiKey === '') {
         config.geminiApiKey = '';

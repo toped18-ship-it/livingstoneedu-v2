@@ -5784,7 +5784,7 @@ ${(lessonContent.keyPoints || []).map((pt: string) => `- ${pt}`).join('\n')}
               showToast={showToast}
               onVerifyKey={async (key) => {
                 try {
-                  const res = await fetch('/api/admin/secure-settings', {
+                  const res = await adminFetch('/api/admin/secure-settings', {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',
