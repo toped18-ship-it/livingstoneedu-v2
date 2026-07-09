@@ -19,6 +19,38 @@ import './index.css';
   }
 })();
 
+// Suppress benign sandbox WebSocket/HMR errors and rejections
+(function suppressWebSocketErrors() {
+  if (typeof window !== 'undefined') {
+    window.addEventListener('unhandledrejection', (event) => {
+      const reason = event.reason;
+      const message = reason ? (reason.message || reason.toString() || '') : '';
+      if (
+        /websocket/i.test(message) ||
+        /WebSocket closed without opened/i.test(message) ||
+        /failed to connect to websocket/i.test(message)
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        console.warn('[Vite HMR Sandbox] Suppressed unhandled rejection:', reason);
+      }
+    });
+
+    window.addEventListener('error', (event) => {
+      const message = event.message || '';
+      if (
+        /websocket/i.test(message) ||
+        /WebSocket closed without opened/i.test(message) ||
+        /failed to connect to websocket/i.test(message)
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        console.warn('[Vite HMR Sandbox] Suppressed error:', message);
+      }
+    });
+  }
+})();
+
 const BUILD_VERSION = "BUILD_ID";
 
 // Force updates if build ID changed
