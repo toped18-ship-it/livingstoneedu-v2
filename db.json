@@ -14,7 +14,8 @@
     "flutterwavePublicKey": "FLWPUBK_TEST-a1b2c3d4e5",
     "stripePublicKey": "pk_test_stripe_12345",
     "paystackLink": "https://paystack.com/pay/livingstone-pro-access",
-    "flutterwaveLink": "https://flutterwave.com/pay/sxagj005oznw"
+    "flutterwaveLink": "https://flutterwave.com/pay/sxagj005oznw",
+    "geminiApiKey": "AIzaSyCGn-gMO1jl8mwd_r72KLp0GCpM8Z5Roxs"
   },
   "activities": [
     {
