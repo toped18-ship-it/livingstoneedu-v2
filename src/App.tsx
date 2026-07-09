@@ -1,3 +1,4 @@
+// LIVINGSTONEEDU learning portal main application entry point
 import React, { useState, useEffect, useMemo } from 'react';
 import { ClassLevel, User, LessonProgress, TermNumber, WeekNumber } from './types';
 import { getSubjectsForClass } from './data/curriculum';
