@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { rtdbSubscribe, rtdbSet, rtdbGet, rtdbUpdate, NODES, seedRtdbIfEmpty } from '../lib/rtdbService';
+import { rtdbSubscribe, rtdbSet, rtdbGet, rtdbUpdate, NODES, seedRtdbIfEmpty, getCanonicalSubjectId } from '../lib/rtdbService';
 import { GmailHub } from './GmailHub';
 import { 
   getSubjectsForClass, 
@@ -921,6 +921,7 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
         
         // Accumulate updates ONLY for this current class level to avoid "Write too large" errors
         const classCurriculumUpdates: Record<string, any> = {};
+        const classSchemesUpdates: Record<string, any> = {};
 
         // Loop and write in flat format directly to prevent any heavy single update issues
         for (const targetClass of targetClasses) {
@@ -962,6 +963,27 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
                   details: objectives.join('\n') || sub.description || `National syllabus guidelines covering ${topicTitle}.`,
                   status: 'Published'
                 };
+
+                // Populate schemes of work hierarchical mapping
+                const classId = targetClass.trim().replace(/\s+/g, '_');
+                const subjectId = getCanonicalSubjectId(sub.name);
+                const termId = `term_${termNum}`;
+                const weekId = `week_${weekNum}`;
+                const pathKey = `${classId}/${subjectId}/${termId}/${weekId}`;
+
+                classSchemesUpdates[pathKey] = {
+                  id: `scheme_${classId}_${subjectId}_t${termNum}_w${weekNum}`,
+                  classLevel: targetClass,
+                  subjectId: subjectId,
+                  subjectName: sub.name,
+                  termNum: termNum,
+                  termLabel: termLabel,
+                  weekNum: weekNum,
+                  focusTopic: topicTitle,
+                  details: objectives.join('\n') || sub.description || `National syllabus guidelines covering ${topicTitle}.`,
+                  objectives: objectives,
+                  status: 'Published'
+                };
               }
             }
           }
@@ -969,6 +991,7 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
 
         // Save progress step by step to flat nodes using rtdbUpdate to only send new records for this class
         await rtdbUpdate(NODES.CURRICULUM, classCurriculumUpdates);
+        await rtdbUpdate(NODES.SCHEMES_OF_WORK, classSchemesUpdates);
 
         // Display progress bar and step updates
         const percent = Math.round((currentStep / totalSteps) * 100);

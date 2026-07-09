@@ -4,6 +4,7 @@ import { LESSON_SYSTEM_PROMPT, getLessonUserPrompt } from '../prompts/lesson.pro
 import { safeParseJson } from '../utils/safeParseJson';
 import { Logger } from '../utils/logger';
 import { LessonNote } from '../types';
+import { Type } from '@google/genai';
 
 export class LessonService {
   /**
@@ -51,15 +52,83 @@ export class LessonService {
         config: {
           responseMimeType: 'application/json',
           responseSchema: {
-            type: 'OBJECT',
+            type: Type.OBJECT,
             properties: {
-              topic: { type: 'STRING' },
-              detailedLessonNote: { 
-                type: 'STRING',
-                description: 'Complete, extensive lesson note in clear Markdown format teaching the specified topic in depth.'
+              topic: { type: Type.STRING },
+              subtopic: { type: Type.STRING },
+              duration: { type: Type.STRING },
+              objectives: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING }
+              },
+              teachingMaterials: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING }
+              },
+              keyVocabulary: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING }
+              },
+              introduction: { type: Type.STRING },
+              teacherExplanationSteps: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING }
+              },
+              detailedLessonNote: { type: Type.STRING },
+              studentActivities: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING }
+              },
+              classExercises: {
+                type: Type.ARRAY,
+                items: { type: Type.STRING }
+              },
+              homeworkAssignment: { type: Type.STRING },
+              quizQuestions: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    question: { type: Type.STRING },
+                    options: {
+                      type: Type.ARRAY,
+                      items: { type: Type.STRING }
+                    },
+                    correctIndex: { type: Type.INTEGER },
+                    explanation: { type: Type.STRING }
+                  },
+                  required: ['question', 'options', 'correctIndex', 'explanation']
+                }
+              },
+              theoryQuestions: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    question: { type: Type.STRING },
+                    modelAnswer: { type: Type.STRING },
+                    markingSchemeName: { type: Type.STRING }
+                  },
+                  required: ['question', 'modelAnswer', 'markingSchemeName']
+                }
+              },
+              subjectSpecificFocus: {
+                type: Type.OBJECT,
+                properties: {
+                  title: { type: Type.STRING },
+                  content: { type: Type.STRING },
+                  safeguardsOrMoralLesson: { type: Type.STRING }
+                },
+                required: ['title', 'content', 'safeguardsOrMoralLesson']
               }
             },
-            required: ['topic', 'detailedLessonNote']
+            required: [
+              'topic', 'subtopic', 'duration', 'objectives', 'teachingMaterials',
+              'keyVocabulary', 'introduction', 'teacherExplanationSteps',
+              'detailedLessonNote', 'studentActivities', 'classExercises',
+              'homeworkAssignment', 'quizQuestions', 'theoryQuestions',
+              'subjectSpecificFocus'
+            ]
           }
         }
       });

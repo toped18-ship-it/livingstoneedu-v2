@@ -68,9 +68,34 @@ export interface QuizQuestion {
   explanation: string;
 }
 
+export interface TheoryQuestion {
+  question: string;
+  modelAnswer: string;
+  markingSchemeName: string;
+}
+
+export interface SubjectSpecificFocus {
+  title: string;
+  content: string;
+  safeguardsOrMoralLesson: string;
+}
+
 export interface LessonNote {
   topic: string;
   detailedLessonNote: string;
+  subtopic?: string;
+  duration?: string;
+  objectives?: string[];
+  teachingMaterials?: string[];
+  keyVocabulary?: string[];
+  introduction?: string;
+  teacherExplanationSteps?: string[];
+  studentActivities?: string[];
+  classExercises?: string[];
+  homeworkAssignment?: string;
+  quizQuestions?: QuizQuestion[];
+  theoryQuestions?: TheoryQuestion[];
+  subjectSpecificFocus?: SubjectSpecificFocus;
 }
 
 export interface CurriculumWeek {

@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { User, ClassLevel, TeacherClassSetup, TeacherStudent, AIExam, QuizQuestion } from '../types';
 import { getSubjectsForClass, getWeeklyTopicTitle, getLessonContent } from '../data/curriculum';
-import { rtdbGet, rtdbSet, NODES } from '../lib/rtdbService';
+import { rtdbGet, rtdbSet, rtdbUpdate, NODES, getCanonicalSubjectId, getSchemePath } from '../lib/rtdbService';
 
 interface TeacherPortalProps {
   user: User;
@@ -169,6 +169,7 @@ export function TeacherPortal({ user, onNavigateToHome, isPro, onPaymentTrigger,
     try {
       const rtdbCurriculum = await rtdbGet(NODES.CURRICULUM) || {};
       const keys = Object.keys(rtdbCurriculum);
+      const schemesUpdates: Record<string, any> = {};
       
       for (let i = 1; i <= 12; i++) {
         const edit = editingCurriculumWeeks[i];
@@ -187,19 +188,46 @@ export function TeacherPortal({ user, onNavigateToHome, isPro, onPaymentTrigger,
           foundKey = `curr_ai_${selectedCurriculumClass.replace(/\s+/g, '_')}_${selectedCurriculumSubject.replace(/\s+/g, '_')}_${selectedCurriculumTerm.replace(/\s+/g, '_')}_W${i}`;
         }
         
+        const topic = edit.topic;
+        const objectives = edit.objectives.split('\n').filter((x: string) => x.trim() !== '');
+
         rtdbCurriculum[foundKey] = {
           id: foundKey,
           class: selectedCurriculumClass,
           subject: selectedCurriculumSubject,
           term: selectedCurriculumTerm,
           week: i,
-          topic: edit.topic,
+          topic: topic,
           details: edit.objectives,
+          status: 'Published'
+        };
+
+        // Populate schemes of work hierarchical mapping
+        const classId = selectedCurriculumClass.trim().replace(/\s+/g, '_');
+        const subjectId = getCanonicalSubjectId(selectedCurriculumSubject);
+        const termMatch = selectedCurriculumTerm.match(/\d+/);
+        const termNumVal = termMatch ? Number(termMatch[0]) : 1;
+        const termId = `term_${termNumVal}`;
+        const weekId = `week_${i}`;
+        const pathKey = `${classId}/${subjectId}/${termId}/${weekId}`;
+
+        schemesUpdates[pathKey] = {
+          id: `scheme_${classId}_${subjectId}_t${termNumVal}_w${i}`,
+          classLevel: selectedCurriculumClass,
+          subjectId: subjectId,
+          subjectName: selectedCurriculumSubject,
+          termNum: termNumVal,
+          termLabel: selectedCurriculumTerm,
+          weekNum: i,
+          focusTopic: topic,
+          details: edit.objectives,
+          objectives: objectives,
           status: 'Published'
         };
       }
       
       await rtdbSet(NODES.CURRICULUM, rtdbCurriculum);
+      await rtdbUpdate(NODES.SCHEMES_OF_WORK, schemesUpdates);
       
       setCurriculumStatus('Curriculum saved and published to the database! Lesson Note Writer and Classroom modules can now use this syllabus.');
       setHasExistingCurriculum(true);
@@ -246,65 +274,85 @@ export function TeacherPortal({ user, onNavigateToHome, isPro, onPaymentTrigger,
     setUserAnswers({});
     setShowAnswerKey(false);
     try {
-      // 1. Retrieve curriculum topic from Firebase Realtime Database curriculum node
-      const rtdbCurriculum = await rtdbGet(NODES.CURRICULUM);
-      
-      // Log the exact Firebase path and query result in the browser console for debugging
-      console.log(`[DEBUG] Querying Firebase Realtime Database Path: /curriculum`);
-      console.log(`[DEBUG] Firebase /curriculum Query Result payload:`, rtdbCurriculum);
-
-      let matchedCurriculum: any = null;
-      
       const targetTerm = selectedTerm; // e.g. "1st Term"
       const targetWeek = selectedWeek; // number
       const targetClass = selectedClass; // e.g. "SS 1"
       const targetSubject = selectedSubject; // e.g. "Mathematics"
 
-      if (rtdbCurriculum) {
-        // Flatten any possible structure (flat or nested) to have uniform search
-        const getFlatCurriculums = (obj: any): any[] => {
-          if (!obj || typeof obj !== 'object') return [];
-          if (obj.topic !== undefined && (obj.class !== undefined || obj.week !== undefined)) {
-            return [obj];
-          }
-          let list: any[] = [];
-          for (const val of Object.values(obj)) {
-            list = list.concat(getFlatCurriculums(val));
-          }
-          return list;
+      // 1. Retrieve curriculum topic from Firebase Realtime Database schemes_of_work hierarchical node
+      const classId = targetClass.trim().replace(/\s+/g, '_');
+      const subjectId = getCanonicalSubjectId(targetSubject);
+      const termMatch = targetTerm.match(/\d+/);
+      const termNumVal = termMatch ? Number(termMatch[0]) : 1;
+      const termId = `term_${termNumVal}`;
+      const weekId = `week_${targetWeek}`;
+      const schemePath = `${NODES.SCHEMES_OF_WORK}/${classId}/${subjectId}/${termId}/${weekId}`;
+
+      console.log(`[DEBUG] Querying Firebase Realtime Database Hierarchical Path: ${schemePath}`);
+      let schemeRecord: any = await rtdbGet(schemePath);
+      let matchedCurriculum: any = null;
+
+      if (schemeRecord) {
+        console.log(`[DEBUG] Found direct scheme in Realtime Database:`, schemeRecord);
+        matchedCurriculum = {
+          class: targetClass,
+          subject: targetSubject,
+          term: targetTerm,
+          week: targetWeek,
+          topic: schemeRecord.focusTopic || schemeRecord.topic,
+          details: schemeRecord.details || (schemeRecord.objectives ? schemeRecord.objectives.join('\n') : ''),
+          status: 'Published'
         };
-
-        const flatList = getFlatCurriculums(rtdbCurriculum);
-        console.log(`[DEBUG] Total flattened curriculum records count: ${flatList.length}`, flatList);
-
-        // Filter records precisely where:
-        // class === selectedClass
-        // subject === selectedSubject
-        // term === selectedTerm
-        // week === selectedWeek
-        // status === "Published"
-        matchedCurriculum = flatList.find((record: any) => {
-          if (!record) return false;
-
-          // Must match status === "Published"
-          const recordStatus = record.status || 'Published';
-          if (recordStatus !== 'Published') return false;
-
-          // Standardize spaces and casing to prevent mismatch
-          const norm = (s: string) => String(s).replace(/\s+/g, '').toLowerCase();
-          const normWeek = (w: any) => {
-            if (typeof w === 'number') return w;
-            const m = String(w).match(/\d+/);
-            return m ? parseInt(m[0], 10) : null;
+      } else {
+        console.log(`[DEBUG] Hierarchical path [${schemePath}] not found. Querying flat /curriculum fallback...`);
+        const rtdbCurriculum = await rtdbGet(NODES.CURRICULUM);
+        
+        if (rtdbCurriculum) {
+          // Flatten any possible structure (flat or nested) to have uniform search
+          const getFlatCurriculums = (obj: any): any[] => {
+            if (!obj || typeof obj !== 'object') return [];
+            if (obj.topic !== undefined && (obj.class !== undefined || obj.week !== undefined)) {
+              return [obj];
+            }
+            let list: any[] = [];
+            for (const val of Object.values(obj)) {
+              list = list.concat(getFlatCurriculums(val));
+            }
+            return list;
           };
 
-          const classMatch = norm(record.class) === norm(targetClass);
-          const subjectMatch = norm(record.subject) === norm(targetSubject);
-          const termMatch = norm(record.term) === norm(targetTerm);
-          const weekMatch = normWeek(record.week) === normWeek(targetWeek);
+          const flatList = getFlatCurriculums(rtdbCurriculum);
+          console.log(`[DEBUG] Total flattened curriculum records count: ${flatList.length}`, flatList);
 
-          return classMatch && subjectMatch && termMatch && weekMatch;
-        });
+          // Filter records precisely where:
+          // class === selectedClass
+          // subject === selectedSubject
+          // term === selectedTerm
+          // week === selectedWeek
+          // status === "Published"
+          matchedCurriculum = flatList.find((record: any) => {
+            if (!record) return false;
+
+            // Must match status === "Published"
+            const recordStatus = record.status || 'Published';
+            if (recordStatus !== 'Published') return false;
+
+            // Standardize spaces and casing to prevent mismatch
+            const norm = (s: string) => String(s).replace(/\s+/g, '').toLowerCase();
+            const normWeek = (w: any) => {
+              if (typeof w === 'number') return w;
+              const m = String(w).match(/\d+/);
+              return m ? parseInt(m[0], 10) : null;
+            };
+
+            const classMatch = norm(record.class) === norm(targetClass);
+            const subjectMatch = norm(record.subject) === norm(targetSubject);
+            const termMatch = norm(record.term) === norm(targetTerm);
+            const weekMatch = normWeek(record.week) === normWeek(targetWeek);
+
+            return classMatch && subjectMatch && termMatch && weekMatch;
+          });
+        }
       }
 
       if (!matchedCurriculum) {

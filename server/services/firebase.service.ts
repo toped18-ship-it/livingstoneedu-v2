@@ -291,20 +291,74 @@ export class FirebaseService {
     }
   }
 
+  static getCanonicalSubjectId(subjName: string): string {
+    const s = subjName.toLowerCase().trim();
+    if (s.includes('math')) return 'mathematics';
+    if (s.includes('english')) return 'english';
+    if (s.includes('basic science') || s.includes('basic_science')) return 'basic_science';
+    if (s.includes('tech') && !s.includes('science')) return 'basic_tech';
+    if (s.includes('values') || s.includes('civic')) return 'civic_education';
+    if (s.includes('computer') || s.includes('ict')) return 'computer_studies';
+    if (s.includes('agri')) return 'agricultural_science';
+    if (s.includes('physics')) return 'physics';
+    if (s.includes('chemistry')) return 'chemistry';
+    if (s.includes('biology')) return 'biology';
+    if (s.includes('economics')) return 'economics';
+    if (s.includes('accounting')) return 'financial_accounting';
+    if (s.includes('commerce')) return 'commerce';
+    if (s.includes('government')) return 'government';
+    if (s.includes('christian') || s.includes('crs')) return 'crs';
+    if (s.includes('islam') || s.includes('irs')) return 'irs';
+    if (s.includes('creative') || s.includes('art')) return 'creative_arts';
+    if (s.includes('home eco') || s.includes('home_eco')) return 'home_economics';
+    if (s.includes('health') || s.includes('phe')) return 'phe';
+    if (s.includes('french')) return 'french';
+    if (s.includes('geography')) return 'geography';
+    return s.replace(/[^a-z0-9]/g, '_');
+  }
+
   static async getStoredTopic(subject: string, classLevel: string, term: string, week: string): Promise<string | null> {
-    const list = await this.getCurriculum(subject, classLevel, term);
-    if (list.length === 0) return null;
+    if (isStandaloneMode()) {
+      return null;
+    }
 
-    const normWeek = (w: any) => {
-      if (typeof w === 'number') return w;
-      const m = String(w).match(/\d+/);
-      return m ? parseInt(m[0], 10) : null;
-    };
+    try {
+      const rtdb = getFirebaseDatabase();
+      if (!rtdb) return null;
 
-    const targetWeekNum = normWeek(week);
-    if (!targetWeekNum) return null;
+      const normWeek = (w: any) => {
+        if (typeof w === 'number') return w;
+        const m = String(w).match(/\d+/);
+        return m ? parseInt(m[0], 10) : null;
+      };
 
-    const matched = list.find((record: any) => normWeek(record.week) === targetWeekNum);
-    return matched ? matched.topic : null;
+      const weekNum = normWeek(week);
+      if (!weekNum) return null;
+
+      const classId = classLevel.trim().replace(/\s+/g, '_');
+      const subjectId = this.getCanonicalSubjectId(subject);
+      const termId = term.trim().replace(/\s+/g, '_').toLowerCase();
+      const weekId = `week_${weekNum}`;
+
+      const path = `schemes_of_work/${classId}/${subjectId}/${termId}/${weekId}`;
+      const snapshot = await rtdb.ref(path).get();
+      
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        return data.focusTopic || data.topic || null;
+      }
+
+      // Fallback
+      const list = await this.getCurriculum(subject, classLevel, term);
+      if (list.length > 0) {
+        const matched = list.find((record: any) => normWeek(record.week) === weekNum);
+        if (matched) return matched.topic;
+      }
+
+      return null;
+    } catch (error) {
+      Logger.error('FirebaseService', `Failed to get stored topic for ${subject} - ${classLevel} - ${term} - ${week}`, error);
+      return null;
+    }
   }
 }

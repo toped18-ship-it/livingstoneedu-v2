@@ -153,6 +153,40 @@ export const rtdbSubscribe = (nodePath: string, callback: (data: any) => void): 
   return () => off(dbRef, 'value', listener);
 };
 
+export const getCanonicalSubjectId = (subjName: string): string => {
+  const s = subjName.toLowerCase().trim();
+  if (s.includes('math')) return 'mathematics';
+  if (s.includes('english')) return 'english';
+  if (s.includes('basic science') || s.includes('basic_science')) return 'basic_science';
+  if (s.includes('tech') && !s.includes('science')) return 'basic_tech';
+  if (s.includes('values') || s.includes('civic')) return 'civic_education';
+  if (s.includes('computer') || s.includes('ict')) return 'computer_studies';
+  if (s.includes('agri')) return 'agricultural_science';
+  if (s.includes('physics')) return 'physics';
+  if (s.includes('chemistry')) return 'chemistry';
+  if (s.includes('biology')) return 'biology';
+  if (s.includes('economics')) return 'economics';
+  if (s.includes('accounting')) return 'financial_accounting';
+  if (s.includes('commerce')) return 'commerce';
+  if (s.includes('government')) return 'government';
+  if (s.includes('christian') || s.includes('crs')) return 'crs';
+  if (s.includes('islam') || s.includes('irs')) return 'irs';
+  if (s.includes('creative') || s.includes('art')) return 'creative_arts';
+  if (s.includes('home eco') || s.includes('home_eco')) return 'home_economics';
+  if (s.includes('health') || s.includes('phe')) return 'phe';
+  if (s.includes('french')) return 'french';
+  if (s.includes('geography')) return 'geography';
+  return s.replace(/[^a-z0-9]/g, '_');
+};
+
+export const getSchemePath = (classLevel: string, subjectName: string, termLabel: string, weekNum: number): string => {
+  const classId = classLevel.trim().replace(/\s+/g, '_');
+  const subjectId = getCanonicalSubjectId(subjectName);
+  const termId = termLabel.trim().replace(/\s+/g, '_').toLowerCase();
+  const weekId = `week_${weekNum}`;
+  return `${NODES.SCHEMES_OF_WORK}/${classId}/${subjectId}/${termId}/${weekId}`;
+};
+
 // Seeding standard high-fidelity data into the 17 nodes if they don't exist
 let wasSeededChecked = false;
 
@@ -303,10 +337,79 @@ export const seedRtdbIfEmpty = async () => {
 
     // Check schemes_of_work
     const schemesData = await rtdbGet(NODES.SCHEMES_OF_WORK);
-    if (!schemesData) {
-      await rtdbSet(NODES.SCHEMES_OF_WORK, {
-        'scheme-1': { id: 'scheme-1', classLevel: 'SS 1', subjectId: 'mathematics', termNum: 1, weekNum: 1, focusTopic: 'Number Bases', details: 'Cover fundamental binary and octal conversions.' }
-      });
+    if (!schemesData || schemesData['scheme-1'] !== undefined) {
+      console.log('[RTDB Seed] Seeding complete schemes of work hierarchically for all classes and subjects...');
+      const fullSchemes: any = {};
+
+      const ALL_CLASSES = [
+        'Primary 1', 'Primary 2', 'Primary 3', 'Primary 4', 'Primary 5', 'Primary 6',
+        'JSS 1', 'JSS 2', 'JSS 3', 'SS 1', 'SS 2', 'SS 3'
+      ];
+
+      const ALL_SUBJECTS = [
+        { id: 'mathematics', name: 'Mathematics' },
+        { id: 'english', name: 'English Studies' },
+        { id: 'basic_science', name: 'Basic Science & Tech' },
+        { id: 'national_values', name: 'National Values Education' },
+        { id: 'creative_arts', name: 'Cultural & Creative Arts' },
+        { id: 'agricultural_science', name: 'Agricultural Science' },
+        { id: 'computer_studies', name: 'Computer Studies (ICT)' },
+        { id: 'physics', name: 'Physics' },
+        { id: 'chemistry', name: 'Chemistry' },
+        { id: 'biology', name: 'Biology' },
+        { id: 'economics', name: 'Economics' },
+        { id: 'accounting', name: 'Financial Accounting' },
+        { id: 'commerce', name: 'Commerce' },
+        { id: 'government', name: 'Government' },
+        { id: 'civic_education', name: 'Civic Education' },
+        { id: 'crs', name: 'Christian Religious Studies' },
+        { id: 'irs', name: 'Islamic Religious Studies' },
+        { id: 'french', name: 'French Language' },
+        { id: 'home_economics', name: 'Home Economics' },
+        { id: 'phe', name: 'Physical & Health Education' },
+        { id: 'geography', name: 'Geography' }
+      ];
+
+      for (const classLevel of ALL_CLASSES) {
+        const classId = classLevel.replace(/\s+/g, '_');
+        fullSchemes[classId] = {};
+
+        for (const subj of ALL_SUBJECTS) {
+          const subjectId = subj.id;
+          fullSchemes[classId][subjectId] = {};
+
+          for (let termNum = 1; termNum <= 3; termNum++) {
+            const termId = `term_${termNum}`;
+            fullSchemes[classId][subjectId][termId] = {};
+
+            for (let weekNum = 1; weekNum <= 12; weekNum++) {
+              const weekId = `week_${weekNum}`;
+              const topic = getWeeklyTopicTitle(classLevel as any, subjectId as any, termNum as any, weekNum as any);
+              
+              fullSchemes[classId][subjectId][termId][weekId] = {
+                id: `scheme_${classId}_${subjectId}_t${termNum}_w${weekNum}`,
+                classLevel,
+                subjectId,
+                subjectName: subj.name,
+                termNum,
+                termLabel: `${termNum}${termNum === 1 ? 'st' : termNum === 2 ? 'nd' : 'rd'} Term`,
+                weekNum,
+                focusTopic: topic,
+                details: `Explain standard rules, definitions and practical operations of ${topic}.`,
+                objectives: [
+                  `Explain standard rules and operations of ${topic}.`,
+                  `Analyze step-by-step calculations and practical occurrences in Nigeria.`,
+                  `Complete corresponding continuous assessment and exam quizzes.`
+                ],
+                status: 'Published'
+              };
+            }
+          }
+        }
+      }
+
+      await rtdbSet(NODES.SCHEMES_OF_WORK, fullSchemes);
+      console.log('[RTDB Seed] Complete hierarchical Schemes of Work seeded successfully!');
     }
 
     // Wipe out the lesson_notes node to remove all previous lesson notes from storage
