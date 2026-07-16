@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Sparkles, Key, Cpu, Sliders, Info, ShieldCheck, RefreshCw, 
-  Settings, Save, Eye, EyeOff
+  Settings, Save, Eye, EyeOff, AlertTriangle
 } from 'lucide-react';
 
 interface AISettingsProps {
@@ -9,13 +9,15 @@ interface AISettingsProps {
   onUpdateConfig: (nextConfig: any) => Promise<void>;
   showToast: (message: string, type: 'success' | 'info' | 'error') => void;
   onVerifyKey: (key: string) => Promise<boolean>;
+  adminFetch?: (url: string, options?: RequestInit) => Promise<Response>;
 }
 
 export function AISettings({
   appConfig,
   onUpdateConfig,
   showToast,
-  onVerifyKey
+  onVerifyKey,
+  adminFetch
 }: AISettingsProps) {
   // Config form states
   const [apiKey, setApiKey] = useState<string>('');
@@ -29,10 +31,13 @@ export function AISettings({
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
+  const [keyStatus, setKeyStatus] = useState<'valid' | 'leaked' | 'invalid' | 'unknown'>('unknown');
+  const [statusDetails, setStatusDetails] = useState<string>('');
+  const [isCheckingStatus, setIsCheckingStatus] = useState<boolean>(false);
+
   // Sync inputs with state
   useEffect(() => {
     if (appConfig) {
-      setApiKey(appConfig.geminiApiKey || '');
       setAiModel(appConfig.aiModel || 'gemini-3.5-flash');
       setAiTemperature(appConfig.aiTemperature !== undefined ? Number(appConfig.aiTemperature) : 0.2);
       setAiMaxTokens(appConfig.aiMaxTokens !== undefined ? Number(appConfig.aiMaxTokens) : 8192);
@@ -40,6 +45,31 @@ export function AISettings({
       setAiTopK(appConfig.aiTopK !== undefined ? Number(appConfig.aiTopK) : 40);
     }
   }, [appConfig]);
+
+  // Load current secure key status and active masked key from server
+  useEffect(() => {
+    const fetchSecureSettings = async () => {
+      if (!adminFetch) return;
+      setIsCheckingStatus(true);
+      try {
+        const res = await adminFetch('/api/admin/secure-settings');
+        const data = await res.json();
+        if (data) {
+          if (data.keyStatus) setKeyStatus(data.keyStatus);
+          if (data.statusDetails) setStatusDetails(data.statusDetails);
+          if (data.geminiApiKey) {
+            setApiKey(data.geminiApiKey);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load secure settings key status:', err);
+      } finally {
+        setIsCheckingStatus(false);
+      }
+    };
+
+    fetchSecureSettings();
+  }, [adminFetch]);
 
   // Handle saving configurations
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -97,6 +127,52 @@ export function AISettings({
         </h3>
         <p className="text-xs text-slate-500 mt-1">Configure API keys, temperature limits, response metrics, and parameters for lesson generation nodes.</p>
       </div>
+
+      {/* Leak Warning Banner or general Key Status Info */}
+      {keyStatus === 'leaked' && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-2xl flex gap-3 text-red-900 animate-pulse shadow-sm">
+          <AlertTriangle size={20} className="shrink-0 text-red-600 mt-0.5" />
+          <div className="space-y-1.5 text-xs">
+            <h4 className="font-extrabold text-red-950">⚠️ Active Google Gemini API Key Flagged as Leaked</h4>
+            <p className="text-red-800 leading-relaxed font-medium">
+              The active Gemini API Key (or the system default configuration) has been flagged as leaked by Google Cloud's security scanner and is being blocked (<code>PERMISSION_DENIED</code>).
+            </p>
+            <p className="text-red-700 leading-relaxed font-medium">
+              <strong>Fault-Tolerance Status:</strong> Our custom, West African NERDC syllabus-compliant local fallback generators are fully operational! All lesson note, exam, and curriculum actions are successfully operating in high-fidelity sandbox mode.
+            </p>
+            <p className="text-red-900 font-bold">
+              To re-enable direct live AI-powered generation, please update the Google Gemini API Key below with a secure, newly generated key from Google AI Studio.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {keyStatus === 'invalid' && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex gap-3 text-amber-900 shadow-sm">
+          <AlertTriangle size={18} className="shrink-0 text-amber-600 mt-0.5" />
+          <div className="space-y-1 text-xs">
+            <h4 className="font-extrabold text-amber-950">Active Gemini API Key is Not Operational</h4>
+            <p className="text-amber-800 leading-relaxed font-medium">
+              The system was unable to verify the connection. Detailed response: <code className="text-[11px] bg-amber-100 px-1 py-0.5 rounded font-mono">{statusDetails || 'Invalid key parameters.'}</code>.
+            </p>
+            <p className="text-amber-700 leading-relaxed font-medium">
+              Using standard local fallback engines for backup safety. You can provide and test another key below.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {keyStatus === 'valid' && (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex gap-3 text-emerald-950 shadow-sm">
+          <ShieldCheck size={18} className="shrink-0 text-emerald-600 mt-0.5" />
+          <div className="space-y-1 text-xs">
+            <h4 className="font-extrabold text-emerald-950">✔ Gemini LLM Key Operational</h4>
+            <p className="text-emerald-800 leading-relaxed font-medium">
+              The Google Gemini API connection is perfectly authenticated and active. High-fidelity West African educational notes and metrics are being synthesised on-demand by Gemini 3.5.
+            </p>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSaveSettings} className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         

@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { ActionDropdown, ActionDropdownItem } from './ActionDropdown';
+import { SidebarMenu } from './SidebarMenu';
 import { rtdbSubscribe, rtdbSet, rtdbGet, rtdbUpdate, NODES, seedRtdbIfEmpty, getCanonicalSubjectId } from '../lib/rtdbService';
 import { GmailHub } from './GmailHub';
 import { 
   getSubjectsForClass, 
   getWeeklyTopicTitle, 
   getLessonContent,
-  ALL_CLASSES
+  ALL_CLASSES,
+  SUBJECTS
 } from '../data/curriculum';
 import { 
   Settings, 
@@ -56,6 +59,7 @@ import { CurriculumManager } from './admin/CurriculumManager';
 import { PromptManager } from './admin/PromptManager';
 import { AISettings } from './admin/AISettings';
 import { AIPlayground } from './admin/AIPlayground';
+import { MasterLessonLibrary } from './MasterLessonLibrary';
 
 interface InquiryItem {
   id: string;
@@ -87,6 +91,8 @@ interface AdminPanelProps {
   };
   onConfigChange: (newConfig: any) => void;
   currentUser: any;
+  activeAdminTab?: 'dashboard' | 'users' | 'curriculum' | 'cbt' | 'payments' | 'results' | 'branding' | 'inquiries' | 'activities' | 'gmail' | 'session' | 'attendance' | 'comms' | 'fees' | 'settings' | 'moderation' | 'db' | 'ai-generator' | 'master-library' | 'ai-settings' | 'ai-prompts' | 'ai-playground';
+  setActiveAdminTab?: (tab: any) => void;
 }
 
 // Nigerian High-Fidelity Mock Curriculums
@@ -184,7 +190,13 @@ const localStorageProxy = {
 
 const localStorage = localStorageProxy;
 
-export function AdminPanel({ currentConfig, onConfigChange, currentUser }: AdminPanelProps) {
+export function AdminPanel({ 
+  currentConfig, 
+  onConfigChange, 
+  currentUser,
+  activeAdminTab: propsActiveAdminTab,
+  setActiveAdminTab: propsSetActiveAdminTab
+}: AdminPanelProps) {
   // Authentication states
   const [isAuthenticated, setIsAuthenticated] = useState(currentUser?.role === 'admin');
   const [passcode, setPasscode] = useState('');
@@ -198,7 +210,9 @@ export function AdminPanel({ currentConfig, onConfigChange, currentUser }: Admin
   }, [currentUser]);
 
   // Main UI Tab Router
-  const [activeAdminTab, setActiveAdminTab] = useState<'dashboard' | 'users' | 'curriculum' | 'cbt' | 'payments' | 'results' | 'branding' | 'inquiries' | 'activities' | 'gmail' | 'session' | 'attendance' | 'comms' | 'fees' | 'settings' | 'moderation' | 'db' | 'ai-generator'>('payments');
+  const [localActiveAdminTab, setLocalActiveAdminTab] = useState<'dashboard' | 'users' | 'curriculum' | 'cbt' | 'payments' | 'results' | 'branding' | 'inquiries' | 'activities' | 'gmail' | 'session' | 'attendance' | 'comms' | 'fees' | 'settings' | 'moderation' | 'db' | 'ai-generator' | 'master-library' | 'ai-settings' | 'ai-prompts' | 'ai-playground'>('payments');
+  const activeAdminTab = propsActiveAdminTab !== undefined ? propsActiveAdminTab : localActiveAdminTab;
+  const setActiveAdminTab = propsSetActiveAdminTab !== undefined ? propsSetActiveAdminTab : setLocalActiveAdminTab;
 
   // Interactive configurations
   const [brandName, setBrandName] = useState(currentConfig.brandName || 'LIVINGSTONEEDU');
@@ -1965,366 +1979,81 @@ ${(lessonContent.keyPoints || []).map((pt: string) => `- ${pt}`).join('\n')}
 
       </div>
 
-      {/* Primary Section Layout Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        {/* Left Side Navigation Sidebar */}
-        <div className="lg:col-span-3 space-y-4">
-          
-          {/* Top Group: Academic & Operations */}
-          <div className="bg-white border border-slate-100 p-5 rounded-2xl shadow-sm space-y-2">
-            <h5 className="text-[10px] font-bold uppercase text-amber-900 tracking-wider pb-1.5 border-b border-amber-100/40 flex items-center gap-1.5 mb-2.5 bg-amber-50/50 px-2.5 py-1.5 rounded-lg border border-amber-100/60">
-              <span>📈</span>
-              <span>Academic & Operations</span>
-            </h5>
-            
-            <button
-              type="button"
-              onClick={() => setActiveAdminTab('dashboard')}
-              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
-                activeAdminTab === 'dashboard'
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
-                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
-              }`}
+      {/* Admin Panel Tab Dropdown (Let all the buttons in admin panel be a drop down menu by the left side at the upper side) */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-5 rounded-2xl border border-slate-150 shadow-xs mb-6">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <span className="text-xs font-black uppercase text-slate-400 tracking-wider shrink-0">Admin Section:</span>
+          <div className="relative w-full sm:w-72">
+            <select
+              value={activeAdminTab}
+              onChange={(e) => setActiveAdminTab(e.target.value as any)}
+              className="w-full bg-slate-50 border-2 border-slate-200 text-slate-800 py-2.5 pl-3 pr-10 rounded-xl text-xs font-bold outline-none focus:border-indigo-650 focus:ring-1 focus:ring-indigo-650 cursor-pointer appearance-none shadow-xs"
             >
-              <span className="flex items-center gap-2">
-                <TrendingUp size={13} className="stroke-[2.5]" />
-                <span>SaaS Analytics Center</span>
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveAdminTab('users')}
-              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
-                activeAdminTab === 'users'
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
-                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <Users size={13} className="stroke-[2.5]" />
-                <span>Academic Directory</span>
-              </span>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${activeAdminTab === 'users' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                {usersList.length}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveAdminTab('curriculum')}
-              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
-                activeAdminTab === 'curriculum'
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
-                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <BookOpen size={13} className="stroke-[2.5]" />
-                <span>Curriculum Align</span>
-              </span>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${activeAdminTab === 'curriculum' ? 'bg-white/20 text-white' : 'bg-blue-50 text-blue-600'}`}>
-                {curriculums.length}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveAdminTab('ai-generator')}
-              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
-                activeAdminTab === 'ai-generator'
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
-                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <Sparkles size={13} className="text-amber-500 fill-amber-500 stroke-[2.5]" />
-                <span>AI Notes Generator</span>
-              </span>
-              <span className="text-[10px] bg-amber-500 text-white font-extrabold px-1.5 py-0.5 rounded-md animate-pulse">
-                AI
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveAdminTab('cbt')}
-              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
-                activeAdminTab === 'cbt'
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
-                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <Award size={13} className="stroke-[2.5]" />
-                <span>CBT Exam Banks</span>
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveAdminTab('payments')}
-              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
-                activeAdminTab === 'payments'
-                  ? 'bg-[#2563EB] text-white shadow-sm shadow-blue-500/10'
-                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <CreditCard size={13} className="stroke-[2.5]" />
-                <span>Payments & Sims</span>
-              </span>
-              <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded-md ${activeAdminTab === 'payments' ? 'bg-white/25 text-white' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}>
-                ₦
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveAdminTab('results')}
-              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
-                activeAdminTab === 'results'
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
-                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <FileText size={13} className="stroke-[2.5]" />
-                <span>Continuous Assessment (CA)</span>
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveAdminTab('session')}
-              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
-                activeAdminTab === 'session'
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
-                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <Calendar size={13} className="stroke-[2.5]" />
-                <span>Academic Session & Term</span>
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveAdminTab('attendance')}
-              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
-                activeAdminTab === 'attendance'
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
-                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <CheckSquare size={13} className="stroke-[2.5]" />
-                <span>Attendance Registry</span>
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveAdminTab('fees')}
-              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
-                activeAdminTab === 'fees'
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
-                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <DollarSign size={13} className="stroke-[2.5]" />
-                <span>School Fees Ledgers</span>
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveAdminTab('comms')}
-              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
-                activeAdminTab === 'comms'
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
-                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <Radio size={13} className="stroke-[2.5]" />
-                <span>Communication Hub</span>
-              </span>
-            </button>
-          </div>
-
-          {/* Support & Core Config Group */}
-          <div className="bg-white border border-slate-100 p-5 rounded-2xl shadow-sm space-y-2">
-            <h5 className="text-[10px] font-bold uppercase text-indigo-900 tracking-wider pb-1.5 border-b border-indigo-100/40 flex items-center gap-1.5 mb-2.5 bg-indigo-50/50 px-2.5 py-1.5 rounded-lg border border-indigo-100/60">
-              <span>🛠️</span>
-              <span>Support & Core Configs</span>
-            </h5>
-
-            <button
-              type="button"
-              onClick={() => setActiveAdminTab('ai-settings')}
-              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
-                activeAdminTab === 'ai-settings'
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
-                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <BrainCircuit size={13} className="stroke-[2.5] text-indigo-500" />
-                <span>AI Core Settings</span>
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveAdminTab('ai-prompts')}
-              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
-                activeAdminTab === 'ai-prompts'
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
-                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <FileText size={13} className="stroke-[2.5] text-amber-500" />
-                <span>AI Prompt Governance</span>
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveAdminTab('ai-playground')}
-              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
-                activeAdminTab === 'ai-playground'
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
-                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <Sparkles size={13} className="stroke-[2.5] text-emerald-500" />
-                <span>AI Sandbox Playground</span>
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveAdminTab('branding')}
-              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
-                activeAdminTab === 'branding'
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
-                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <Settings size={13} className="stroke-[2.5]" />
-                <span>Identity Configurations</span>
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveAdminTab('gmail')}
-              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
-                activeAdminTab === 'gmail'
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
-                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <Mail size={13} className="stroke-[2.5]" />
-                <span>School Gmail Manager</span>
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveAdminTab('inquiries')}
-              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
-                activeAdminTab === 'inquiries'
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
-                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <MessageSquare size={13} className="stroke-[2.5]" />
-                <span>Inquiries Counseling Inbox</span>
-              </span>
-              {statsSummary.totalPendingInq > 0 && (
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${activeAdminTab === 'inquiries' ? 'bg-white/20 text-white animate-pulse' : 'bg-red-50 text-red-500 animate-pulse'}`}>
-                  {statsSummary.totalPendingInq}
-                </span>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveAdminTab('activities')}
-              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
-                activeAdminTab === 'activities'
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
-                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <Clock size={13} className="stroke-[2.5]" />
-                <span>Live Interaction Telemetry</span>
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveAdminTab('settings')}
-              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
-                activeAdminTab === 'settings'
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
-                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <Shield size={13} className="stroke-[2.5]" />
-                <span>Roles & Permissions Matrix</span>
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveAdminTab('moderation')}
-              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
-                activeAdminTab === 'moderation'
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
-                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <Eye size={13} className="stroke-[2.5]" />
-                <span>Moderation Queue</span>
-              </span>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${activeAdminTab === 'moderation' ? 'bg-white/20 text-white' : 'bg-indigo-50 text-indigo-600'}`}>
-                {moderationQueue.length}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveAdminTab('db')}
-              className={`w-full text-left py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-between transition-all duration-300 cursor-pointer ${
-                activeAdminTab === 'db'
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/10'
-                  : 'bg-transparent text-slate-655 hover:bg-slate-50'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                <Database size={13} className="stroke-[2.5]" />
-                <span>Database Backup Manager</span>
-              </span>
-            </button>
+              <optgroup label="📈 Academic & Operations">
+                <option value="dashboard">📈 SaaS Analytics Center</option>
+                <option value="users">👥 Academic Directory</option>
+                <option value="curriculum">📖 Curriculum Align</option>
+                <option value="master-library">📚 Master Lesson Library</option>
+                <option value="ai-generator">✨ AI Notes Generator</option>
+                <option value="cbt">🏆 CBT Exam Banks</option>
+                <option value="payments">💳 Payments & Sims</option>
+                <option value="results">📄 Continuous Assessment (CA)</option>
+                <option value="session">📅 Academic Session & Term</option>
+                <option value="attendance">✅ Attendance Registry</option>
+                <option value="fees">💰 School Fees Ledgers</option>
+                <option value="comms">📻 Communication Hub</option>
+              </optgroup>
+              <optgroup label="🛠️ Support & Core Configs">
+                <option value="ai-settings">🧠 AI Core Settings</option>
+                <option value="ai-prompts">📜 AI Prompt Governance</option>
+                <option value="ai-playground">🧪 AI Sandbox Playground</option>
+                <option value="branding">⚙️ Identity Configurations</option>
+                <option value="gmail">📧 School Gmail Manager</option>
+                <option value="inquiries">📥 Inquiries Counseling Inbox</option>
+                <option value="activities">⏱️ Live Interaction Telemetry</option>
+                <option value="settings">🛡️ Roles & Permissions Matrix</option>
+                <option value="moderation">👁️ Moderation Queue</option>
+                <option value="db">🗄️ Database Backup Manager</option>
+              </optgroup>
+            </select>
+            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-500">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7"></path>
+              </svg>
+            </div>
           </div>
         </div>
+        <div className="text-xs font-bold text-slate-505 flex items-center gap-1.5">
+          <span>Active View:</span>
+          <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg font-black uppercase text-[10px] border border-indigo-100">
+            {activeAdminTab === 'dashboard' ? '📈 SaaS Analytics Center' :
+             activeAdminTab === 'users' ? '👥 Academic Directory' :
+             activeAdminTab === 'curriculum' ? '📖 Curriculum Align' :
+             activeAdminTab === 'master-library' ? '📚 Master Lesson Library' :
+             activeAdminTab === 'ai-generator' ? '✨ AI Notes Generator' :
+             activeAdminTab === 'cbt' ? '🏆 CBT Exam Banks' :
+             activeAdminTab === 'payments' ? '💳 Payments & Sims' :
+             activeAdminTab === 'results' ? '📄 Continuous Assessment (CA)' :
+             activeAdminTab === 'session' ? '📅 Academic Session & Term' :
+             activeAdminTab === 'attendance' ? '✅ Attendance Registry' :
+             activeAdminTab === 'fees' ? '💰 School Fees Ledgers' :
+             activeAdminTab === 'comms' ? '📻 Communication Hub' :
+             activeAdminTab === 'ai-settings' ? '🧠 AI Core Settings' :
+             activeAdminTab === 'ai-prompts' ? '📜 AI Prompt Governance' :
+             activeAdminTab === 'ai-playground' ? '🧪 AI Sandbox Playground' :
+             activeAdminTab === 'branding' ? '⚙️ Identity Configurations' :
+             activeAdminTab === 'gmail' ? '📧 School Gmail Manager' :
+             activeAdminTab === 'inquiries' ? '📥 Inquiries Counseling Inbox' :
+             activeAdminTab === 'activities' ? '⏱️ Live Interaction Telemetry' :
+             activeAdminTab === 'settings' ? '🛡️ Roles & Permissions Matrix' :
+             activeAdminTab === 'moderation' ? '👁️ Moderation Queue' :
+             activeAdminTab === 'db' ? '🗄️ Database Backup Manager' : activeAdminTab}
+          </span>
+        </div>
+      </div>
 
-        {/* Right Side Content Canvas */}
-        <div className="lg:col-span-9 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+      <div className="w-full">
+        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
           
           {/* TAB 1: SAAS ANALYTICS SYSTEM */}
           {activeAdminTab === 'dashboard' && (
@@ -2747,35 +2476,33 @@ ${(lessonContent.keyPoints || []).map((pt: string) => `- ${pt}`).join('\n')}
                             <p className="text-[8px] text-slate-400 font-bold uppercase tracking-wide">Due per billing term</p>
                           </div>
                         </td>
-                        <td className="p-4 text-right space-x-1.5">
-                          {usr.role === 'student' && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedIdCardUser(usr);
-                                showToast(`Synthesizing Digital ID Card for ${usr.fullName}...`, 'info');
-                              }}
-                              className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] uppercase rounded transition cursor-pointer"
-                            >
-                              🆔 Issue ID
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => handleStartEditUser(usr)}
-                            title="Edit school member profile"
-                            className="p-1 text-indigo-650 hover:bg-indigo-50 rounded transition cursor-pointer"
-                          >
-                            <Edit size={13} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteUser(usr.id, usr.fullName)}
-                            title="Delete user profile"
-                            className="p-1 text-red-500 hover:bg-red-50 rounded transition cursor-pointer"
-                          >
-                            <Trash2 size={13} />
-                          </button>
+                        <td className="p-4 text-right">
+                          <ActionDropdown
+                            label="Actions"
+                            align="right"
+                            items={[
+                              ...(usr.role === 'student' ? [{
+                                label: 'Issue Student ID',
+                                icon: () => <span>🆔</span>,
+                                onClick: () => {
+                                  setSelectedIdCardUser(usr);
+                                  showToast(`Synthesizing Digital ID Card for ${usr.fullName}...`, 'info');
+                                }
+                              }] : []),
+                              {
+                                label: 'Edit Profile',
+                                icon: Edit,
+                                onClick: () => handleStartEditUser(usr)
+                              },
+                              {
+                                label: 'Delete Profile',
+                                icon: Trash2,
+                                isDanger: true,
+                                confirmMessage: `Are you sure you want to delete profile for ${usr.fullName}?`,
+                                onClick: () => handleDeleteUser(usr.id, usr.fullName)
+                              }
+                            ]}
+                          />
                         </td>
                       </tr>
                     ))}
@@ -3200,25 +2927,27 @@ ${(lessonContent.keyPoints || []).map((pt: string) => `- ${pt}`).join('\n')}
 
                               <div className="pt-2 border-t border-slate-50 flex justify-between items-center">
                                 <span className="text-[9px] bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-full font-black border border-emerald-100 uppercase">{cur.status || 'Published'}</span>
-                                <div className="flex gap-1.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      handleStartEditCurriculum(cur);
-                                      setCurriculumActiveSubTab('edit');
-                                    }}
-                                    className="px-2 py-0.5 text-[9px] font-bold text-indigo-650 hover:bg-slate-50 border border-slate-200 rounded transition cursor-pointer bg-white"
-                                  >
-                                    Edit
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteCurriculum(cur.id)}
-                                    className="px-2 py-0.5 text-[9px] font-bold text-red-650 hover:bg-red-50 border border-red-100 rounded transition cursor-pointer bg-white"
-                                  >
-                                    Delete
-                                  </button>
-                                </div>
+                                <ActionDropdown
+                                  label="Actions"
+                                  align="right"
+                                  items={[
+                                    {
+                                      label: 'Edit',
+                                      icon: Edit,
+                                      onClick: () => {
+                                        handleStartEditCurriculum(cur);
+                                        setCurriculumActiveSubTab('edit');
+                                      }
+                                    },
+                                    {
+                                      label: 'Delete',
+                                      icon: Trash2,
+                                      isDanger: true,
+                                      confirmMessage: `Are you sure you want to delete curriculum record for "${cur.topic}"?`,
+                                      onClick: () => handleDeleteCurriculum(cur.id)
+                                    }
+                                  ]}
+                                />
                               </div>
                             </div>
                           ))}
@@ -3789,6 +3518,19 @@ ${(lessonContent.keyPoints || []).map((pt: string) => `- ${pt}`).join('\n')}
                 </div>
               )}
 
+            </div>
+          )}
+
+          {/* TAB: MASTER LESSON LIBRARY */}
+          {activeAdminTab === 'master-library' && (
+            <div className="space-y-6 animate-fade-in text-slate-800 text-left">
+              <MasterLessonLibrary
+                user={currentUser}
+                subjects={Object.values(SUBJECTS)}
+                classes={ALL_CLASSES.map(c => ({ id: c.toLowerCase().replace(/\s+/g, ''), name: c }))}
+                curriculums={curriculums}
+                onShowToast={showToast}
+              />
             </div>
           )}
 
@@ -4440,25 +4182,28 @@ ${(lessonContent.keyPoints || []).map((pt: string) => `- ${pt}`).join('\n')}
                         </div>
                       </div>
 
-                      <div className="pt-3 border-t border-slate-100 flex gap-2 justify-end">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedCbtForQuestions(ex);
-                            showToast(`Selected ${ex.title} question bank for interactive editing.`, 'info');
-                          }}
-                          className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider bg-indigo-650 text-white rounded hover:bg-indigo-720 transition cursor-pointer"
-                        >
-                          Configure Questions ({(cbtQuestionsRecord[ex.id] || []).length || ex.questions})
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteCbtExam(ex.id)}
-                          title="Remove exam sheet"
-                          className="p-1 text-red-500 hover:bg-red-50 rounded transition cursor-pointer"
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                      <div className="pt-3 border-t border-slate-100 flex justify-end">
+                        <ActionDropdown
+                          label="Options"
+                          align="right"
+                          items={[
+                            {
+                              label: `Configure Questions (${(cbtQuestionsRecord[ex.id] || []).length || ex.questions})`,
+                              icon: Settings,
+                              onClick: () => {
+                                setSelectedCbtForQuestions(ex);
+                                showToast(`Selected ${ex.title} question bank for interactive editing.`, 'info');
+                              }
+                            },
+                            {
+                              label: 'Remove Exam Sheet',
+                              icon: Trash2,
+                              isDanger: true,
+                              confirmMessage: `Are you sure you want to delete the exam sheet: "${ex.title}"?`,
+                              onClick: () => handleDeleteCbtExam(ex.id)
+                            }
+                          ]}
+                        />
                       </div>
                     </div>
                   ))}
@@ -4988,18 +4733,29 @@ ${(lessonContent.keyPoints || []).map((pt: string) => `- ${pt}`).join('\n')}
                         <td className="p-4 text-center font-bold text-indigo-900">{g.exam}</td>
                         <td className="p-4 font-black text-rose-700">{g.gpa}</td>
                         <td className="p-4 text-right">
-                          {g.status === 'Pending Approval' ? (
-                            <button
-                              onClick={() => handleApproveGrades(g.id)}
-                              className="px-3 py-1 bg-indigo-650 hover:bg-indigo-755 text-white font-extrabold text-[9px] uppercase tracking-wider rounded transition cursor-pointer"
-                            >
-                              Approve Sheet
-                            </button>
-                          ) : (
-                            <span className="text-[10px] font-black uppercase text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                              Published
-                            </span>
-                          )}
+                          <ActionDropdown
+                            label={g.status === 'Pending Approval' ? 'Pending' : 'Published'}
+                            align="right"
+                            items={[
+                              ...(g.status === 'Pending Approval' ? [{
+                                label: 'Approve Sheet',
+                                icon: Check,
+                                onClick: () => handleApproveGrades(g.id)
+                              }] : []),
+                              {
+                                label: 'Delete Record',
+                                icon: Trash2,
+                                isDanger: true,
+                                confirmMessage: `Are you sure you want to delete result for ${g.studentName}?`,
+                                onClick: () => {
+                                  const updatedGrades = grades.filter(item => item.id !== g.id);
+                                  setGrades(updatedGrades);
+                                  localStorage.setItem('system_grades', JSON.stringify(updatedGrades));
+                                  showToast(`Assessment of ${g.studentName} deleted!`, "success");
+                                }
+                              }
+                            ]}
+                          />
                         </td>
                       </tr>
                     ))}
@@ -5800,6 +5556,7 @@ ${(lessonContent.keyPoints || []).map((pt: string) => `- ${pt}`).join('\n')}
           {activeAdminTab === 'ai-settings' && (
             <AISettings 
               appConfig={currentConfig}
+              adminFetch={adminFetch}
               onUpdateConfig={async (updatedConfig) => {
                 onConfigChange(updatedConfig);
                 showToast('AI Settings updated successfully.', 'success');

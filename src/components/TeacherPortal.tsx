@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { ActionDropdown } from './ActionDropdown';
 import { 
   Users, CheckSquare, Plus, Trash2, BrainCircuit, Check, Loader2, 
   Printer, Clock, Sparkles, BookOpen, TrendingUp, X, Percent, 
@@ -8,6 +9,7 @@ import {
 import { User, ClassLevel, TeacherClassSetup, TeacherStudent, AIExam, QuizQuestion } from '../types';
 import { getSubjectsForClass, getWeeklyTopicTitle, getLessonContent } from '../data/curriculum';
 import { rtdbGet, rtdbSet, rtdbUpdate, NODES, getCanonicalSubjectId, getSchemePath } from '../lib/rtdbService';
+import { SidebarMenu } from './SidebarMenu';
 
 interface TeacherPortalProps {
   user: User;
@@ -15,6 +17,8 @@ interface TeacherPortalProps {
   isPro: boolean;
   onPaymentTrigger: () => void;
   proPrice?: string;
+  activeSubTab?: 'roster' | 'attendance' | 'exam-maker' | 'grader' | 'reports' | 'curriculum-generator';
+  setActiveSubTab?: (tab: any) => void;
 }
 
 // Initial Nigerian mock names for instant classroom bootstrapping
@@ -25,8 +29,18 @@ const DEMO_STUDENT_NAMES = [
   { name: 'Ngozi Adebayo', email: 'ngozi.adebayo@school.ng' }
 ];
 
-export function TeacherPortal({ user, onNavigateToHome, isPro, onPaymentTrigger, proPrice = '₦5,000' }: TeacherPortalProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'roster' | 'attendance' | 'exam-maker' | 'grader' | 'reports' | 'curriculum-generator'>('roster');
+export function TeacherPortal({ 
+  user, 
+  onNavigateToHome, 
+  isPro, 
+  onPaymentTrigger, 
+  proPrice = '₦5,000',
+  activeSubTab: propsActiveSubTab,
+  setActiveSubTab: propsSetActiveSubTab
+}: TeacherPortalProps) {
+  const [localActiveSubTab, setLocalActiveSubTab] = useState<'roster' | 'attendance' | 'exam-maker' | 'grader' | 'reports' | 'curriculum-generator'>('roster');
+  const activeSubTab = propsActiveSubTab !== undefined ? propsActiveSubTab : localActiveSubTab;
+  const setActiveSubTab = propsSetActiveSubTab !== undefined ? propsSetActiveSubTab : setLocalActiveSubTab;
   
   // Roster Class Level State
   const [classLevel, setClassLevel] = useState<ClassLevel>('SS 1');
@@ -1033,7 +1047,20 @@ ${generatedNote.homeworkAssignment || ''}
   };
 
   return (
-    <div className="space-y-6 animate-fade-in font-sans print:bg-white print:p-0">
+    <div className="flex flex-col md:flex-row min-h-screen bg-slate-50 w-full animate-fade-in font-sans print:bg-white print:p-0">
+      {/* Sidebar Navigation */}
+      <div className="hidden md:block h-screen sticky top-0 shrink-0 print:hidden bg-slate-50">
+        <SidebarMenu 
+          currentUser={user}
+          activeTab="teacher"
+          setActiveTab={() => {}}
+          activeSubTab={activeSubTab}
+          setActiveSubTab={setActiveSubTab}
+        />
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 p-6 space-y-6 overflow-y-auto">
       
       {/* Upper Brand Section (Hide during printing) */}
       <div className="bg-white rounded-3xl border border-slate-150 p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs print:hidden">
@@ -1076,8 +1103,8 @@ ${generatedNote.homeworkAssignment || ''}
         </div>
       </div>
 
-      {/* Classroom Setup Selector Header (Hide during printing) */}
-      <div className="bg-slate-100/50 p-1.5 rounded-2xl flex flex-wrap gap-1.5 border border-slate-200/50 print:hidden">
+      {/* Classroom Setup Selector Header (Hide during printing - Deactivated in favor of sidebar) */}
+      {false && <div className="bg-slate-100/50 p-1.5 rounded-2xl flex flex-wrap gap-1.5 border border-slate-200/50 print:hidden">
         <button
           onClick={() => setActiveSubTab('roster')}
           className={`px-4 py-2 text-xs font-bold rounded-xl transition flex items-center gap-2 cursor-pointer ${
@@ -1132,7 +1159,7 @@ ${generatedNote.homeworkAssignment || ''}
           <Sparkles size={14} className="text-violet-600 animate-pulse" />
           NERDC Curriculum Generator
         </button>
-      </div>
+      </div>}
 
       {/* Subtab Content Panels */}
 
@@ -1206,29 +1233,25 @@ ${generatedNote.homeworkAssignment || ''}
                             <td className="py-3 px-2 text-center font-bold">
                               {Object.keys(student.termScores).length}
                             </td>
-                            <td className="py-3 px-2">
-                              <div className="flex items-center justify-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => handleEditStudentSelect(student)}
-                                  className={`p-1.5 rounded-lg transition-all ${
-                                    editingStudentId === student.id
-                                      ? 'bg-blue-105 text-blue-700 font-bold border border-blue-200'
-                                      : 'text-slate-400 hover:text-blue-600 hover:bg-slate-100'
-                                  }`}
-                                  title="Edit Student Profile"
-                                >
-                                  <Edit size={13} />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveStudent(student.id)}
-                                  className="text-slate-400 hover:text-rose-600 p-1.5 rounded-lg transition hover:bg-slate-100"
-                                  title="Delete Student"
-                                >
-                                  <Trash2 size={13} />
-                                </button>
-                              </div>
+                            <td className="py-3 px-2 text-center">
+                              <ActionDropdown
+                                label="Actions"
+                                align="right"
+                                items={[
+                                  {
+                                    label: 'Edit Profile',
+                                    icon: Edit,
+                                    onClick: () => handleEditStudentSelect(student)
+                                  },
+                                  {
+                                    label: 'Remove Student',
+                                    icon: Trash2,
+                                    isDanger: true,
+                                    confirmMessage: `Are you sure you want to remove "${student.name}" from the roster?`,
+                                    onClick: () => handleRemoveStudent(student.id)
+                                  }
+                                ]}
+                              />
                             </td>
                           </tr>
                         );
@@ -1539,21 +1562,25 @@ ${generatedNote.homeworkAssignment || ''}
                         <h4 className="text-[11px] font-black text-slate-800 truncate">{ex.title}</h4>
                         <p className="text-[9px] text-slate-400 mt-1">Class: {ex.classLevel} | {ex.questions.length} Items</p>
                       </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <button
-                          title="Download Exam"
-                          onClick={() => handleDownloadExam(ex)}
-                          className="text-slate-500 hover:text-indigo-600 transition cursor-pointer"
-                        >
-                          <Download size={12} />
-                        </button>
-                        <button
-                          title="Delete Exam"
-                          onClick={() => handleDeleteExam(ex.id)}
-                          className="text-slate-400 hover:text-rose-600 transition cursor-pointer"
-                        >
-                          <Trash2 size={12} />
-                        </button>
+                      <div className="flex items-center shrink-0">
+                        <ActionDropdown
+                          label="Actions"
+                          align="right"
+                          items={[
+                            {
+                              label: 'Download Blueprint',
+                              icon: Download,
+                              onClick: () => handleDownloadExam(ex)
+                            },
+                            {
+                              label: 'Delete Blueprint',
+                              icon: Trash2,
+                              isDanger: true,
+                              confirmMessage: `Are you sure you want to delete the exam "${ex.title}"?`,
+                              onClick: () => handleDeleteExam(ex.id)
+                            }
+                          ]}
+                        />
                       </div>
                     </div>
                   ))}
@@ -1851,22 +1878,22 @@ ${generatedNote.homeworkAssignment || ''}
               </select>
 
               {activeReportStudent && (
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleDownloadReportCard(activeReportStudent)}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 transition shadow-md shadow-emerald-500/10 cursor-pointer"
-                  >
-                    <Download size={13} />
-                    Download Report Card
-                  </button>
-                  <button
-                    onClick={handlePrint}
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-750 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 transition shadow-md shadow-indigo-500/10 cursor-pointer"
-                  >
-                    <Printer size={13} />
-                    Print Report Card
-                  </button>
-                </div>
+                <ActionDropdown
+                  label="Report Actions"
+                  align="right"
+                  items={[
+                    {
+                      label: 'Download Report Card',
+                      icon: Download,
+                      onClick: () => handleDownloadReportCard(activeReportStudent)
+                    },
+                    {
+                      label: 'Print Report Card',
+                      icon: Printer,
+                      onClick: handlePrint
+                    }
+                  ]}
+                />
               )}
             </div>
           </div>
@@ -2232,22 +2259,22 @@ ${generatedNote.homeworkAssignment || ''}
                 <div className="space-y-4">
                   {/* Action row */}
                   <div className="bg-white rounded-2xl border border-slate-150 p-4 shadow-sm flex justify-between items-center print:hidden">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => window.print()}
-                        className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-950 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-xs transition cursor-pointer"
-                      >
-                        <Printer size={13} />
-                        Print Note Sheet
-                      </button>
-                      <button
-                        onClick={handleCopyNoteToClipboard}
-                        className="px-3.5 py-1.5 border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold rounded-lg text-xs flex items-center gap-1.5 transition cursor-pointer"
-                      >
-                        <Download size={13} />
-                        Copy Raw Text
-                      </button>
-                    </div>
+                    <ActionDropdown
+                      label="Note Actions"
+                      align="left"
+                      items={[
+                        {
+                          label: 'Print Note Sheet',
+                          icon: Printer,
+                          onClick: () => window.print()
+                        },
+                        {
+                          label: 'Copy Raw Text',
+                          icon: Download,
+                          onClick: handleCopyNoteToClipboard
+                        }
+                      ]}
+                    />
 
                     <div className="text-[10px] text-slate-400 font-semibold italic flex items-center gap-1">
                       <div className="w-2 h-2 bg-emerald-500 rounded-full animate-ping" />
@@ -2846,6 +2873,7 @@ ${generatedNote.homeworkAssignment || ''}
         </div>
       )}
 
+      </div>
     </div>
   );
 }

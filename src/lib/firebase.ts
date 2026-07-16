@@ -9,7 +9,8 @@ const firestoreDbId = (firebaseConfig as any).firestoreDatabaseId || "(default)"
 
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
-}, firestoreDbId); /* CRITICAL: The app will break without this line */
+  useFetchCallbacks: true,
+} as any, firestoreDbId); /* CRITICAL: The app will break without this line */
 export const auth = getAuth(app);
 
 const databaseUrlFromConfig = (firebaseConfig as any).databaseURL || "https://livingstoneedu-17aad-default-rtdb.firebaseio.com/";

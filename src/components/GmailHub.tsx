@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ActionDropdown } from './ActionDropdown';
 import { 
   googleSignIn, 
   initAuth, 
@@ -812,24 +813,25 @@ export function GmailHub({ user }: GmailHubProps) {
                               <span>Inbox</span>
                             </button>
 
-                            <div className="flex items-center gap-1.5 ml-auto">
-                              <button
-                                onClick={() => toggleUnreadLabel(selectedEmail)}
-                                className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-indigo-600 flex items-center gap-1 border border-transparent hover:border-slate-200"
-                                title={selectedEmail.isUnread ? "Mark as Read" : "Mark as Unread"}
-                              >
-                                {selectedEmail.isUnread ? <MailOpen size={14} /> : <Mail size={14} />}
-                                <span className="text-[10px] font-bold uppercase">{selectedEmail.isUnread ? "Mark Read" : "Mark Unread"}</span>
-                              </button>
-                              
-                              <button
-                                onClick={() => trashMessage(selectedEmail.id)}
-                                className="p-1.5 hover:bg-rose-50 rounded-lg text-slate-500 hover:text-red-650 flex items-center gap-1 border border-transparent hover:border-red-100"
-                                title="Trash message"
-                              >
-                                <Trash2 size={14} />
-                                <span className="text-[10px] font-bold uppercase">Trash</span>
-                              </button>
+                            <div className="flex items-center ml-auto">
+                              <ActionDropdown
+                                label="Actions"
+                                align="right"
+                                items={[
+                                  {
+                                    label: selectedEmail.isUnread ? "Mark as Read" : "Mark as Unread",
+                                    icon: selectedEmail.isUnread ? MailOpen : Mail,
+                                    onClick: () => toggleUnreadLabel(selectedEmail)
+                                  },
+                                  {
+                                    label: "Trash Message",
+                                    icon: Trash2,
+                                    isDanger: true,
+                                    confirmMessage: "Are you sure you want to delete this email?",
+                                    onClick: () => trashMessage(selectedEmail.id)
+                                  }
+                                ]}
+                              />
                             </div>
                           </div>
 

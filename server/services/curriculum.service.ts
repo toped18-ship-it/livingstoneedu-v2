@@ -4,6 +4,7 @@ import { CURRICULUM_SYSTEM_PROMPT, getCurriculumUserPrompt } from '../prompts/cu
 import { safeParseJson } from '../utils/safeParseJson';
 import { Logger } from '../utils/logger';
 import { CurriculumWeek } from '../types';
+import { generateLocalFallbackCurriculum } from '../utils/fallbackGenerator';
 
 export class CurriculumService {
   /**
@@ -72,7 +73,7 @@ export class CurriculumService {
       return weeks;
     } catch (error: any) {
       Logger.error('CurriculumService', 'Gemini curriculum generation failed. Serving high-fidelity standard fallbacks.', error);
-      return this.padOrTrimTo12Weeks([], subject);
+      return generateLocalFallbackCurriculum(subject, classLevel, term);
     }
   }
 

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { ActionDropdown } from '../ActionDropdown';
 import { 
   BookOpen, Plus, Search, Edit, Trash2, Download, Upload, Copy, 
   ChevronLeft, ChevronRight, Check, AlertCircle, FileText, CheckCircle2, RotateCcw
@@ -554,24 +555,24 @@ export function CurriculumManager({
                           )}
                         </td>
                         <td className="p-3 text-right">
-                          <div className="inline-flex gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => startEdit(item)}
-                              title="Edit Topic"
-                              className="p-1.5 border hover:bg-indigo-50 hover:text-indigo-650 rounded-lg cursor-pointer"
-                            >
-                              <Edit size={12} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteItem(item.id)}
-                              title="Delete Topic"
-                              className="p-1.5 border hover:bg-red-50 hover:text-red-600 rounded-lg cursor-pointer"
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
+                          <ActionDropdown
+                            label="Actions"
+                            align="right"
+                            items={[
+                              {
+                                label: 'Edit Topic',
+                                icon: Edit,
+                                onClick: () => startEdit(item)
+                              },
+                              {
+                                label: 'Delete Topic',
+                                icon: Trash2,
+                                isDanger: true,
+                                confirmMessage: `Are you sure you want to delete this topic: "${item.topic}"?`,
+                                onClick: () => handleDeleteItem(item.id)
+                              }
+                            ]}
+                          />
                         </td>
                       </tr>
                     ))}

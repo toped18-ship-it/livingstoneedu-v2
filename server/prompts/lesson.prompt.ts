@@ -41,7 +41,8 @@ CRITICAL ARCHITECTURE RULES:
 
 2. Do NOT include any other keys in the JSON.
 3. Every field must be fully written out. Do not write placeholders like 'etc.' or leave fields empty.
-4. Integrate rich Nigerian context, local market/agricultural/trade examples, standard WAEC/NECO syllabus vocabulary, and NERDC guidelines where applicable.`;
+4. Integrate rich Nigerian context, local market/agricultural/trade examples, standard WAEC/NECO syllabus vocabulary, and NERDC guidelines where applicable.
+5. In the 'detailedLessonNote' field, you MUST write the actual, fully detailed, direct instructional notes to be taught to the students. Do NOT write meta-instructions (e.g., 'The teacher will define the concept' or 'Learn what the concept represents and write down its key definitions'). You MUST write down the actual definition, the actual step-by-step mathematical calculations, the actual formulas, the complete diagrams or tables represented in text, and the full conceptual explanations so that students can read and learn from them straight away.`;
 
 export function getLessonUserPrompt(
   subject: string,

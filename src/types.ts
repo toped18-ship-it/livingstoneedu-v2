@@ -113,3 +113,38 @@ export interface FAQItem {
   answer: string;
   category: 'General' | 'Curriculum' | 'Billing' | 'Technical';
 }
+
+export interface LessonRecord {
+  id?: string;
+  classLevel: string; // e.g., 'Primary 1', 'JSS 2'
+  subject: string; // e.g., 'Mathematics', 'English Studies'
+  term: string; // e.g., 'FirstTerm', 'SecondTerm'
+  week: string; // e.g., 'Week3', 'Week 3'
+  topic: string;
+  subtopics?: string;
+  learningObjectives?: string;
+  behaviouralObjectives?: string;
+  previousKnowledge?: string;
+  instructionalMaterials?: string;
+  referenceBooks?: string;
+  introduction?: string;
+  detailedLessonDevelopment: string; // Maps to detailedNote or note body
+  examples?: string;
+  workedSolutions?: string;
+  teacherActivities?: string;
+  studentActivities?: string;
+  evaluation?: string;
+  assignment?: string;
+  summary?: string;
+  keywords?: string;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  reviewedBy?: string;
+  status: 'Draft' | 'Teacher Review' | 'Approved' | 'Published';
+  difficulty?: 'Beginner' | 'Intermediate' | 'Advanced';
+  estimatedDuration?: string;
+  tags?: string[];
+  quizQuestions?: QuizQuestion[];
+  theoryQuestions?: { question: string; modelAnswer: string; markingSchemeName?: string }[];
+}

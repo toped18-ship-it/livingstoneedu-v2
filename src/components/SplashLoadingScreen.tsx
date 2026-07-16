@@ -30,7 +30,7 @@ export function SplashLoadingScreen({
   useEffect(() => {
     const interval = setInterval(() => {
       setStatusIndex((prev) => (prev < ACADEMIC_STATUSES.length - 1 ? prev + 1 : prev));
-    }, 1300);
+    }, 350);
     return () => clearInterval(interval);
   }, []);
 
@@ -116,7 +116,7 @@ export function SplashLoadingScreen({
             className="h-full bg-gradient-to-r from-sky-400 to-indigo-400 shadow-[0_0_8px_rgba(56,189,248,0.8)]"
             initial={{ width: '0%' }}
             animate={{ width: '100%' }}
-            transition={{ duration: 10.0, ease: 'easeInOut' }}
+            transition={{ duration: 2.5, ease: 'easeInOut' }}
           />
         </div>
 

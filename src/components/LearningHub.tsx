@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { ActionDropdown } from './ActionDropdown';
 import { ClassLevel, User, Subject, TermNumber, WeekNumber, LessonProgress, LessonContent } from '../types';
 import { getSubjectsForClass, getWeeklyTopicTitle, getLessonContent } from '../data/curriculum';
 import { SubjectIcon } from './SubjectIcon';
@@ -266,81 +267,126 @@ export function LearningHub({
   const [editVocab, setEditVocab] = useState('');
   const [editMaterials, setEditMaterials] = useState('');
 
-  // Automatically sync/load the compiled AI lesson note from the Realtime Database if it was published by the admin
-  React.useEffect(() => {
+  // Asynchronous robust fetcher from Master Lesson Library node with offline caching & automatic online sync
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [offlineCached, setOfflineCached] = useState(false);
+
+  const loadLessonFromRTDB = async () => {
     if (!selectedSubject) {
       setAiLessonNote(null);
       return;
     }
-    const termStr = selectedTerm === 1 ? '1st Term' : selectedTerm === 2 ? '2nd Term' : '3rd Term';
-    const rtItem = (curriculums || []).find((c) => {
-      const matchClass = c.class === user.classLevel;
-      const matchSubject = c.subject?.toLowerCase() === selectedSubject.name?.toLowerCase() || c.subject?.toLowerCase() === selectedSubject.id?.toLowerCase();
-      const matchTerm = c.term === termStr;
-      const matchWeek = Number(c.week) === selectedWeek;
-      return matchClass && matchSubject && matchTerm && matchWeek;
-    });
+    const classKey = (user.classLevel || 'SS 1').replace(/\s+/g, '');
+    const subjectKey = selectedSubject.name;
+    const termKey = selectedTerm === 1 ? 'FirstTerm' : selectedTerm === 2 ? 'SecondTerm' : 'ThirdTerm';
+    const weekKey = `Week${selectedWeek}`;
 
-    if (rtItem && (rtItem.detailedLessonNote || rtItem.introduction)) {
-      setAiLessonNote(formatLessonNote(rtItem));
-    } else {
-      const storageKey = `livingstone_custom_lesson_note_${user.id}_${user.classLevel}_${selectedSubject.id}_${selectedTerm}_${selectedWeek}`;
-      const cached = localStorage.getItem(storageKey);
+    const cacheKey = `livingstone_lesson_cache_${classKey}_${subjectKey.replace(/\s+/g, '_')}_${termKey}_${weekKey}`;
+
+    setIsGeneratingAI(true);
+    setAiError('');
+    setOfflineCached(false);
+
+    try {
+      const lessonPath = `lessonNotes/${classKey}/${subjectKey}/${termKey}/${weekKey}`;
+      const record = await rtdbGet(lessonPath);
+
+      if (record && record.status === 'Published') {
+        const formatted = formatLessonNote(record);
+        setAiLessonNote(formatted);
+        localStorage.setItem(cacheKey, JSON.stringify(formatted));
+      } else {
+        // Fallback check to see if we have an offline cached copy
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          try {
+            setAiLessonNote(JSON.parse(cached));
+            setOfflineCached(true);
+            setAiError('');
+          } catch {
+            setAiLessonNote(null);
+            setAiError('This lesson has not yet been published.');
+          }
+        } else {
+          setAiLessonNote(null);
+          setAiError('This lesson has not yet been published.');
+        }
+      }
+    } catch (err: any) {
+      console.warn("[LearningHub] Database retrieval failed, falling back to local storage cache:", err);
+      const cached = localStorage.getItem(cacheKey);
       if (cached) {
         try {
-          setAiLessonNote(formatLessonNote(JSON.parse(cached)));
+          setAiLessonNote(JSON.parse(cached));
+          setOfflineCached(true);
+          setAiError('');
         } catch {
           setAiLessonNote(null);
+          setAiError('This lesson has not yet been published.');
         }
       } else {
         setAiLessonNote(null);
+        setAiError('This lesson has not yet been published.');
       }
+    } finally {
+      setIsGeneratingAI(false);
     }
-    setIsEditingLocal(false);
-  }, [selectedSubject, selectedTerm, selectedWeek, curriculums, user.classLevel]);
+  };
 
-  // Retrieve current active lesson content using generator or real-time admin sync
+  React.useEffect(() => {
+    const handleOnline = () => {
+      setIsOffline(false);
+      loadLessonFromRTDB();
+    };
+    const handleOffline = () => {
+      setIsOffline(true);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    loadLessonFromRTDB();
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [selectedSubject, selectedTerm, selectedWeek, user.classLevel]);
+
+  // Retrieve current active lesson content using master lesson library or fallback
   const lesson: LessonContent = useMemo(() => {
     if (!selectedSubject) return { title: '', objectives: [], body: [], keyPoints: [], quiz: [] };
 
-    // Check if there is an override in real-time curriculums from RTDB
-    const termStr = selectedTerm === 1 ? '1st Term' : selectedTerm === 2 ? '2nd Term' : '3rd Term';
-    const rtItem = (curriculums || []).find((c) => {
-      const matchClass = c.class === user.classLevel;
-      const matchSubject = c.subject?.toLowerCase() === selectedSubject.name?.toLowerCase() || c.subject?.toLowerCase() === selectedSubject.id?.toLowerCase();
-      const matchTerm = c.term === termStr;
-      const matchWeek = Number(c.week) === selectedWeek;
-      return matchClass && matchSubject && matchTerm && matchWeek;
-    });
-
-    if (rtItem) {
-      const title = rtItem.topic || rtItem.title || `Week ${selectedWeek} Topic`;
+    if (aiLessonNote) {
+      const title = aiLessonNote.topic || `Week ${selectedWeek} Topic`;
       
       let body: string[] = [];
-      if (Array.isArray(rtItem.body)) {
-        body = rtItem.body;
-      } else if (typeof rtItem.details === 'string') {
-        body = rtItem.details.split('\n\n').map((p: any) => String(p).trim()).filter(Boolean);
-      } else if (typeof rtItem.body === 'string') {
-        body = rtItem.body.split('\n\n').map((p: any) => String(p).trim()).filter(Boolean);
+      if (typeof aiLessonNote.detailedLessonDevelopment === 'string') {
+        body = aiLessonNote.detailedLessonDevelopment.split('\n\n').map((p: any) => String(p).trim()).filter(Boolean);
+      } else if (typeof aiLessonNote.detailedLessonNote === 'string') {
+        body = aiLessonNote.detailedLessonNote.split('\n\n').map((p: any) => String(p).trim()).filter(Boolean);
+      } else if (typeof aiLessonNote.details === 'string') {
+        body = aiLessonNote.details.split('\n\n').map((p: any) => String(p).trim()).filter(Boolean);
+      } else if (Array.isArray(aiLessonNote.body)) {
+        body = aiLessonNote.body;
       } else {
-        body = [rtItem.details || 'No details provided yet.'];
+        body = [aiLessonNote.details || 'No details provided yet.'];
       }
 
       let objectives: string[] = [];
-      if (Array.isArray(rtItem.objectives)) {
-        objectives = rtItem.objectives;
-      } else if (typeof rtItem.objectives === 'string') {
-        objectives = rtItem.objectives.split('\n').map((o: any) => String(o).replace(/^[*-]\s*/, '').trim()).filter(Boolean);
+      if (typeof aiLessonNote.learningObjectives === 'string' && aiLessonNote.learningObjectives.trim()) {
+        objectives = aiLessonNote.learningObjectives.split('\n').map((o: any) => String(o).replace(/^[*-]\s*/, '').trim()).filter(Boolean);
+      } else if (Array.isArray(aiLessonNote.objectives)) {
+        objectives = aiLessonNote.objectives;
       } else {
         objectives = [`Understand the core concepts of ${title}`];
       }
 
       let keyPoints: string[] = [];
-      if (Array.isArray(rtItem.keyPoints)) {
-        keyPoints = rtItem.keyPoints;
-      } else if (typeof rtItem.keyPoints === 'string') {
-        keyPoints = rtItem.keyPoints.split('\n').map((kp: any) => String(kp).replace(/^[*-]\s*/, '').trim()).filter(Boolean);
+      if (typeof aiLessonNote.keywords === 'string' && aiLessonNote.keywords.trim()) {
+        keyPoints = aiLessonNote.keywords.split(',').map((k: any) => String(k).trim()).filter(Boolean);
+      } else if (Array.isArray(aiLessonNote.keyPoints)) {
+        keyPoints = aiLessonNote.keyPoints;
       } else {
         keyPoints = [
           `Active learning of ${title}`,
@@ -349,13 +395,10 @@ export function LearningHub({
       }
 
       let quiz: any[] = [];
-      if (Array.isArray(rtItem.quiz)) {
-        quiz = rtItem.quiz;
-      } else if (rtItem.questions && Array.isArray(rtItem.questions)) {
-        quiz = rtItem.questions;
-      } else {
-        const staticLesson = getLessonContent(user.classLevel, selectedSubject.id, selectedTerm, selectedWeek);
-        quiz = staticLesson?.quiz || [];
+      if (Array.isArray(aiLessonNote.quizQuestions)) {
+        quiz = aiLessonNote.quizQuestions;
+      } else if (Array.isArray(aiLessonNote.quiz)) {
+        quiz = aiLessonNote.quiz;
       }
 
       return {
@@ -368,7 +411,7 @@ export function LearningHub({
     }
 
     return getLessonContent(user.classLevel, selectedSubject.id, selectedTerm, selectedWeek);
-  }, [user.classLevel, selectedSubject, selectedTerm, selectedWeek, curriculums]);
+  }, [user.classLevel, selectedSubject, selectedTerm, selectedWeek, aiLessonNote]);
 
   // Is this specific combination of (Subject, Term, Week) marked as completed?
   const currentProgress = useMemo(() => {
@@ -1186,8 +1229,22 @@ export function LearningHub({
               );
             }
 
+            if (aiError === 'This lesson has not yet been published.' || (!aiLessonNote && !isGeneratingAI)) {
+              return (
+                <div className="bg-white p-8 rounded-3xl border border-slate-150 shadow-sm text-center py-20 space-y-4 animate-fade-in flex flex-col items-center">
+                  <div className="h-16 w-16 bg-amber-50 border border-amber-100 text-amber-550 rounded-full flex items-center justify-center">
+                    <AlertCircle size={32} />
+                  </div>
+                  <h3 className="text-lg font-black text-slate-900">This lesson has not yet been published.</h3>
+                  <p className="text-xs text-slate-500 max-w-sm">
+                    Please check back later or notify your teacher/administrator to publish the curriculum notes for Term {selectedTerm}, Week {selectedWeek}.
+                  </p>
+                </div>
+              );
+            }
+
             return (
-              <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-150 shadow-sm space-y-6 animate-fade-in">
+              <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-150 shadow-sm space-y-6 animate-fade-in text-left">
               
               {/* Heading */}
               <div className="border-b border-slate-100 pb-5 space-y-2">
@@ -1256,8 +1313,6 @@ export function LearningHub({
                 </ul>
               </div>
 
-
-
               {aiError && (
                 <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-xs font-semibold text-red-700 flex gap-2">
                   <AlertCircle size={15} className="shrink-0" />
@@ -1308,7 +1363,7 @@ export function LearningHub({
                         )}
                       </button>
 
-                       {(user?.role === 'admin' || user?.role === 'student' || !user?.role) && (
+                       {user?.role === 'admin' && (
                         <button
                           type="button"
                           onClick={handleGenerateAISyllabus}
@@ -1342,25 +1397,22 @@ export function LearningHub({
                         </button>
                       )}
 
-                      <button
-                        type="button"
-                        onClick={() => window.print()}
-                        className="bg-white border border-slate-200 hover:bg-indigo-50/20 text-slate-600 hover:text-indigo-600 text-[11px] font-bold py-1 px-2.5 rounded-lg flex items-center gap-1 transition cursor-pointer"
-                        title="Print / PDF Export"
-                      >
-                        <Printer size={12} />
-                        <span>Print</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleExportToWord}
-                        className="bg-white border border-slate-200 hover:bg-indigo-50/20 text-slate-600 hover:text-indigo-600 text-[11px] font-bold py-1 px-2.5 rounded-lg flex items-center gap-1 transition cursor-pointer"
-                        title="Word Export"
-                      >
-                        <Download size={12} />
-                        <span>Word</span>
-                      </button>
+                      <ActionDropdown
+                        label="Export"
+                        align="right"
+                        items={[
+                          {
+                            label: 'Print / Export PDF',
+                            icon: Printer,
+                            onClick: () => window.print()
+                          },
+                          {
+                            label: 'Export to Word',
+                            icon: Download,
+                            onClick: handleExportToWord
+                          }
+                        ]}
+                      />
                       
                       <button
                         type="button"

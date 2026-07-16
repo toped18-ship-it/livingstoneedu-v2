@@ -5,6 +5,7 @@ import { safeParseJson } from '../utils/safeParseJson';
 import { Logger } from '../utils/logger';
 import { LessonNote } from '../types';
 import { Type } from '@google/genai';
+import { generateLocalFallbackNote } from '../utils/fallbackGenerator';
 
 export class LessonService {
   /**
@@ -18,12 +19,15 @@ export class LessonService {
     subject: string,
     classLevel: string,
     term: string,
-    week: string
+    week: string,
+    focusTopic?: string
   ): Promise<LessonNote> {
-    Logger.info('LessonService', `Initiating Lesson Note Generation: Class=${classLevel}, Subject=${subject}, Term=${term}, ${week}`);
+    Logger.info('LessonService', `Initiating Lesson Note Generation: Class=${classLevel}, Subject=${subject}, Term=${term}, ${week}, focusTopic=${focusTopic}`);
 
-    // 1. Retrieve the stored topic from Firebase Realtime Database
-    let storedTopic = await FirebaseService.getStoredTopic(subject, classLevel, term, week);
+    // 1. Retrieve the stored topic from Firebase Realtime Database or use the provided focusTopic
+    let storedTopic = (focusTopic && focusTopic.trim() !== '') 
+      ? focusTopic.trim() 
+      : await FirebaseService.getStoredTopic(subject, classLevel, term, week);
 
     if (!storedTopic) {
       // Robust fallback lookup in case the curriculum is not generated yet (prevents immediate user blocks)
@@ -147,25 +151,7 @@ export class LessonService {
     } catch (error: any) {
       Logger.error('LessonService', `Gemini AI Lesson Note generation failed. Preparing high-fidelity local fallback...`, error);
       
-      // Strict Fallback satisfying the exact V2 AI RESPONSE format
-      const fallbackNote: LessonNote = {
-        topic: storedTopic,
-        detailedLessonNote: `## Lesson Note: ${storedTopic}
-
-### Introduction to ${storedTopic}
-In this lesson, we study **${storedTopic}**, which is an essential part of the **${subject}** curriculum for **${classLevel}** (${term}, ${week}). This lesson is designed in strict compliance with the National Educational Research and Development Council (NERDC) national guidelines.
-
-### Detailed Concept Explanations
-1. **Core Principles**: Understanding the core elements of ${storedTopic} is fundamental to mastering more advanced theoretical and practical applications in ${subject}.
-2. **Standard Procedures & Rules**:
-   - Step 1: Critically analyze the given numbers, words, equations, or context parameters.
-   - Step 2: Formulate standard NERDC-approved rules, mathematical calculations, or grammatical guidelines.
-   - Step 3: Solve or analyze step-by-step to arrive at verified outcomes.
-
-### Practical Local Context (Nigerian Integration)
-Within Nigeria, mastering ${storedTopic} enables us to address real-world community challenges, optimize trade transactions across local markets, improve mechanical or agricultural efficiencies, and communicate our ideas clearly. Grounding our studies in active domestic scenarios ensures we build practical skills for our national development and civic excellence.`
-      };
-
+      const fallbackNote = generateLocalFallbackNote(subject, classLevel, term, week, storedTopic);
       return fallbackNote;
     }
   }

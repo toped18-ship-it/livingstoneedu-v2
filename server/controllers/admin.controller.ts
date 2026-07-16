@@ -9,9 +9,43 @@ export class AdminController {
   static async getSecureSettings(req: Request, res: Response, next: NextFunction) {
     try {
       const config = await FirebaseService.getConfig();
-      const key = config.geminiApiKey || '';
-      const maskedKey = key ? `${key.substring(0, Math.min(6, key.length))}...${key.substring(Math.max(0, key.length - 4))}` : '';
-      return res.json({ geminiApiKey: maskedKey, hasKey: !!key });
+      const configKey = config.geminiApiKey || '';
+      const activeKey = configKey || process.env.GEMINI_API_KEY || '';
+      const maskedKey = configKey ? `${configKey.substring(0, Math.min(6, configKey.length))}...${configKey.substring(Math.max(0, configKey.length - 4))}` : '';
+      
+      let keyStatus: 'valid' | 'leaked' | 'invalid' | 'unknown' = 'unknown';
+      let statusDetails = '';
+      
+      if (activeKey) {
+        try {
+          const client = getGeminiClient(activeKey);
+          await client.models.generateContent({
+            model: 'gemini-3.5-flash',
+            contents: 'ping',
+            config: {
+              maxOutputTokens: 2,
+            },
+          });
+          keyStatus = 'valid';
+        } catch (error: any) {
+          const errMsg = error?.message || '';
+          const errStr = JSON.stringify(error) || '';
+          if (errMsg.includes('leaked') || errMsg.includes('API key was reported as leaked') || errStr.includes('leaked')) {
+            keyStatus = 'leaked';
+          } else {
+            keyStatus = 'invalid';
+          }
+          statusDetails = errMsg || 'Verification error';
+        }
+      }
+
+      return res.json({ 
+        geminiApiKey: maskedKey, 
+        hasKey: !!configKey, 
+        isUsingEnvKey: !configKey && !!process.env.GEMINI_API_KEY,
+        keyStatus,
+        statusDetails
+      });
     } catch (error: any) {
       next(error);
     }

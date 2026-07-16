@@ -17,6 +17,7 @@ import { PaymentModal } from './components/PaymentModal';
 import { AdminPanel } from './components/AdminPanel';
 import { SplashLoadingScreen } from './components/SplashLoadingScreen';
 import { PWAInstallBanner } from './components/PWAInstallBanner';
+import { SidebarMenu } from './components/SidebarMenu';
 import { syncUserProfile, syncLessonProgress } from './lib/firebaseSync';
 import { GraduationCap, LogOut, Home, BookOpen, HelpCircle, MessageSquare, ShieldCheck, Heart, Trophy, Award, Zap, Sparkles, Mail, Sun, Moon, Clock, X } from 'lucide-react';
 import { seedRtdbIfEmpty, rtdbSubscribe, rtdbSet, rtdbGet, NODES } from './lib/rtdbService';
@@ -54,6 +55,8 @@ export default function App() {
     }
     return 'home';
   });
+
+  const [activeAdminTab, setActiveAdminTab] = useState<'dashboard' | 'users' | 'curriculum' | 'cbt' | 'payments' | 'results' | 'branding' | 'inquiries' | 'activities' | 'gmail' | 'session' | 'attendance' | 'comms' | 'fees' | 'settings' | 'moderation' | 'db' | 'ai-generator' | 'master-library' | 'ai-settings' | 'ai-prompts' | 'ai-playground'>('dashboard');
 
   const helmetData = useMemo(() => {
     if (!currentUser) {
@@ -331,7 +334,7 @@ export default function App() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsSplashLoading(false);
-    }, 10000);
+    }, 2500);
     return () => clearTimeout(timer);
   }, []);
 
@@ -1110,8 +1113,8 @@ export default function App() {
               </div>
             </div>
 
-            {/* Desktop Navigation Links Selector */}
-            <nav className="hidden md:flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+            {/* Desktop Navigation Links (Deactivated in favor of sidebar) */}
+            {false && <nav className="hidden md:flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
               <button
                 type="button"
                 onClick={() => setActiveTab('home')}
@@ -1198,7 +1201,7 @@ export default function App() {
                   <span>Admin Panel</span>
                 </button>
               )}
-            </nav>
+            </nav>}
 
             {/* User Profile Summary trigger */}
             <div className="flex items-center gap-1.5 sm:gap-3">
@@ -1354,7 +1357,28 @@ export default function App() {
       </div>
 
       {/* 3. Main content body sections with responsive boundaries */}
-      <main className="flex-grow max-w-full w-full mx-auto px-4 sm:px-8 lg:px-12 py-8">
+      <div className="flex-grow flex flex-col md:flex-row w-full min-h-[calc(100vh-4rem)]">
+        {/* Sticky Sidebar (Desktop only) */}
+        {currentUser && (
+          <div className="hidden md:block h-[calc(100vh-4rem)] sticky top-16 shrink-0 print:hidden bg-white border-r border-slate-100/80 w-66 lg:w-72 overflow-y-auto">
+            <SidebarMenu 
+              currentUser={currentUser}
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              selectedSubjectId={selectedSubjectId}
+              setSelectedSubjectId={setSelectedSubjectId}
+              onClassChange={handleClassChange}
+              isPro={!!currentUser?.isPro}
+              onPaymentTrigger={() => setIsPaymentModalOpen(true)}
+              activeAdminTab={activeAdminTab}
+              setActiveAdminTab={setActiveAdminTab}
+            />
+          </div>
+        )}
+
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col min-w-0 bg-slate-50/10">
+          <main className="flex-grow max-w-full w-full mx-auto px-4 sm:px-8 lg:px-12 py-8">
         {isRefreshing ? (
           <div className="h-64 flex flex-col items-center justify-center space-y-2">
             <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -1452,6 +1476,8 @@ export default function App() {
                   currentConfig={appConfig}
                   onConfigChange={(newConfig) => setAppConfig(newConfig)}
                   currentUser={currentUser}
+                  activeAdminTab={activeAdminTab}
+                  setActiveAdminTab={setActiveAdminTab}
                 />
               ) : (
                 <div className="max-w-md mx-auto my-12 p-8 bg-white border border-red-150 rounded-2xl shadow-xl space-y-6 text-center animate-fade-in">
@@ -1479,6 +1505,8 @@ export default function App() {
           </>
         )}
       </main>
+        </div>
+      </div>
 
       {/* 4. Elegant footer with credits */}
       <footer className="bg-white border-t border-slate-150 py-8 text-center text-slate-500 space-y-3">
